@@ -1,8 +1,10 @@
-TARGET = blink
-TOP = Blink
-SCALA_PACKAGE = playground
+TARGET = rt68ice
+TOP = Rt68IceTopLevel
+SCALA_PACKAGE = rt68ice
 VERILOG_SOURCES = hw/gen/$(TOP).v
-WAVE_FILE = simWorkspace/Blink/test/wave.fst
+
+# TODO
+##WAVE_FILE = simWorkspace/Blink/test/wave.fst
 
 # ECP5 Specifics
 DEVICE  = --25k

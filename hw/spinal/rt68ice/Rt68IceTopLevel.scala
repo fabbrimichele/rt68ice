@@ -1,18 +1,17 @@
-package playground
+package rt68ice
 
 import spinal.core._
-import spinal.core.sim.SimDataPimper
 
 import scala.language.postfixOps
 
 //noinspection TypeAnnotation
 //noinspection ScalaWeakerAccess
-case class Blink() extends Component {
+case class Rt68IceTopLevel() extends Component {
   val io = new Bundle {
     val led = out Bits(3 bits)
   }
 
-  val clockCounter = Reg(UInt(24 bits)).init(0).simPublic()
+  val clockCounter = Reg(UInt(24 bits)).init(0)
   val ledCounter = Reg(UInt(3 bits)) init 0
 
   when(clockCounter === 12_500_000) {
@@ -25,10 +24,7 @@ case class Blink() extends Component {
   io.led := ledCounter.asBits
 }
 
-object BlinkVerilog extends App {
-  Config.spinal.generateVerilog(Blink())
+object Rt68IceTopLevelVerilog extends App {
+  Config.spinal.generateVerilog(Rt68IceTopLevel())
 }
 
-object BlinkVhdl extends App {
-  Config.spinal.generateVhdl(Blink())
-}
