@@ -1,0 +1,10 @@
+## IceSugar Pro
+* [IceSugar Pro official repository](https://github.com/wuxx/icesugar-pro)
+  * [Ext-Board Pin map](https://github.com/wuxx/icesugar-pro/blob/master/schematic/README.md#ext-board-pin-map)
+  * [Examples](https://github.com/wuxx/icesugar-pro/tree/master/src)
+* [PMOD Schematics](https://github.com/wuxx/icesugar/tree/master/schematic)
+* [Litex definition for IceSugar Pro](litex_boards/platforms/muselab_icesugar_pro.py)
+* [LPF Specification](https://github.com/danderson/ulxs/blob/main/lpf.md)
+* [Blog on Icesugar Pro - it refers to reset button](https://waxpple.github.io/posts/day15/)
+* [Another Blog on Icesugar Pro - it shows how to add a reset button](https://yodalee.me/en/2021/09/openfpga_uart/#reset-signal)
+* [FPGA based IBM-PC-XT](https://bit-hack.net/2025/11/10/fpga-based-ibm-pc-xt/)
