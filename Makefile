@@ -14,7 +14,7 @@ LPF     = hw/constraints/$(TOP).lpf
 all: $(TARGET).bit
 
 # 1. Generate Verilog from SpinalHDL (The bridge)
-$(VERILOG_SOURCES): hw/spinal/playground/*.scala
+$(VERILOG_SOURCES): hw/spinal/rt68ice/*.scala
 	sbt "runMain $(SCALA_PACKAGE).$(TOP)Verilog"
 
 # 2. Synthesis
