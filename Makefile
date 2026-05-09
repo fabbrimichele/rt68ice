@@ -2,6 +2,7 @@ TARGET = rt68ice
 TOP = Rt68IceTopLevel
 SCALA_PACKAGE = rt68ice
 VERILOG_SOURCES = hw/gen/$(TOP).v
+MERGED_VHDL = hw/gen/mergeRTL.vhd
 
 # TODO
 ##WAVE_FILE = simWorkspace/Blink/test/wave.fst
@@ -14,12 +15,15 @@ LPF     = hw/constraints/$(TOP).lpf
 all: $(TARGET).bit
 
 # 1. Generate Verilog from SpinalHDL (The bridge)
-$(VERILOG_SOURCES): hw/spinal/rt68ice/*.scala
+$(VERILOG_SOURCES) $(MERGED_VHDL): hw/spinal/rt68ice/*.scala
 	sbt "runMain $(SCALA_PACKAGE).$(TOP)Verilog"
 
 # 2. Synthesis
-$(TARGET).json: $(VERILOG_SOURCES)
-	yosys -p "synth_ecp5 -json $@" $(VERILOG_SOURCES)
+$(TARGET).json: $(VERILOG_TOP) $(MERGED_VHDL)
+	#yosys -p "synth_ecp5 -json $@" $(VERILOG_SOURCES)
+	yosys -m ghdl -p "ghdl -C --std=08 -C -fsynopsys -C --latches $(MERGED_VHDL) -e TG68KdotC_Kernel; \
+		read_verilog $(VERILOG_SOURCES); \
+		synth_ecp5 -top $(TOP) -json $@"
 
 # 3. Place & Route (Using the LPF file!)
 $(TARGET).config: $(TARGET).json
@@ -45,4 +49,4 @@ view-wave: simWorkspace/Blink/test/wave.fst
 		echo "Error: Waveform file not found. Run simulation first."; \
 	fi
 clean:
-	rm -f *.json *.config *.bit hw/gen/*.v
+	rm -f *.json *.config *.bit hw/gen/*.v hw/gen/*.vhd

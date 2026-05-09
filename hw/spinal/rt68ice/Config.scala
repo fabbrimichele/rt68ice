@@ -10,9 +10,7 @@ import scala.language.postfixOps
 object Config {
   def spinal = SpinalConfig(
     targetDirectory = "hw/gen",
-    defaultConfigForClockDomains = ClockDomainConfig(
-      resetKind = BOOT
-    ),
+    defaultConfigForClockDomains = ClockDomainConfig(resetKind = BOOT),
     defaultClockDomainFrequency = FixedFrequency(25 MHz),
     onlyStdLogicVectorAtTopLevelIo = false
   )
