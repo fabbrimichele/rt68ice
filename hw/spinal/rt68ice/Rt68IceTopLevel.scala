@@ -1,6 +1,7 @@
 package rt68ice
 
 import rt68ice.core._
+import rt68ice.memory.Mem16Bit
 import spinal.core._
 
 import scala.annotation.unused
@@ -26,15 +27,32 @@ case class Rt68IceTopLevel() extends Component {
   @unused
   val coreArea = new ClockingArea(coreClockDomain) {
     // CPU
-    val cpu = new TG68KdotC
-    cpu.io.data_in := B"x4E71" // NOP
-    cpu.io.IPL := B"111"
-    cpu.io.IPL_autovector := True // Do not ask peripheral for a vector number
-    cpu.io.berr := False
-    cpu.io.CPU := B"00" // 68000, let's start simple
+    val cpu = new M68KSync
+    cpu.io.ipl := B"111"
+    cpu.io.busErr := False
+
+    // Mapping - TODO: move to a separate component
+    val sectionAddress = cpu.io.address(31 downto 11).asUInt // 2KB each memory section
+    val romSel = Bool()
+    val ledSel = Bool()
+
+    romSel := False
+    ledSel := False
+    when (sectionAddress === 0) {       //    0 - 2048
+      romSel := True
+    } elsewhen(sectionAddress === 1) {  // 2048 - 4096
+      ledSel := True
+    }
+
+    val rom = Mem16Bit(1024, Some("blink.hex")) // 2 KB
+    rom.io.address := cpu.io.address
+    cpu.io.dataIn := rom.io.dataOut
+    rom.io.sel := romSel
 
     // LED Device
-    io.led := cpu.io.addr_out(24 downto 22)
+    val ledReg = Reg(Bits(16 bits)) init 0
+    when(ledSel) { ledReg := cpu.io.dataOut }
+    io.led := ledReg(2 downto 0)
   }
 }
 

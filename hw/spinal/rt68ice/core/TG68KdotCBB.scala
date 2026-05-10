@@ -6,7 +6,7 @@ import scala.language.postfixOps
 
 //noinspection TypeAnnotation
 //noinspection ScalaWeakerAccess
-class TG68KdotC extends BlackBox {
+class TG68KdotCBB extends BlackBox {
   val io = new Bundle {
     val clk						  = in Bool()
     val nReset				  = in Bool()
