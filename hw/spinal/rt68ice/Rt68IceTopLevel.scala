@@ -14,18 +14,11 @@ case class Rt68IceTopLevel() extends Component {
     val led = out Bits(3 bits)
   }
 
-  // Reset
-  val reset = Reset(resetCycles = 25000) // 1 ms at 25 MHz
-
-  // Domain with reset
-  val coreClockDomain = ClockDomain.current.copy(
-    config = ClockDomainConfig(resetKind = SYNC),
-    reset = reset.io.resetOut
-  )
+  val clockCtrl = ClockCtrl()
 
   // Area with reset
   @unused
-  val coreArea = new ClockingArea(coreClockDomain) {
+  val coreArea = new ClockingArea(clockCtrl.clk20Domain) {
     // CPU
     val cpu = new M68KSync
     cpu.io.ipl := B"111"

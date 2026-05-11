@@ -4,6 +4,7 @@ TOP = Rt68IceTopLevel
 SCALA_PACKAGE = rt68ice
 VERILOG_SOURCES = hw/gen/$(TOP).v
 MERGED_VHDL = hw/gen/mergeRTL.vhd
+MERGED_VERILOG = hw/gen/mergeRTL.v
 # TODO
 ##WAVE_FILE = simWorkspace/Blink/test/wave.fst
 # ECP5 Specifics
@@ -30,12 +31,12 @@ $(VERILOG_SOURCES) $(MERGED_VHDL): hw/spinal/rt68ice/*.scala rom
 $(TARGET).json: $(VERILOG_TOP) $(MERGED_VHDL)
 	#yosys -p "synth_ecp5 -json $@" $(VERILOG_SOURCES)
 	yosys -m ghdl -p "ghdl -C --std=08 -C -fsynopsys -C --latches $(MERGED_VHDL) -e TG68KdotC_Kernel; \
-		read_verilog $(VERILOG_SOURCES); \
+		read_verilog $(VERILOG_SOURCES) $(MERGED_VERILOG); \
 		synth_ecp5 -top $(TOP) -json $@"
 
 # 3. Place & Route (Using the LPF file!)
 $(TARGET).config: $(TARGET).json
-	nextpnr-ecp5 $(DEVICE) $(PACKAGE) --speed 6 --json $< --textcfg $@ --lpf $(LPF) --freq 65
+	nextpnr-ecp5 $(DEVICE) $(PACKAGE) --speed 6 --json $< --textcfg $@ --lpf $(LPF) --freq 30
 
 # 4. Bitstream
 $(TARGET).bit: $(TARGET).config
