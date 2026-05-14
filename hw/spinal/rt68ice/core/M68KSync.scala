@@ -38,9 +38,11 @@ case class M68KSync(cpuType: M68KType = M68000, autovector: Boolean = true) exte
   // Assign IO
   io.address := tg68kernel.io.addr_out
   io.dataOut := tg68kernel.io.data_write
+  /*
   io.wr := !tg68kernel.io.nWr
   io.uds := !tg68kernel.io.nUDS
   io.lds := !tg68kernel.io.nLDS
+  */
 
   tg68kernel.io.data_in := io.dataIn
   tg68kernel.io.IPL := io.ipl
@@ -80,4 +82,12 @@ case class M68KSync(cpuType: M68KType = M68000, autovector: Boolean = true) exte
     tg68kernel.io.clkena_in := True
     isWaiting := False
   }
+
+  // 4. IMPORTANT: Gate the External Write signal
+  // Only allow 'io.wr' to be seen by the memory when isWaiting is True.
+  // This ensures the write happens on the SECOND clock cycle, after the
+  // CPU has had time to stabilize the data and address.
+  io.wr  := !tg68kernel.io.nWr  && isWaiting // Only enable write during the wait cycle
+  io.uds := !tg68kernel.io.nUDS && isWaiting
+  io.lds := !tg68kernel.io.nLDS && isWaiting
 }

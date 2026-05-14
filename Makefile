@@ -17,7 +17,7 @@ ASM_SRC_DIR = sw/fw/asm
 BIN_GEN_DIR = hw/gen
 HEX_SPINAL_DIR = hw/spinal/rt68ice/memory
 HEX_CLASS_DIR = target/scala-2.13/classes/rt68ice/memory
-ASSEMBLIES = blink
+ASSEMBLIES = blink mem_test
 
 .PHONY: all clean rom prog prog-flash view-wave
 
@@ -50,6 +50,9 @@ prog: # $(TARGET).bit
 # 5. Load to FLASH (permanent)
 prog-flash: $(TARGET).bit
 	openFPGALoader -f -c cmsisdap --vid=0x1d50 --pid=0x602b $<
+
+reset:
+	openFPGALoader -c cmsisdap --vid=0x1d50 --pid=0x602b --reset
 
 view-wave: simWorkspace/Blink/test/wave.fst
 	@if [ -f $(WAVE_FILE) ]; then \

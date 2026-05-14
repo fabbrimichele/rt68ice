@@ -9,7 +9,7 @@ import scala.language.postfixOps
 
 //noinspection TypeAnnotation
 //noinspection ScalaWeakerAccess
-case class Rt68IceTopLevel() extends Component {
+case class Rt68IceTopLevel(romFile: String) extends Component {
   val io = new Bundle {
     val led = out Bits(3 bits)
   }
@@ -28,29 +28,53 @@ case class Rt68IceTopLevel() extends Component {
     val sectionAddress = cpu.io.address(31 downto 11).asUInt // 2KB each memory section
     val romSel = Bool()
     val ledSel = Bool()
+    val ramSel = Bool()
 
     romSel := False
     ledSel := False
+    ramSel := False
     when (sectionAddress === 0) {       //    0 - 2048
       romSel := True
     } elsewhen(sectionAddress === 1) {  // 2048 - 4096
       ledSel := True
+    } elsewhen(sectionAddress === 2) {  // 4096 - 6144
+      ramSel := True
     }
 
-    val rom = Mem16Bit(1024, Some("blink.hex")) // 2 KB
-    rom.io.address := cpu.io.address
-    cpu.io.dataIn := rom.io.dataOut
+    // ROM
+    val rom = Mem16Bit(sizeInWords = 1024, initFile = Some(romFile), readOnly = true)
     rom.io.sel := romSel
+    rom.io.wr := cpu.io.wr
+    rom.io.uds := cpu.io.uds
+    rom.io.lds := cpu.io.lds
+    rom.io.address := cpu.io.address
+    rom.io.dataIn := cpu.io.dataOut
+
+    // RAM
+    val ram = Mem16Bit(sizeInWords = 1024)
+    ram.io.sel := ramSel
+    ram.io.wr := cpu.io.wr
+    ram.io.uds := cpu.io.uds
+    ram.io.lds := cpu.io.lds
+    ram.io.address := cpu.io.address
+    ram.io.dataIn := cpu.io.dataOut
 
     // LED Device
     val ledReg = Reg(Bits(16 bits)) init 0
-    when(ledSel) { ledReg := cpu.io.dataOut }
+    when(ledSel && cpu.io.wr) { ledReg := cpu.io.dataOut }
     io.led := ledReg(2 downto 0)
+
+    cpu.io.dataIn := 0
+    when(romSel) {
+      cpu.io.dataIn := rom.io.dataOut
+    } elsewhen(ramSel) {
+      cpu.io.dataIn := ram.io.dataOut
+    }
   }
 }
 
 object Rt68IceTopLevelVerilog extends App {
-  private val report = Config.spinal.generateVerilog(Rt68IceTopLevel())
+  private val report = Config.spinal.generateVerilog(Rt68IceTopLevel(romFile = "mem_test.hex"))
   report.mergeRTLSource("mergeRTL") // Merge all rtl sources into mergeRTL.vhd and mergeRTL.v files
 }
 
