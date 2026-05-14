@@ -23,7 +23,7 @@ case class M68K(
     val ipl		    = in Bits(3 bits)
     val busState  = out Bits(2 bits)
     val busErr    = in Bool()
-    val enable    = in Bool()
+    val clockEn   = in Bool()
   }
 
   // CPU
@@ -42,7 +42,7 @@ case class M68K(
   tg68kernel.io.data_in := io.bus.dataIn
   tg68kernel.io.IPL := io.ipl
   tg68kernel.io.berr := io.busErr
-  tg68kernel.io.clkena_in := io.enable
+  tg68kernel.io.clkena_in := io.clockEn
   io.bus.address := tg68kernel.io.addr_out
   io.bus.dataOut := tg68kernel.io.data_write
   io.bus.uds := !tg68kernel.io.nUDS

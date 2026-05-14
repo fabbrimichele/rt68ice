@@ -12,7 +12,7 @@ case class BusController() extends Component {
     // Master Interface (from CPU)
     val cpuBus    = slave(M68KBus())
     val busState	= in Bits(2 bits)  // 00-> fetch code 10->read data 11->write data 01->no memaccess
-    val clkEnable = out Bool()
+    val clockEn   = out Bool()
 
     // Slave buses
     val romBus    = master(M68KBus())
@@ -51,12 +51,12 @@ case class BusController() extends Component {
   when(busActive && !isWaiting) {
     // A bus cycle just started.
     // Pull the brake (clkEnable = Low) and set the flag.
-    io.clkEnable := False
+    io.clockEn := False
     isWaiting := True
   } otherwise {
     // Either the bus is idle (01), or we already finished our 1-cycle wait.
     // Release the brake.
-    io.clkEnable := True
+    io.clockEn := True
     isWaiting := False
   }
 
