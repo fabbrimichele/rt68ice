@@ -72,15 +72,15 @@ case class BusController() extends Component {
   io.romSel := False
   io.ledSel := False
   io.uartSel := False
-  when (address(31 downto 3) === 0) { // ROM: Accessing initial SP and PC values
+  when (address(31 downto 3) === 0) { // ROM:  Accessing initial SP and PC values
     io.romSel := True
-  } elsewhen (sectionAddress === 0) { // RAM: $0008 - $07FF
+  } elsewhen (sectionAddress === 0) { // RAM:  $0008 - $07FF
     io.ramSel := True
-  } elsewhen(sectionAddress === 1) {  // ROM: $0800 - $0FFF
+  } elsewhen(sectionAddress === 1) {  // ROM:  $0800 - $0FFF
     io.romSel := True
-  } elsewhen(sectionAddress === 2) {  // LED: $1000 - $17FF
+  } elsewhen(sectionAddress === 2) {  // LED:  $1000 - $17FF
     io.ledSel := True
-  } elsewhen(sectionAddress === 3) {  // LED: $1800 - $1FFF
+  } elsewhen(sectionAddress === 3) {  // UART: $1800 - $1FFF
     io.uartSel := True
   } otherwise {
     // TODO: busErr?
