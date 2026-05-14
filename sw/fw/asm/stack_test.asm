@@ -46,18 +46,16 @@
     ORG    $0400            ; Start after Vector Table
 
 START:
-    move.w  #$55,$1002
-    move.w  $1002,D0
-    cmp.w   #$55,D0
-    beq     OK
-NOT_OK:
-    move.w  #1,LED          ; memory mismatch, LED red
-    bra     LOOP
-OK:
-    move.w  #2,LED          ; memory match, LED green
+    move.w  #1,D0
+    move.w  D0,LED          ; Red -> NOT OK
+    bsr     SET_GREEN
+    move.w  D0,LED          ; Green -> OK
 LOOP:
     bra     LOOP
 
+SET_GREEN:
+    move.w  #2,D0
+    rts
 
     ; ===========================
     ; Constants

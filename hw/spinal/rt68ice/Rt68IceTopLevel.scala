@@ -1,6 +1,7 @@
 package rt68ice
 
 import rt68ice.core._
+import rt68ice.io.LedDevice
 import rt68ice.memory.Mem16Bit
 import spinal.core._
 
@@ -19,62 +20,37 @@ case class Rt68IceTopLevel(romFile: String) extends Component {
   // Area with reset
   @unused
   val coreArea = new ClockingArea(clockCtrl.clk20Domain) {
+    // Bus Controller
+    val bus = new BusController
+
     // CPU
-    val cpu = new M68KSync
+    val cpu = new M68K
     cpu.io.ipl := B"111"
     cpu.io.busErr := False
-
-    // Mapping - TODO: move to a separate component
-    val sectionAddress = cpu.io.address(31 downto 11).asUInt // 2KB each memory section
-    val romSel = Bool()
-    val ledSel = Bool()
-    val ramSel = Bool()
-
-    romSel := False
-    ledSel := False
-    ramSel := False
-    when (sectionAddress === 0) {       //    0 - 2048
-      romSel := True
-    } elsewhen(sectionAddress === 1) {  // 2048 - 4096
-      ledSel := True
-    } elsewhen(sectionAddress === 2) {  // 4096 - 6144
-      ramSel := True
-    }
+    cpu.io.clockEn := bus.io.clockEn
+    bus.io.cpuBus <> cpu.io.bus
+    bus.io.busState := cpu.io.busState
 
     // ROM
     val rom = Mem16Bit(sizeInWords = 1024, initFile = Some(romFile), readOnly = true)
-    rom.io.sel := romSel
-    rom.io.wr := cpu.io.wr
-    rom.io.uds := cpu.io.uds
-    rom.io.lds := cpu.io.lds
-    rom.io.address := cpu.io.address
-    rom.io.dataIn := cpu.io.dataOut
+    rom.io.sel := bus.io.romSel
+    bus.io.romBus  <> rom.io.bus
 
     // RAM
     val ram = Mem16Bit(sizeInWords = 1024)
-    ram.io.sel := ramSel
-    ram.io.wr := cpu.io.wr
-    ram.io.uds := cpu.io.uds
-    ram.io.lds := cpu.io.lds
-    ram.io.address := cpu.io.address
-    ram.io.dataIn := cpu.io.dataOut
+    ram.io.sel := bus.io.ramSel
+    bus.io.ramBus <> ram.io.bus
 
     // LED Device
-    val ledReg = Reg(Bits(16 bits)) init 0
-    when(ledSel && cpu.io.wr) { ledReg := cpu.io.dataOut }
-    io.led := ledReg(2 downto 0)
-
-    cpu.io.dataIn := 0
-    when(romSel) {
-      cpu.io.dataIn := rom.io.dataOut
-    } elsewhen(ramSel) {
-      cpu.io.dataIn := ram.io.dataOut
-    }
+    val ledDevice = LedDevice()
+    ledDevice.io.sel := bus.io.ledSel
+    io.led := ledDevice.io.led
+    bus.io.ledBus <> ledDevice.io.bus
   }
 }
 
 object Rt68IceTopLevelVerilog extends App {
-  private val report = Config.spinal.generateVerilog(Rt68IceTopLevel(romFile = "mem_test.hex"))
+  private val report = Config.spinal.generateVerilog(Rt68IceTopLevel(romFile = "stack_test.hex"))
   report.mergeRTLSource("mergeRTL") // Merge all rtl sources into mergeRTL.vhd and mergeRTL.v files
 }
 
