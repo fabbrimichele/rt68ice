@@ -1,6 +1,9 @@
 package rt68ice.memory
 
+import rt68ice.core.M68KBus
+import rt68ice.core.M68KBus.DATA_WIDTH
 import spinal.core._
+import spinal.lib._
 
 import scala.io.Source
 import scala.language.postfixOps
@@ -10,24 +13,19 @@ import scala.util.Using
 //noinspection ScalaWeakerAccess
 case class Mem16Bit(sizeInWords: Int, initFile: Option[String] = None, readOnly: Boolean = false) extends Component {
   val io = new Bundle {
+    val bus     = slave(M68KBus())
     val sel     = in Bool()
-    val wr      = in Bool()
-    val address = in Bits(32 bits)
-    val dataOut = out Bits(16 bits)
-    val dataIn  = in Bits(16 bits)
-    val uds     = in Bool()
-    val lds     = in Bool()
   }
 
-  val mem = Mem(Bits(16 bits), sizeInWords)
+  val mem = Mem(Bits(DATA_WIDTH bits), sizeInWords)
   initFile.foreach { filename => mem.init(readContentFromFile(filename)) }
 
-  io.dataOut := mem.readWriteSync(
-    address = io.address(log2Up(sizeInWords) downto 1).asUInt,
-    data = io.dataIn,
+  io.bus.dataIn := mem.readWriteSync(
+    address = io.bus.address(log2Up(sizeInWords) downto 1).asUInt,
+    data = io.bus.dataOut,
     enable = io.sel,
-    write = io.wr && !Bool(readOnly),
-    mask = io.uds ## io.lds,
+    write = io.bus.wr && !Bool(readOnly),
+    mask = io.bus.uds ## io.bus.lds,
   )
 
   private def readContentFromFile(initFile: String) = {

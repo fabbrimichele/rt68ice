@@ -2,6 +2,7 @@ package rt68ice.core
 
 import spinal.core._
 
+import scala.annotation.unused
 import scala.language.postfixOps
 
 //noinspection TypeAnnotation
@@ -38,7 +39,7 @@ class TG68KdotCBB extends BlackBox {
 
   // Map the clock domain
   // Mapped in the wrapper
-  mapClockDomain(clock = io.clk, reset = io.nReset, resetActiveLevel = LOW, enable = io.clkena_in)
+  mapClockDomain(clock = io.clk, reset = io.nReset, resetActiveLevel = LOW/*, enable = io.clkena_in*/)
 
   setDefinitionName("TG68KdotC_Kernel") // This tells SpinalHDL which Verilog module to instantiate
   addRTLPath("hw/vhdl/TG68K_ALU.vhd")   // Merge the file to the generated 'mergeRTL.vhdl' file
