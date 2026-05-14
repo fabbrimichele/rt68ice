@@ -167,7 +167,8 @@ begin
                         if LCR(7) = '1' then
                             DLM <= D_In;
                         else
-                            IER(3 downto 0) <= D_In(3 downto 0);
+                            IER <= "0000" & D_In(3 downto 0);
+                            --IER(3 downto 0) <= D_In(3 downto 0);
                         end if;
                     when "011" =>
                         LCR <= D_In;
@@ -408,6 +409,7 @@ begin
             TX_Next_Is_Stop <= '0';
             TX_Stop_Bit <= '0';
         elsif XIn'event and XIn = '1' then
+            LSR(7) <= '0'; -- Explicitly drive the unused bit
             if TX_Tick = '1' then
                 TX_Next_Is_Stop <= '0';
                 TX_Stop_Bit <= TX_Next_Is_Stop;
