@@ -63,17 +63,20 @@ case class BusController() extends Component {
   // ------------------------
   //    Address Decoding
   // ------------------------
-  val sectionAddress = io.cpuBus.address(31 downto 11).asUInt // 2KB each memory section
+  val address = io.cpuBus.address.asUInt
+  val sectionAddress = address(31 downto 11) // 2KB each memory section
 
+  io.ramSel := False
   io.romSel := False
   io.ledSel := False
-  io.ramSel := False
-  when (sectionAddress === 0) {       //    0 - 2048
+  when (address(31 downto 3) === 0) { // ROM: Accessing initial SP and PC values
     io.romSel := True
-  } elsewhen(sectionAddress === 1) {  // 2048 - 4096
-    io.ledSel := True
-  } elsewhen(sectionAddress === 2) {  // 4096 - 6144
+  } elsewhen (sectionAddress === 0) { // RAM: $0008 - $07FF
     io.ramSel := True
+  } elsewhen(sectionAddress === 1) {  // ROM: $0800 - $0FFF
+    io.romSel := True
+  } elsewhen(sectionAddress === 2) {  // LED: $1000 - $17FF
+    io.ledSel := True
   } otherwise {
     // TODO: busErr?
   }
