@@ -26,8 +26,8 @@ case class Mem16Bit(sizeInWords: Int, initFile: Option[String] = None, readOnly:
     address = io.address(log2Up(sizeInWords) downto 1).asUInt,
     data = io.dataIn,
     enable = io.sel,
-    write = io.wr, // TODO: add !Bool(readOnly)
-    mask = !io.uds ## !io.lds,
+    write = io.wr && !Bool(readOnly),
+    mask = io.uds ## io.lds,
   )
 
   private def readContentFromFile(initFile: String) = {
