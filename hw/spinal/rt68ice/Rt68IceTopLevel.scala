@@ -1,9 +1,11 @@
 package rt68ice
 
 import rt68ice.core._
-import rt68ice.io.LedDevice
+import rt68ice.io.{LedDevice, T16450Device}
 import rt68ice.memory.Mem16Bit
 import spinal.core._
+import spinal.lib.com.uart.Uart
+import spinal.lib.master
 
 import scala.annotation.unused
 import scala.language.postfixOps
@@ -13,6 +15,7 @@ import scala.language.postfixOps
 case class Rt68IceTopLevel(romFile: String) extends Component {
   val io = new Bundle {
     val led = out Bits(3 bits)
+    val uart = master(Uart()) // Expose UART pins (txd, rxd), must be defined in the constraints file
   }
 
   val clockCtrl = ClockCtrl()
@@ -46,7 +49,16 @@ case class Rt68IceTopLevel(romFile: String) extends Component {
     ledDevice.io.sel := bus.io.ledSel
     io.led := ledDevice.io.led
     bus.io.ledBus <> ledDevice.io.bus
+
+    // UART Device
+    val uartDevice = T16450Device()
+    uartDevice.io.uart <> io.uart
+    uartDevice.io.sel := bus.io.uartSel
+    bus.io.uartBus <> uartDevice.io.bus
   }
+
+  // Remove io_ prefix
+  noIoPrefix()
 }
 
 object Rt68IceTopLevelVerilog extends App {

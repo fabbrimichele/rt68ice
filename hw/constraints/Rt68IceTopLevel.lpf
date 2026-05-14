@@ -2,22 +2,20 @@ LOCATE COMP "clk" SITE "P6";
 IOBUF PORT "clk" IO_TYPE=LVCMOS33;
 FREQUENCY PORT "clk" 25 MHZ;
 
+// RGB LED is connected to B11 (red), A11 (green), A12 (blue)
+LOCATE COMP "led[0]" SITE "B11";
+IOBUF PORT "led[0]" IO_TYPE=LVCMOS33;
+LOCATE COMP "led[1]" SITE "A11";
+IOBUF PORT "led[1]" IO_TYPE=LVCMOS33;
+LOCATE COMP "led[2]" SITE "A12";
+IOBUF PORT "led[2]" IO_TYPE=LVCMOS33;
+
+// Serial
+LOCATE COMP "uart_txd" SITE "B9";
+IOBUF PORT "uart_txd" IO_TYPE=LVCMOS33;
+LOCATE COMP "uart_rxd" SITE "A9";
+IOBUF PORT "uart_rxd" IO_TYPE=LVCMOS33;
+
 // For other mappings, refer to:
 // - https://github.com/wuxx/icesugar-pro/blob/master/src/litex_linux/top_bg256.lpf
 // - https://github.com/litex-hub/litex-boards/blob/master/litex_boards/platforms/muselab_icesugar_pro.py
-
-// RGB LED is connected to {A11, A12, B11}
-// B11: red
-// A11: green
-// A12: blue
-// Note: In the icesugar_pro repository the led is connected to LVCMOS25
-//       but in the schematic of the board is connected to LVCMOS33, and
-//       the latter is also used by the litex_linux example, so LVCMOS33
-//       is the correct one.
-LOCATE COMP "io_led[0]" SITE "B11";
-LOCATE COMP "io_led[1]" SITE "A11";
-LOCATE COMP "io_led[2]" SITE "A12";
-IOBUF PORT "io_led[0]" IO_TYPE=LVCMOS33;
-IOBUF PORT "io_led[1]" IO_TYPE=LVCMOS33;
-IOBUF PORT "io_led[2]" IO_TYPE=LVCMOS33;
-
