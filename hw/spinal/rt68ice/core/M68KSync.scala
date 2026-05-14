@@ -24,6 +24,11 @@ case class M68KSync(cpuType: M68KType = M68000, autovector: Boolean = true) exte
     val lds     = out Bool()
   }
 
+  // The Wait-State Register
+  // This keeps track of whether we are currently in the middle of a pause
+  val isWaiting = RegInit(False)
+
+  // CPU
   val tg68kernel = new TG68KdotCBB
 
   // Configure CPU
@@ -36,14 +41,20 @@ case class M68KSync(cpuType: M68KType = M68000, autovector: Boolean = true) exte
   tg68kernel.io.IPL_autovector := Bool(autovector)
 
   // Assign IO
+  tg68kernel.io.data_in := io.dataIn
+  tg68kernel.io.IPL := io.ipl
+  tg68kernel.io.berr := io.busErr
+
   io.address := tg68kernel.io.addr_out
   io.dataOut := tg68kernel.io.data_write
   io.uds := !tg68kernel.io.nUDS
   io.lds := !tg68kernel.io.nLDS
 
-  tg68kernel.io.data_in := io.dataIn
-  tg68kernel.io.IPL := io.ipl
-  tg68kernel.io.berr := io.busErr
+  // IMPORTANT: Gate the External Write signal
+  // Only allow 'io.wr' to be seen by the memory when isWaiting is True.
+  // This ensures write happens on the SECOND clock cycle, after the
+  // CPU has had time to stabilize the data and address.
+  io.wr  := !tg68kernel.io.nWr  && isWaiting // Only enable write during the wait cycle
 
   // TODO: move to a BusController class once starting using SDRAM
   // 1. Remove internal 'isWaiting' register from M68KSync.
@@ -55,19 +66,14 @@ case class M68KSync(cpuType: M68KType = M68000, autovector: Boolean = true) exte
   //    - SDRAM (Dynamic/Handshaking)
 
   // Handle memory sync access
-  // disable the CPU for one clock cycle when accessing memory
-  // ROM
-  // 1. Detect if the CPU is trying to use the bus
+  // Disable the CPU for one clock cycle when accessing memory
+  // Detect if the CPU is trying to use the bus
   // We pause for Fetch (00), Data Read (10), and Data Write (11)
   val busActive = tg68kernel.io.busstate === B"00" ||
     tg68kernel.io.busstate === B"10" ||
     tg68kernel.io.busstate === B"11"
 
-  // 2. The Wait-State Register
-  // This keeps track of whether we are currently in the middle of a pause
-  val isWaiting = RegInit(False)
-
-  // 3. The Handshake Logic
+  // The Handshake Logic
   when(busActive && !isWaiting) {
     // A bus cycle just started.
     // Pull the brake (clkena_in = Low) and set the flag.
@@ -79,10 +85,4 @@ case class M68KSync(cpuType: M68KType = M68000, autovector: Boolean = true) exte
     tg68kernel.io.clkena_in := True
     isWaiting := False
   }
-
-  // 4. IMPORTANT: Gate the External Write signal
-  // Only allow 'io.wr' to be seen by the memory when isWaiting is True.
-  // This ensures the write happens on the SECOND clock cycle, after the
-  // CPU has had time to stabilize the data and address.
-  io.wr  := !tg68kernel.io.nWr  && isWaiting // Only enable write during the wait cycle
 }
