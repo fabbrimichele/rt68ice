@@ -17,7 +17,7 @@ ASM_SRC_DIR = sw/fw/asm
 BIN_GEN_DIR = hw/gen
 HEX_SPINAL_DIR = hw/spinal/rt68ice/memory
 HEX_CLASS_DIR = target/scala-2.13/classes/rt68ice/memory
-ASSEMBLIES = blink mem_test
+ASSEMBLIES = blink mem_test stack_test
 
 .PHONY: all clean rom prog prog-flash view-wave
 

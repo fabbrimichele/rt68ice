@@ -50,7 +50,7 @@ case class Rt68IceTopLevel(romFile: String) extends Component {
 }
 
 object Rt68IceTopLevelVerilog extends App {
-  private val report = Config.spinal.generateVerilog(Rt68IceTopLevel(romFile = "mem_test.hex"))
+  private val report = Config.spinal.generateVerilog(Rt68IceTopLevel(romFile = "stack_test.hex"))
   report.mergeRTLSource("mergeRTL") // Merge all rtl sources into mergeRTL.vhd and mergeRTL.v files
 }
 
