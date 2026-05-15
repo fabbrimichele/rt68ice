@@ -52,6 +52,9 @@ prog: # $(TARGET).bit
 prog-flash: $(TARGET).bit
 	openFPGALoader -f -c cmsisdap --vid=0x1d50 --pid=0x602b $<
 
+serial-open:
+	picocom -b 19200 /dev/ttyACM0
+
 reset:
 	openFPGALoader -c cmsisdap --vid=0x1d50 --pid=0x602b --reset
 

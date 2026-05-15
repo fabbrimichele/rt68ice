@@ -12,25 +12,25 @@
     ; ===========================
 START:
     bsr     UART_INIT
-    move.b  #'H',D0
-    bsr     PUT_CHAR
-    move.b  #'e',D0
-    bsr     PUT_CHAR
-    move.b  #'l',D0
-    bsr     PUT_CHAR
-    move.b  #'l',D0
-    bsr     PUT_CHAR
-    move.b  #'o',D0
-    bsr     PUT_CHAR
-    move.b  #'!',D0
-    bsr     PUT_CHAR
-    move.b  #$0D,D0    ; Carriage Return
-    bsr     PUT_CHAR
-    move.b  #$0A,D0    ; Line Feed
-    bsr     PUT_CHAR
+    lea     MSG_HELLO,A0
+    bsr     PUT_STR
 
 LOOP:
     bra     LOOP
+
+; =================================================================
+; PUT_STR - Prints a null-terminated string
+; Input: A0 = Pointer to the start of the string
+; Modifies: D0 (clobbered by character data), A0 (moves to end of string)
+; =================================================================
+PUT_STR:
+    move.b  (A0)+,D0        ; Read character from address A0 into D0,
+                            ; then auto-increment A0 to point to the next char
+    beq     .STR_DONE       ; If the character is 0 (null terminator), we are done
+    bsr     PUT_CHAR        ; Print the character using your existing routine
+    bra     PUT_STR         ; Repeat for next character
+.STR_DONE:
+    rts                     ; Return to caller
 
 PUT_CHAR:
     move.w  UART_LSR,D1
@@ -49,12 +49,21 @@ UART_INIT:
 	move.b #$00,UART_IER	; disable interrupt
 	RTS
 
+MSG_HELLO:
+    DC.B    "Hello World!",CR,LF,NUL
+
     ; ===========================
     ; Constants
     ; ===========================
+
+CR          EQU     $0D
+LF          EQU     $0A
+NUL         EQU     $00
+
 RAM_START   EQU     $00000400
 RAM_END     EQU     $00000800   ; End of RAM address (+1)
 LED         EQU     $00001000   ; LED-mapped register base address
+
 UART_RBR    EQU     $00001800   ; Receive Buffer Register(RBR) / Transmitter Holding Register(THR) / Divisor Latch (LSB)
 UART_IER    EQU     $00001802   ; Interrupt enable register / Divisor Latch (MSB)
 UART_IIR    EQU     $00001804   ; Interrupt Identification Register
