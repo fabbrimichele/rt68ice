@@ -48,7 +48,7 @@ GET_CHR:
     move.w  UART_LSR,D1     ; Read status register
     btst    #0,D1           ; read full?
     beq     GET_CHR         ; Wait until RX ready
-    move.b  UART_RBR,D0     ; Read character to D0
+    move.w  UART_RBR,D0     ; Read character to D0
     rts
 
 ; =================================================================
