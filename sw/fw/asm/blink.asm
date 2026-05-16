@@ -1,4 +1,4 @@
-    ORG     $0800            ; Start of ROM
+    ORG     $4000            ; Start of ROM
 
 ; ===========================
 ; 68000 Vector Table, only initial PC and SP
@@ -26,12 +26,17 @@ DLY_LOOP:
 
 
 ; ===========================
-; Constants
+; Value Constants
 ; ===========================
 DLY_VAL     EQU     3125000     ; Delay iterations, 0.5 sec at 25 MHz
-RAM_END     EQU     $00000800   ; End of RAM address (+1)
+RAM_END     EQU     $00004000   ; End of RAM address (+1)
 
 ; ===========================
 ; Include files
 ; ===========================
     INCLUDE '../../lib/asm/mem_map_led.asm'
+
+; ===========================
+; Data Constants
+; Must be after code to avoid alignment issues
+; ===========================

@@ -1,4 +1,4 @@
-    ORG     $0800            ; Start of ROM
+    ORG     $4000            ; Start of ROM
 
 ; ===========================
 ; 68000 Vector Table, only initial PC and SP
@@ -12,9 +12,9 @@
 ; ===========================
 START:
     move.w  #1,D0
-    move.w  D0,LED          ; Red -> NOT OK
+    move.b  D0,LED          ; Red -> NOT OK
     bsr     SET_GREEN
-    move.w  D0,LED          ; Green -> OK
+    move.b  D0,LED          ; Green -> OK
 LOOP:
     bra     LOOP
 
@@ -23,7 +23,16 @@ SET_GREEN:
     rts
 
 ; ===========================
-; Constants
+; Value Constants
 ; ===========================
-RAM_END     EQU     $00000800   ; End of RAM address (+1)
-LED         EQU     $00001000   ; LED-mapped register base address
+RAM_END     EQU     $00004000   ; End of RAM address (+1)
+
+; ===========================
+; Include files
+; ===========================
+    INCLUDE '../../lib/asm/mem_map_led.asm'
+
+; ===========================
+; Data Constants
+; Must be after code to avoid alignment issues
+; ===========================

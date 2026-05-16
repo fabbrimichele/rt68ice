@@ -1,4 +1,4 @@
-    ORG     $0800            ; Start of ROM
+    ORG     $4000            ; Start of ROM
 
 ; ===========================
 ; 68000 Vector Table, only initial PC and SP
@@ -39,16 +39,19 @@ START:
     bsr     PUT_CHR
     bra     .LOOP
 
-MSG_HELLO:
-    DC.B    "Type something:",CR,LF,NUL
-
 ; ===========================
-; Constants
+; Value Constants
 ; ===========================
-RAM_START   EQU     $00000400
-RAM_END     EQU     $00000800   ; End of RAM address (+1)
+RAM_END     EQU     $00004000   ; End of RAM address (+1)
 
 ; ===========================
 ; Include files
 ; ===========================
     INCLUDE '../../lib/asm/console_io_uart.asm'
+
+; ===========================
+; Data Constants
+; Must be after code to avoid alignment issues
+; ===========================
+MSG_HELLO:
+    DC.B    "Type something:",CR,LF,NUL
