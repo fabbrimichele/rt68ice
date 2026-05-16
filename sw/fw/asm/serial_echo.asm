@@ -16,7 +16,15 @@ START:
     bsr     PUT_STR
 .LOOP:
     bsr     GET_CHR
+    cmp.b   #CR,D0          ; Check if the user pressed ENTER (Carriage Return)
+    beq     .NEWLINE        ; If yes, branch to the newline handler
     move.b  D0,LED
+    bsr     PUT_CHR
+    bra     .LOOP
+.NEWLINE:
+    move.b  #CR,D0
+    bsr     PUT_CHR
+    move.b  #LF,D0
     bsr     PUT_CHR
     bra     .LOOP
 
