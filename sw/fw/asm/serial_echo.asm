@@ -46,7 +46,7 @@ PUT_CHR:
     move.w  UART_LSR,D1
 	btst    #5,D1   		; write buffer empty?
 	beq     PUT_CHR 		; eq 0, not ready, check again
-	move.b  D0,UART_RBR		; write D0 to serial
+	move.w  D0,UART_RBR		; write D0 to serial
 	rts						; return
 
 ; =================================================================

@@ -36,7 +36,7 @@ PUT_CHAR:
     move.w  UART_LSR,D1
 	btst    #5,D1   		; write buffer empty?
 	beq     PUT_CHAR 		; eq 0, not ready, check again
-	move.b  D0,UART_RBR		; write D0 to serial
+	move.w  D0,UART_RBR		; write D0 to serial
 	rts						; return
 
 ; Serial initialization 19200 baud, 8N1
