@@ -16,6 +16,7 @@ case class LedDevice(width: Int = 3) extends Component {
     val led = out Bits (width bits)
   }
 
+  // TODO: make it an 8-bit device, see UART
   val ledReg = Reg(Bits(DATA_WIDTH bits)) init 0
   io.led := ledReg(width - 1 downto 0)
 
