@@ -23,8 +23,6 @@ case class T16450Device() extends Component {
   uart.io.Rd_n := io.bus.wr
   uart.io.Wr_n := !io.bus.wr
   uart.io.A := io.bus.address(3 downto 1)
-  uart.io.D_In := io.bus.dataOut(7 downto 0)
-  io.bus.dataIn := uart.io.D_Out.resized
   uart.io.SIn := io.uart.rxd
   uart.io.CTS_n := False
   uart.io.DSR_n := False
@@ -32,4 +30,9 @@ case class T16450Device() extends Component {
   uart.io.DCD_n := False
   io.uart.txd := uart.io.SOut
   io.int := uart.io.Intr
+
+  // Data bus mapping (access by byte, i.e. move.b)
+  uart.io.D_In := io.bus.dataOut(15 downto 8)
+  io.bus.dataIn(15 downto 8) := uart.io.D_Out
+  io.bus.dataIn(7 downto 0) := 0
 }

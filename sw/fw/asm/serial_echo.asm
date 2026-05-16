@@ -54,20 +54,20 @@ PUT_STR:
     rts                     ; Return to caller
 
 PUT_CHR:
-    move.w  UART_LSR,D1
+    move.b  UART_LSR,D1
 	btst    #5,D1   		; write buffer empty?
 	beq     PUT_CHR 		; eq 0, not ready, check again
-	move.w  D0,UART_RBR		; write D0 to serial
+	move.b  D0,UART_RBR		; write D0 to serial
 	rts						; return
 
 ; =================================================================
 ; GETCHAR - Gets a single character from the UART data register and stores it in D0
 ; =================================================================
 GET_CHR:
-    move.w  UART_LSR,D1     ; Read status register
+    move.b  UART_LSR,D1     ; Read status register
     btst    #0,D1           ; read full?
     beq     GET_CHR         ; Wait until RX ready
-    move.w  UART_RBR,D0     ; Read character to D0
+    move.b  UART_RBR,D0     ; Read character to D0
     rts
 
 ; =================================================================
