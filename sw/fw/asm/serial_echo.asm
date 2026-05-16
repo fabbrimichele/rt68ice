@@ -1,15 +1,15 @@
     ORG     $0800            ; Start of ROM
 
-    ; ===========================
-    ; 68000 Vector Table, only initial PC and SP
-    ; Each vector is 32 bits (long)
-    ; ===========================
+; ===========================
+; 68000 Vector Table, only initial PC and SP
+; Each vector is 32 bits (long)
+; ===========================
     DC.L   RAM_END      ; 0: Initial Stack Pointer (SP)
     DC.L   START        ; 1: Reset vector (PC start address)
 
-    ; ===========================
-    ; Program code
-    ; ===========================
+; ===========================
+; Program code
+; ===========================
 START:
     bsr     UART_INIT
     lea     MSG_HELLO,A0
