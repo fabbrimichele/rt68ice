@@ -17,14 +17,25 @@ START:
 .LOOP:
     bsr     GET_CHR
     cmp.b   #CR,D0          ; Check if the user pressed ENTER (Carriage Return)
-    beq     .NEWLINE        ; If yes, branch to the newline handler
-    move.b  D0,LED
+    beq     .NEWLINE
+    cmp.b   #BS,D0          ; Check if the user pressed BACKSPACE
+    beq     .BACKSPACE
+    cmp.b   #DEL,D0         ; Check if the user pressed DEL
+    beq     .BACKSPACE
     bsr     PUT_CHR
     bra     .LOOP
 .NEWLINE:
     move.b  #CR,D0
     bsr     PUT_CHR
     move.b  #LF,D0
+    bsr     PUT_CHR
+    bra     .LOOP
+.BACKSPACE:
+    move.b  #BS,D0
+    bsr     PUT_CHR
+    move.b  #SPACE,D0
+    bsr     PUT_CHR
+    move.b  #BS,D0
     bsr     PUT_CHR
     bra     .LOOP
 
@@ -82,6 +93,9 @@ CR          EQU     $0D
 LF          EQU     $0A
 NUL         EQU     $00
 ESC         EQU     $1B
+BS          EQU     $08
+DEL         EQU     $7F
+SPACE       EQU     $20
 
 RAM_START   EQU     $00000400
 RAM_END     EQU     $00000800   ; End of RAM address (+1)
