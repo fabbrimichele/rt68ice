@@ -18,11 +18,13 @@ case class BusController() extends Component {
     val romBus    = master(M68KBus())
     val ramBus    = master(M68KBus())
     val ledBus    = master(M68KBus())
+    val uartBus   = master(M68KBus())
 
     // Slave select signals (to peripherals)
     val romSel    = out Bool()
     val ledSel    = out Bool()
     val ramSel    = out Bool()
+    val uartSel   = out Bool()
   }
 
   // ---------------------------
@@ -69,14 +71,17 @@ case class BusController() extends Component {
   io.ramSel := False
   io.romSel := False
   io.ledSel := False
-  when (address(31 downto 3) === 0) { // ROM: Accessing initial SP and PC values
+  io.uartSel := False
+  when (address(31 downto 3) === 0) { // ROM:  Accessing initial SP and PC values
     io.romSel := True
-  } elsewhen (sectionAddress === 0) { // RAM: $0008 - $07FF
+  } elsewhen (sectionAddress === 0) { // RAM:  $0008 - $07FF
     io.ramSel := True
-  } elsewhen(sectionAddress === 1) {  // ROM: $0800 - $0FFF
+  } elsewhen(sectionAddress === 1) {  // ROM:  $0800 - $0FFF
     io.romSel := True
-  } elsewhen(sectionAddress === 2) {  // LED: $1000 - $17FF
+  } elsewhen(sectionAddress === 2) {  // LED:  $1000 - $17FF
     io.ledSel := True
+  } elsewhen(sectionAddress === 3) {  // UART: $1800 - $1FFF
+    io.uartSel := True
   } otherwise {
     // TODO: busErr?
   }
@@ -84,7 +89,7 @@ case class BusController() extends Component {
   // ----------------------
   //    Buses mapping
   // ----------------------
-  val buses = List(io.romBus, io.ramBus, io.ledBus)
+  val buses = List(io.romBus, io.ramBus, io.ledBus, io.uartBus)
   for (bus <- buses) {
     bus.address := io.cpuBus.address
     bus.dataOut := io.cpuBus.dataOut
@@ -99,6 +104,8 @@ case class BusController() extends Component {
   } elsewhen io.ramSel {
     io.cpuBus.dataIn := io.ramBus.dataIn
   } elsewhen io.ledSel {
-      io.cpuBus.dataIn := io.ledBus.dataIn
+    io.cpuBus.dataIn := io.ledBus.dataIn
+  } elsewhen io.uartSel {
+    io.cpuBus.dataIn := io.uartBus.dataIn
   }
 }

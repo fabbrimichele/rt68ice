@@ -17,7 +17,7 @@ ASM_SRC_DIR = sw/fw/asm
 BIN_GEN_DIR = hw/gen
 HEX_SPINAL_DIR = hw/spinal/rt68ice/memory
 HEX_CLASS_DIR = target/scala-2.13/classes/rt68ice/memory
-ASSEMBLIES = blink mem_test stack_test
+ASSEMBLIES = blink mem_test stack_test serial_hello serial_echo
 
 .PHONY: all clean rom prog prog-flash view-wave
 
@@ -31,6 +31,7 @@ $(VERILOG_SOURCES) $(MERGED_VHDL): hw/spinal/rt68ice/*.scala rom
 $(TARGET).json: $(VERILOG_TOP) $(MERGED_VHDL)
 	#yosys -p "synth_ecp5 -json $@" $(VERILOG_SOURCES)
 	yosys -m ghdl -p "ghdl -C --std=08 -C -fsynopsys -C --latches $(MERGED_VHDL) -e TG68KdotC_Kernel; \
+		ghdl -C --std=08 -C -fsynopsys -C --latches $(MERGED_VHDL) -e T16450; \
 		read_verilog $(VERILOG_SOURCES) $(MERGED_VERILOG); \
 		synth_ecp5 -top $(TOP) -json $@"
 
@@ -50,6 +51,9 @@ prog: # $(TARGET).bit
 # 5. Load to FLASH (permanent)
 prog-flash: $(TARGET).bit
 	openFPGALoader -f -c cmsisdap --vid=0x1d50 --pid=0x602b $<
+
+serial-open:
+	picocom -b 19200 /dev/ttyACM0
 
 reset:
 	openFPGALoader -c cmsisdap --vid=0x1d50 --pid=0x602b --reset
