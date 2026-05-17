@@ -5,17 +5,17 @@
 ; Each vector is 32 bits (long)
 ; ===========================
     DC.L   RAM_END      ; 0: Initial Stack Pointer (SP)
-    DC.L   START        ; 1: Reset vector (PC start address)
+    DC.L   start        ; 1: Reset vector (PC start address)
 
 ; ===========================
 ; Program code
 ; ===========================
-START:
+start:
     bsr     uart_init
-    lea     MSG_HELLO,A0
+    lea     msg_hello,a0
     bsr     put_str
-LOOP:
-    bra     LOOP
+.loop:
+    bra     .loop
 
 ; ===========================
 ; Value Constants
@@ -31,5 +31,5 @@ RAM_END     EQU     $00004000   ; End of RAM address (+1)
 ; Data Constants
 ; Must be after code to avoid alignment issues
 ; ===========================
-MSG_HELLO:
-    DC.B    "Hello World!",CR,LF,NUL
+msg_hello:
+    dc.b    "Hello World!",CR,LF,NUL

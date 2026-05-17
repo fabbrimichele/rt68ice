@@ -5,23 +5,23 @@
 ; Each vector is 32 bits (long)
 ; ===========================
     DC.L   RAM_END      ; 0: Initial Stack Pointer (SP)
-    DC.L   START        ; 1: Reset vector (PC start address)
+    DC.L   start        ; 1: Reset vector (PC start address)
 
 ; ===========================
 ; Program code
 ; ===========================
-START:
+start:
     move.w  #$55,RAM_START
     move.w  RAM_START,D0
     cmp.w   #$55,D0
-    beq     OK
-NOT_OK:
+    beq     .ok
+.not_ok:
     move.b  #1,LED          ; memory mismatch, LED red
-    bra     LOOP
-OK:
+    bra     .loop
+.ok:
     move.b  #2,LED          ; memory match, LED green
-LOOP:
-    bra     LOOP
+.loop:
+    bra     .loop
 
 ; ===========================
 ; Value Constants

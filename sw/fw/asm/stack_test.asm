@@ -5,20 +5,20 @@
 ; Each vector is 32 bits (long)
 ; ===========================
     DC.L   RAM_END      ; 0: Initial Stack Pointer (SP)
-    DC.L   START        ; 1: Reset vector (PC start address)
+    DC.L   start        ; 1: Reset vector (PC start address)
 
 ; ===========================
 ; Program code
 ; ===========================
-START:
+start:
     move.w  #1,D0
     move.b  D0,LED          ; Red -> NOT OK
-    bsr     SET_GREEN
+    bsr     set_green
     move.b  D0,LED          ; Green -> OK
-LOOP:
-    bra     LOOP
+.loop:
+    bra     .loop
 
-SET_GREEN:
+set_green:
     move.w  #2,D0
     rts
 

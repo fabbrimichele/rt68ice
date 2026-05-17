@@ -137,7 +137,7 @@ DUMP_CMD:
     MOVE.W  #(8-1),D1       ; Print 8 lines
 DUMP_LINE:
     MOVE.L  A1,D0
-    BSR     BINTOHEX        ; Print address
+    BSR     bin_to_hex        ; Print address
     MOVE.B  #':',D0
     BSR     put_chr
     MOVE.W  #(8-1),D2       ; Print 8 cells
@@ -145,7 +145,7 @@ DUMP_CELL:
     MOVE.B  #' ',D0
     BSR     put_chr
     MOVE.W  (A1)+,D0
-    BSR     BINTOHEX_W      ; Print mem value
+    BSR     bin_to_hex_w      ; Print mem value
     DBRA    D2,DUMP_CELL    ; Decrement D1, branch if D1 is NOT -1
 
     MOVE.B  #CR,D0
@@ -259,7 +259,7 @@ PARSE_DUMP:
     BTST    #0,D0               ; D0.0 equals 0, failure
     BEQ     PRS_DMP_DONE        ; Exit on failure
 
-    BSR     HEXTOBIN            ; Parse 1st argument (32 bits)
+    BSR     hex_to_bin            ; Parse 1st argument (32 bits)
     BTST    #0,D0               ; D0.0 equals 0, failure
     BEQ     PRS_DMP_DONE        ; Exit on failure
     MOVE.L  D1,A1               ; Move the parsed address from D0 into A1
@@ -290,7 +290,7 @@ PARSE_WRITE:
     BTST    #0,D0               ; D0.0 equals 0, failure
     BEQ     PRS_WRT_DONE        ; Exit on failure
 
-    BSR     HEXTOBIN            ; Parse 1st argument (32 bits)
+    BSR     hex_to_bin            ; Parse 1st argument (32 bits)
     BTST    #0,D0               ; D0.0 equals 0, failure
     BEQ     PRS_WRT_DONE        ; Exit on failure
     MOVE.L  D1,A1               ; Move the parsed address from D0 into A1
@@ -299,7 +299,7 @@ PARSE_WRITE:
     BTST    #0,D0               ; D0.0 equals 0, failure
     BEQ     PRS_WRT_DONE        ; Exit on failure
 
-    BSR     HEXTOBIN            ; Parse 2st argument (32 bits), D1 contains result
+    BSR     hex_to_bin            ; Parse 2st argument (32 bits), D1 contains result
     BTST    #0,D0               ; D0.0 equals 0, failure
     BEQ     PRS_WRT_DONE        ; Exit on failure
 
@@ -372,7 +372,7 @@ PARSE_RUN:
     BTST    #0,D0               ; D0.0 equals 0, failure
     BEQ     PRS_RUN_DONE        ; Exit on failure
 
-    BSR     HEXTOBIN            ; Parse 1st argument (32 bits)
+    BSR     hex_to_bin            ; Parse 1st argument (32 bits)
     BTST    #0,D0               ; D0.0 equals 0, failure
     BEQ     PRS_RUN_DONE        ; Exit on failure
     MOVE.L  D1,A1               ; Move the parsed address from D0 into A1

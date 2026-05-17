@@ -5,39 +5,39 @@
 ; Each vector is 32 bits (long)
 ; ===========================
     DC.L   RAM_END      ; 0: Initial Stack Pointer (SP)
-    DC.L   START        ; 1: Reset vector (PC start address)
+    DC.L   start        ; 1: Reset vector (PC start address)
 
 ; ===========================
 ; Program code
 ; ===========================
-START:
+start:
     bsr     uart_init
-    lea     MSG_HELLO,A0
+    lea     msg_hello,a0
     bsr     put_str
-.LOOP:
+.loop:
     bsr     get_chr
-    cmp.b   #CR,D0          ; Check if the user pressed ENTER (Carriage Return)
-    beq     .NEWLINE
-    cmp.b   #BS,D0          ; Check if the user pressed BACKSPACE
-    beq     .BACKSPACE
-    cmp.b   #DEL,D0         ; Check if the user pressed DEL
-    beq     .BACKSPACE
+    cmp.b   #CR,d0          ; Check if the user pressed ENTER (Carriage Return)
+    beq     .newline
+    cmp.b   #BS,d0          ; Check if the user pressed BACKSPACE
+    beq     .backspace
+    cmp.b   #DEL,d0         ; Check if the user pressed DEL
+    beq     .backspace
     bsr     put_chr
-    bra     .LOOP
-.NEWLINE:
-    move.b  #CR,D0
+    bra     .loop
+.newline:
+    move.b  #CR,d0
     bsr     put_chr
-    move.b  #LF,D0
+    move.b  #LF,d0
     bsr     put_chr
-    bra     .LOOP
-.BACKSPACE:
-    move.b  #BS,D0
+    bra     .loop
+.backspace:
+    move.b  #BS,d0
     bsr     put_chr
-    move.b  #SPACE,D0
+    move.b  #SPACE,d0
     bsr     put_chr
-    move.b  #BS,D0
+    move.b  #BS,d0
     bsr     put_chr
-    bra     .LOOP
+    bra     .loop
 
 ; ===========================
 ; Value Constants
@@ -53,5 +53,5 @@ RAM_END     EQU     $00004000   ; End of RAM address (+1)
 ; Data Constants
 ; Must be after code to avoid alignment issues
 ; ===========================
-MSG_HELLO:
-    DC.B    "Type something:",CR,LF,NUL
+msg_hello:
+    dc.b    "Type something:",CR,LF,NUL
