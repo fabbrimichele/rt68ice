@@ -31,16 +31,16 @@ case class Rt68IceTopLevel(romFile: String) extends Component {
     cpu.io.ipl := B"111"
     cpu.io.busErr := False
     cpu.io.clockEn := bus.io.clockEn
-    bus.io.cpuBus <> cpu.io.bus
     bus.io.busState := cpu.io.busState
+    bus.io.cpuBus <> cpu.io.bus
 
     // ROM
-    val rom = Mem16Bit(sizeInWords = 1024, initFile = Some(romFile), readOnly = true)
+    val rom = Mem16Bit(sizeInWords = 8192, initFile = Some(romFile), readOnly = true)
     rom.io.sel := bus.io.romSel
     bus.io.romBus  <> rom.io.bus
 
     // RAM
-    val ram = Mem16Bit(sizeInWords = 1024)
+    val ram = Mem16Bit(sizeInWords = 8192)
     ram.io.sel := bus.io.ramSel
     bus.io.ramBus <> ram.io.bus
 
@@ -62,7 +62,7 @@ case class Rt68IceTopLevel(romFile: String) extends Component {
 }
 
 object Rt68IceTopLevelVerilog extends App {
-  private val report = Config.spinal.generateVerilog(Rt68IceTopLevel(romFile = "serial_echo.hex"))
+  private val report = Config.spinal.generateVerilog(Rt68IceTopLevel(romFile = "monitor.hex"))
   report.mergeRTLSource("mergeRTL") // Merge all rtl sources into mergeRTL.vhd and mergeRTL.v files
 }
 

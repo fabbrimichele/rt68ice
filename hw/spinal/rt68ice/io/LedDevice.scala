@@ -9,25 +9,25 @@ import scala.language.postfixOps
 
 //noinspection TypeAnnotation
 //noinspection ScalaWeakerAccess
-case class LedDevice(width: Int = 3) extends Component {
+case class LedDevice() extends Component {
   val io = new Bundle {
     val bus = slave(M68KBus())
     val sel = in Bool()
-    val led = out Bits (width bits)
+    val led = out Bits (3 bits)
   }
 
-  val ledReg = Reg(Bits(DATA_WIDTH bits)) init 0
-  io.led := ledReg(width - 1 downto 0)
+  val ledReg = Reg(Bits(3 bits)) init 0
+  io.led := ledReg
 
   io.bus.dataIn := 0
 
   when(io.sel) {
     when(io.bus.wr) {
       // Write
-      ledReg := io.bus.dataOut
+      ledReg := io.bus.dataOut(10 downto 8)
     } otherwise {
       // Read
-      io.bus.dataIn := ledReg
+      io.bus.dataIn(10 downto 8) := ledReg
     }
   }
 }
