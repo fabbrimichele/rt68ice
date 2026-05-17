@@ -14,21 +14,21 @@
 ; ------------------------------
 START:
     JSR     INIT_VECTOR_TABLE
-    JSR     UART_INIT
+    JSR     uart_init
     LEA     MSG_TITLE,A0
-    BSR     PUT_STR
+    BSR     put_str
 
 MON_ENTRY:
 NEW_CMD:
     LEA     IN_BUF,A5       ; A5 = current buffer position
     MOVE.B  #CR,D0
-    BSR     PUT_CHR
+    BSR     put_chr
     MOVE.B  #LF,D0
-    BSR     PUT_CHR
+    BSR     put_chr
     MOVE.B  #'>',D0
-    BSR     PUT_CHR
+    BSR     put_chr
 LOOP:
-    BSR     GET_CHR
+    BSR     get_chr
 
     CMP.B   #CR,D0          ; Check for Enter
     BEQ     PROCESS_CMD     ; then process command
@@ -40,7 +40,7 @@ LOOP:
     CMP.L   #IN_BUF_END,A5  ; Check if buffer is full
     BEQ     BUFFER_FULL
 
-    BSR     PUT_CHR         ; print character
+    BSR     put_chr         ; print character
     MOVE.B  D0,(A5)+        ; Store D0 into buffer, then increment A5
     BRA     LOOP
 
@@ -58,15 +58,15 @@ BS_HANDLER:
     ; 3. Correct the terminal display (echo the standard sequence)
     ; Send BS (0x08) to move cursor left
     MOVE.B  #BS,D0
-    BSR     PUT_CHR
+    BSR     put_chr
 
     ; Send Space (0x20) to erase the character
     MOVE.B  #' ',D0
-    BSR     PUT_CHR
+    BSR     put_chr
 
     ; Send BS (0x08) again to move cursor back to erased position
     MOVE.B  #BS,D0
-    BSR     PUT_CHR
+    BSR     put_chr
 
     BRA     LOOP                ; Continue input loop
 
@@ -76,9 +76,9 @@ BS_HANDLER:
 BUFFER_FULL:
     ; Send BEL (7) once to alert the user that the buffer is full
     MOVE.B  #BEL,D0
-    BSR     PUT_CHR
+    BSR     put_chr
 
-    BSR     GET_CHR             ; Get the next character
+    BSR     get_chr             ; Get the next character
     ; Check 1: Enter pressed (CR)
     CMP.B   #CR,D0
     BEQ     PROCESS_CMD         ; Yes, go process the command
@@ -92,9 +92,9 @@ BUFFER_FULL:
 PROCESS_CMD:
     MOVE.B  #0,(A5)         ; Null-terminate the string in the buffer
     MOVE.B  #CR,D0
-    BSR     PUT_CHR
+    BSR     put_chr
     MOVE.B  #LF,D0
-    BSR     PUT_CHR
+    BSR     put_chr
 
     ; Parse DUMP
     BSR     PARSE_DUMP
@@ -129,7 +129,7 @@ PROCESS_CMD:
 UNKNOWN_CMD:
     ; Print error message
     LEA     MSG_UNKNOWN,A0
-    BSR     PUT_STR
+    BSR     put_str
     BRA     NEW_CMD
 
 ; A1 - Dump address
@@ -139,19 +139,19 @@ DUMP_LINE:
     MOVE.L  A1,D0
     BSR     BINTOHEX        ; Print address
     MOVE.B  #':',D0
-    BSR     PUT_CHR
+    BSR     put_chr
     MOVE.W  #(8-1),D2       ; Print 8 cells
 DUMP_CELL:
     MOVE.B  #' ',D0
-    BSR     PUT_CHR
+    BSR     put_chr
     MOVE.W  (A1)+,D0
     BSR     BINTOHEX_W      ; Print mem value
     DBRA    D2,DUMP_CELL    ; Decrement D1, branch if D1 is NOT -1
 
     MOVE.B  #CR,D0
-    BSR     PUT_CHR
+    BSR     put_chr
     MOVE.B  #LF,D0
-    BSR     PUT_CHR
+    BSR     put_chr
     DBRA    D1,DUMP_LINE    ; Decrement D1, branch if D1 is NOT -1
     BRA     NEW_CMD
 
@@ -163,7 +163,7 @@ WRITE_CMD:
 
 HELP_CMD:
     LEA     MSG_HELP,A0
-    BSR     PUT_STR
+    BSR     put_str
     BRA     NEW_CMD
 
 ; -------------------------------------------------------------------------
@@ -200,7 +200,7 @@ HELP_CMD:
 ; -------------------------------------------------------------------------
 LOAD_CMD:
     LEA     MSG_LOADING,A0
-    BSR     PUT_STR
+    BSR     put_str
 
     ; Read header start address (32 bits)
     JSR     READ_32BIT_WORD     ; Result in D1.L
@@ -214,13 +214,13 @@ LOAD_CMD:
 
     ; Read content
 LOA_CMD_LOOP:
-    JSR     GET_CHR             ; Read byte from UART to D0
+    JSR     get_chr             ; Read byte from UART to D0
     MOVE.B  D0,(A0)+            ; Copy read byte to memory
     DBRA    D1,LOA_CMD_LOOP     ; Decrement D1, if != -1 exit
 
 LOA_CMD_DONE:
     LEA     MSG_LOAD_DONE,A0
-    BSR     PUT_STR
+    BSR     put_str
     BRA     NEW_CMD
 
 ; TODO: Load - Add checksum at the end
@@ -510,16 +510,16 @@ TRAP_14_HANDLER:
 ; READ_32BIT_WORD: Reads 4 bytes from UART and assembles into D1.L
 ; Input: None
 ; Output: D1.L = 32-bit value
-; Uses: GET_CHR (assumed to return 8-bit char in D0.B)
+; Uses: get_chr (assumed to return 8-bit char in D0.B)
 ; -------------------------------------------------------------
 READ_32BIT_WORD:
-    MOVEM.L D0/D2,-(SP)     ; Save D0 (used for GET_CHR) and D2 (used for loop counter)
+    MOVEM.L D0/D2,-(SP)     ; Save D0 (used for get_chr) and D2 (used for loop counter)
 
     MOVEQ   #4-1,D2         ; D2 = 3 (loop 4 times for 4 bytes)
     CLR.L   D1              ; D1 = Accumulator (cleared for the 32-bit result)
 
 READ_LOOP:
-    BSR     GET_CHR         ; D0.B = Get one byte from the serial port
+    BSR     get_chr         ; D0.B = Get one byte from the serial port
 
     ; 1. Shift the current result (D1) left by 8 bits (makes room for the new byte)
     LSL.L   #8,D1

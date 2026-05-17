@@ -38,7 +38,7 @@ BTH_PRINT:
     MOVE.L  D0,-(SP)            ; SAFELY PUSH D0.L (THE VALUE) TO STACK
 
     MOVE.B  D1,D0               ; Pass the ASCII char in D0.B for PUTCHAR
-    BSR     PUT_CHR             ; Display the character
+    BSR     put_chr             ; Display the character
 
     MOVE.L  (SP)+,D0            ; RESTORE D0.L (THE VALUE) from stack
 
@@ -86,8 +86,8 @@ BTH_W_PRINT:
     ; --- 3. Display Character and Restore D0 ---
     MOVE.L  D0,-(SP)            ; **SAVE D0.L** (the value) to stack
 
-    MOVE.B  D1,D0               ; Pass the ASCII char in D0.B for PUT_CHR
-    BSR     PUT_CHR             ; Display the character
+    MOVE.B  D1,D0               ; Pass the ASCII char in D0.B for put_chr
+    BSR     put_chr             ; Display the character
 
     MOVE.L  (SP)+,D0            ; **RESTORE D0.L** (the value) from stack
 

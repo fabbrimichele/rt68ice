@@ -11,9 +11,9 @@
 ; Program code
 ; ===========================
 START:
-    bsr     UART_INIT
+    bsr     uart_init
     lea     MSG_HELLO,A0
-    bsr     PUT_STR
+    bsr     put_str
 LOOP:
     bra     LOOP
 

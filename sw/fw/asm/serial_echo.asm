@@ -11,32 +11,32 @@
 ; Program code
 ; ===========================
 START:
-    bsr     UART_INIT
+    bsr     uart_init
     lea     MSG_HELLO,A0
-    bsr     PUT_STR
+    bsr     put_str
 .LOOP:
-    bsr     GET_CHR
+    bsr     get_chr
     cmp.b   #CR,D0          ; Check if the user pressed ENTER (Carriage Return)
     beq     .NEWLINE
     cmp.b   #BS,D0          ; Check if the user pressed BACKSPACE
     beq     .BACKSPACE
     cmp.b   #DEL,D0         ; Check if the user pressed DEL
     beq     .BACKSPACE
-    bsr     PUT_CHR
+    bsr     put_chr
     bra     .LOOP
 .NEWLINE:
     move.b  #CR,D0
-    bsr     PUT_CHR
+    bsr     put_chr
     move.b  #LF,D0
-    bsr     PUT_CHR
+    bsr     put_chr
     bra     .LOOP
 .BACKSPACE:
     move.b  #BS,D0
-    bsr     PUT_CHR
+    bsr     put_chr
     move.b  #SPACE,D0
-    bsr     PUT_CHR
+    bsr     put_chr
     move.b  #BS,D0
-    bsr     PUT_CHR
+    bsr     put_chr
     bra     .LOOP
 
 ; ===========================
