@@ -1,38 +1,38 @@
-    ORG     $4000            ; Start of ROM
+    org     $4000            ; Start of ROM
 
 ; ===========================
 ; 68000 Vector Table, only initial PC and SP
 ; Each vector is 32 bits (long)
 ; ===========================
-    DC.L   RAM_END      ; 0: Initial Stack Pointer (SP)
-    DC.L   START        ; 1: Reset vector (PC start address)
+    dc.l   RAM_END      ; 0: Initial Stack Pointer (SP)
+    dc.l   start        ; 1: Reset vector (PC start address)
 
 ; ===========================
 ; Program code
 ; ===========================
-START:
+start:
     move.w  #$55,RAM_START
     move.w  RAM_START,D0
     cmp.w   #$55,D0
-    beq     OK
-NOT_OK:
+    beq     .ok
+.not_ok:
     move.b  #1,LED          ; memory mismatch, LED red
-    bra     LOOP
-OK:
+    bra     .loop
+.ok:
     move.b  #2,LED          ; memory match, LED green
-LOOP:
-    bra     LOOP
+.loop:
+    bra     .loop
 
 ; ===========================
 ; Value Constants
 ; ===========================
-RAM_START   EQU     $00000400
-RAM_END     EQU     $00004000   ; End of RAM address (+1)
+RAM_START   equ     $00000400
+RAM_END     equ     $00004000   ; End of RAM address (+1)
 
 ; ===========================
 ; Include files
 ; ===========================
-    INCLUDE '../../lib/asm/mem_map_led.asm'
+    include '../../lib/asm/mem_map_led.asm'
 
 ; ===========================
 ; Data Constants

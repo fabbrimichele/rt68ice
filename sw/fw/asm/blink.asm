@@ -1,40 +1,39 @@
-    ORG     $4000            ; Start of ROM
+    org     $4000            ; Start of ROM
 
 ; ===========================
 ; 68000 Vector Table, only initial PC and SP
 ; Each vector is 32 bits (long)
 ; ===========================
-    DC.L   RAM_END      ; 0: Initial Stack Pointer (SP)
-    DC.L   START        ; 1: Reset vector (PC start address)
+    dc.l   RAM_END      ; 0: Initial Stack Pointer (SP)
+    dc.l   start        ; 1: Reset vector (PC start address)
 
 ; ===========================
 ; Program code
 ; ===========================
-START:
-    lea     LED,A0          ; Load LED register address into A0
-    move.b  #1,D1
+start:
+    lea     LED,a0          ; Load LED register address into a0
+    move.b  #1,d1
 
-LOOP:
-    move.b  D1,(A0)         ; Write D1 into LED register
-    addq.b  #1,D1           ; Increment register
-DELAY:
-    move.l  #DLY_VAL,D0     ;
-DLY_LOOP:
-    subq.l  #1,D0           ; 4 cycles
-    bne     DLY_LOOP        ; 10 cycles when taken
-    jmp     LOOP            ; Infinite loop
+.loop:
+    move.b  d1,(a0)         ; Write d1 into LED register
+    addq.b  #1,d1           ; Increment register
+    move.l  #DLY_VAL,d0     ;
+.dly_loop:
+    subq.l  #1,d0           ; 4 cycles
+    bne     .dly_loop        ; 10 cycles when taken
+    jmp     .loop            ; Infinite loop
 
 
 ; ===========================
 ; Value Constants
 ; ===========================
-DLY_VAL     EQU     3125000     ; Delay iterations, 0.5 sec at 25 MHz
-RAM_END     EQU     $00004000   ; End of RAM address (+1)
+DLY_VAL     equ     3125000     ; Delay iterations, 0.5 sec at 25 MHz
+RAM_END     equ     $00004000   ; End of RAM address (+1)
 
 ; ===========================
 ; Include files
 ; ===========================
-    INCLUDE '../../lib/asm/mem_map_led.asm'
+    include '../../lib/asm/mem_map_led.asm'
 
 ; ===========================
 ; Data Constants
