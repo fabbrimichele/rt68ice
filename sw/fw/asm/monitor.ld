@@ -1,21 +1,32 @@
 MEMORY
 {
     /* The hardware maps the first 8 bytes to ROM, but we define the actual ROM storage */
-    RAM (rwx)   : ORIGIN = 0x00000400, LENGTH = 16K - 0x400
+    RAM (rwx)   : ORIGIN = 0x00000000, LENGTH = 16K
     ROM (rx)    : ORIGIN = 0x00004000, LENGTH = 16K
 }
 
 SECTIONS
 {
-    .bss (NOLOAD) : {
-        _bss_start = .;         /* Mark the start of uninitialized RAM */
-        *(.bss*)                /* buffers and variables go here */
-        _bss_end = .;           /* Mark where your variables end */
-        /* 2. Calculate the Initial Stack Pointer at the very top edge of RAM */
-        _stack_top = ORIGIN(RAM) + LENGTH(RAM);
+    /* Vector Table Boundaries */
+    _vector_table_start = ORIGIN(RAM);
+    _vector_table_end   = ORIGIN(RAM) + 0x0400;
+
+    /* Define the boundary where the user loading area begins */
+    _user_ram_start = _vector_table_end;
+
+    /* Force the monitor's private variables to start exactly at $3F00 */
+    .bss 0x00003F00 (NOLOAD) : {
+        _bss_start = .;
+        *(.bss*)
+        _bss_end = .;
+
     } > RAM
 
-    .text : {
+    /* The initial stack pointer is at the top of user RAM */
+    _user_ram_end = _bss_start;
+    _reset_sp = _bss_start;
+
+    .text ORIGIN(ROM) : {
         *(.text*)
         *(.rodata*)
     } > ROM
