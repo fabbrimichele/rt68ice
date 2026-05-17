@@ -1,12 +1,12 @@
 ; ------------------------------
 ; ROM Monitor (ROM version)
 ; ------------------------------
-    org    $4000          ; ROM Start Address
+    section .text, code
 
 ; ------------------------------
 ; Initial Reset sp and PC in Vector Table
 ; ------------------------------
-    dc.l RAM_END            ; Reset Stack Pointer (sp, sp move downward far from SO_RAM)
+    dc.l _bss_start         ; Reset Stack Pointer (sp, sp move downward far from SO_RAM)
     dc.l start              ; Reset Program counter (PC) (point to the beginning of code)
 
 ; ------------------------------
@@ -564,13 +564,17 @@ load_str        dc.b    'LOAD',NUL
 run_str         dc.b    'RUN',NUL,NUL
 fbclr_str       dc.b    'FBCLR',NUL
 
+; ------------------------------
+; RAM Data Section (bootloader mem)
+; ------------------------------
+    section .bss
+
 ; ===========================
 ; Constants
 ; ===========================
 MON_MEM_LEN     equ 256                     ; RAM allocated for the monitor
 
 ; Memory Map
-RAM_START       equ $00000400               ; Start of RAM address (after the vector table)
 RAM_END         equ $00004000               ; End of RAM address (+1)
 SP_START        equ (RAM_END-MON_MEM_LEN)   ; After sp, allocates monitor RAM
 MON_MEM_START   equ SP_START                ;
