@@ -7,12 +7,15 @@
 ;             A0 = Points to the byte immediately following the null terminator.
 ; =============================================================================
 PUT_STR:
+    movem.l D0/A0,-(SP)
+.LOOP:
     move.b  (A0)+,D0        ; Read character from address A0 into D0,
                             ; then auto-increment A0 to point to the next char
     beq     .STR_DONE       ; If the character is 0 (null terminator), we are done
     bsr     PUT_CHR         ; Print the character using your existing routine
-    bra     PUT_STR         ; Repeat for next character
+    bra     .LOOP           ; Repeat for next character
 .STR_DONE:
+    movem.l (SP)+,D0/A0
     rts                     ; Return to caller
 
 ; =============================================================================
@@ -25,10 +28,13 @@ PUT_STR:
 ;             is completely empty (THRE, bit 5).
 ; =============================================================================
 PUT_CHR:
+    movem.l D1,-(SP)         ; Save D2
+.WAIT:
     move.b  UART_LSR,D1
 	btst    #5,D1   		; write buffer empty?
-	beq     PUT_CHR 		; eq 0, not ready, check again
+	beq     .WAIT    		; eq 0, not ready, check again
 	move.b  D0,UART_RBR		; write D0 to serial
+    movem.l (SP)+,D1
 	rts						; return
 
 ; =============================================================================
@@ -41,10 +47,13 @@ PUT_CHR:
 ;             is set, indicating a byte has arrived in the FIFO.
 ; =============================================================================
 GET_CHR:
+    movem.l D1,-(SP)         ; Save D2
+.WAIT:
     move.b  UART_LSR,D1     ; Read status register
     btst    #0,D1           ; read full?
-    beq     GET_CHR         ; Wait until RX ready
+    beq     .WAIT           ; Wait until RX ready
     move.b  UART_RBR,D0     ; Read character to D0
+    movem.l (SP)+,D1
     rts
 
 ; =============================================================================
@@ -59,12 +68,12 @@ GET_CHR:
 ;             to write baud generator latches sharing physical register spaces.
 ; =============================================================================
 UART_INIT:
-	move.b #$80,UART_LCR	; select DLAB = 1, to access the Divisor Latches of the Baud Generator
-	move.b #$00,UART_IER	; set divisor MSB to 0
-	move.b #65,UART_RBR     ; set divisor LSB to 65: 20MHz/16/65 = 19231 (should be 19200)
-	move.b #$00,UART_LCR	; select DLAB = 0
-	move.b #$03,UART_LCR	; set options to 8N1
-	move.b #$00,UART_IER	; disable interrupt
+	move.b  #$80,UART_LCR	; select DLAB = 1, to access the Divisor Latches of the Baud Generator
+	move.b  #$00,UART_IER	; set divisor MSB to 0
+	move.b  #65,UART_RBR     ; set divisor LSB to 65: 20MHz/16/65 = 19231 (should be 19200)
+	move.b  #$00,UART_LCR	; select DLAB = 0
+	move.b  #$03,UART_LCR	; set options to 8N1
+	move.b  #$00,UART_IER	; disable interrupt
 	rts
 
 ; ===========================
@@ -77,6 +86,7 @@ ESC         EQU     $1B
 BS          EQU     $08
 DEL         EQU     $7F
 SPACE       EQU     $20
+BEL         EQU     $07
 
 ; ===========================
 ; Include files
