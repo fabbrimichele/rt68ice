@@ -4,8 +4,8 @@
 ; 68000 Vector Table, only initial PC and SP
 ; Each vector is 32 bits (long)
 ; ===========================
-    DC.L   RAM_END      ; 0: Initial Stack Pointer (SP)
-    DC.L   start        ; 1: Reset vector (PC start address)
+    dc.l   RAM_END      ; 0: Initial Stack Pointer (SP)
+    dc.l   start        ; 1: Reset vector (PC start address)
 
 ; ===========================
 ; Program code
@@ -32,7 +32,7 @@ RAM_END     EQU     $00004000   ; End of RAM address (+1)
 ; ===========================
 ; Include files
 ; ===========================
-    INCLUDE '../../lib/asm/mem_map_led.asm'
+    include '../../lib/asm/mem_map_led.asm'
 
 ; ===========================
 ; Data Constants

@@ -4,22 +4,22 @@
 ; 68000 Vector Table, only initial PC and SP
 ; Each vector is 32 bits (long)
 ; ===========================
-    DC.L   RAM_END      ; 0: Initial Stack Pointer (SP)
-    DC.L   start        ; 1: Reset vector (PC start address)
+    dc.l   RAM_END      ; 0: Initial Stack Pointer (SP)
+    dc.l   start        ; 1: Reset vector (PC start address)
 
 ; ===========================
 ; Program code
 ; ===========================
 start:
-    move.w  #1,D0
-    move.b  D0,LED          ; Red -> NOT OK
+    move.w  #1,d0
+    move.b  d0,LED          ; Red -> NOT OK
     bsr     set_green
-    move.b  D0,LED          ; Green -> OK
+    move.b  d0,LED          ; Green -> OK
 .loop:
     bra     .loop
 
 set_green:
-    move.w  #2,D0
+    move.w  #2,d0
     rts
 
 ; ===========================
@@ -30,7 +30,7 @@ RAM_END     EQU     $00004000   ; End of RAM address (+1)
 ; ===========================
 ; Include files
 ; ===========================
-    INCLUDE '../../lib/asm/mem_map_led.asm'
+    include '../../lib/asm/mem_map_led.asm'
 
 ; ===========================
 ; Data Constants

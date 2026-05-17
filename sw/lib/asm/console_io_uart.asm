@@ -91,4 +91,4 @@ BEL         EQU     $07
 ; ===========================
 ; Include files
 ; ===========================
-    INCLUDE '../../lib/asm/mem_map_uart.asm'
+    include '../../lib/asm/mem_map_uart.asm'

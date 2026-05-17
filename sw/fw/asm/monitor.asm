@@ -6,8 +6,8 @@
 ; ------------------------------
 ; Initial Reset SP and PC in Vector Table
 ; ------------------------------
-    DC.L RAM_END            ; Reset Stack Pointer (SP, SP move downward far from SO_RAM)
-    DC.L START              ; Reset Program counter (PC) (point to the beginning of code)
+    dc.l RAM_END            ; Reset Stack Pointer (SP, SP move downward far from SO_RAM)
+    dc.l START              ; Reset Program counter (PC) (point to the beginning of code)
 
 ; ------------------------------
 ; Program code
@@ -503,8 +503,8 @@ TRAP_14_HANDLER:
 ; ------------------------------
 ; Libraries
 ; ------------------------------
-    INCLUDE '../../lib/asm/console_io_uart.asm'
-    INCLUDE '../../lib/asm/conversions.asm'
+    include '../../lib/asm/console_io_uart.asm'
+    include '../../lib/asm/conversions.asm'
 
 ; -------------------------------------------------------------
 ; READ_32BIT_WORD: Reads 4 bytes from UART and assembles into D1.L
