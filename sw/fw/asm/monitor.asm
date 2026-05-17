@@ -6,7 +6,7 @@
 ; ------------------------------
 ; Initial Reset sp and PC in Vector Table
 ; ------------------------------
-    dc.l _bss_start         ; Reset Stack Pointer (sp, sp move downward far from SO_RAM)
+    dc.l _stack_top         ; Reset Stack Pointer (sp, sp move downward far from SO_RAM)
     dc.l start              ; Reset Program counter (PC) (point to the beginning of code)
 
 ; ------------------------------
@@ -564,10 +564,19 @@ load_str        dc.b    'LOAD',NUL
 run_str         dc.b    'RUN',NUL,NUL
 fbclr_str       dc.b    'FBCLR',NUL
 
-; ------------------------------
+; ===========================
 ; RAM Data Section (bootloader mem)
-; ------------------------------
+; ===========================
+; TODO: this is OK for a generic program
+;       the monitor needs to have a different memory layout
+;       RAM:
+;       - memory to load programs
+;       - SP top
+;       - monitor working area (256 bytes)
     section .bss
+IN_BUF:
+    ds.b    80
+IN_BUF_END:
 
 ; ===========================
 ; Constants
@@ -585,14 +594,6 @@ FB_LEN          equ (FB_END-FB_START)       ; Framebuffer length
 
 ; Vector Table
 VT_TRAP_14      equ $B8
-
-; Monitor RAM
-; Allocated after the stack point, if the monitor needs
-; more memory it's sufficient to move the stack pointer
-; Buffer
-IN_BUF          equ MON_MEM_START           ; IN_BUF start after the stack pointer
-IN_BUF_LEN      equ 80                      ; BUFFER LEN should be less than MON_MEM_LEN equ
-IN_BUF_END      equ IN_BUF+IN_BUF_LEN       ;
 
 ; Program Constants
 DLY_VAL         equ 1333333     ; Delay iterations, 1.33 million = 0.5 sec at 32MHz

@@ -1,18 +1,18 @@
-    org     $4000            ; Start of ROM
+    section .text, code
 
 ; ===========================
 ; 68000 Vector Table, only initial PC and SP
 ; Each vector is 32 bits (long)
 ; ===========================
-    dc.l   RAM_END      ; 0: Initial Stack Pointer (SP)
+    dc.l   _stack_top   ; 0: Initial Stack Pointer (SP)
     dc.l   start        ; 1: Reset vector (PC start address)
 
 ; ===========================
 ; Program code
 ; ===========================
 start:
-    move.w  #$55,RAM_START
-    move.w  RAM_START,D0
+    move.w  #$55,buffer
+    move.w  buffer,D0
     cmp.w   #$55,D0
     beq     .ok
 .not_ok:
@@ -26,8 +26,6 @@ start:
 ; ===========================
 ; Value Constants
 ; ===========================
-RAM_START   equ     $00000400
-RAM_END     equ     $00004000   ; End of RAM address (+1)
 
 ; ===========================
 ; Include files
@@ -38,3 +36,10 @@ RAM_END     equ     $00004000   ; End of RAM address (+1)
 ; Data Constants
 ; Must be after code to avoid alignment issues
 ; ===========================
+; Add here data costants, e.g. `msg_hello dc.b    "Type something:",CR,LF,NUL`
+
+; ===========================
+; RAM Data Section (bootloader mem)
+; ===========================
+    section .bss
+buffer  ds.w 1

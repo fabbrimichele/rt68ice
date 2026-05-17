@@ -19,7 +19,7 @@ HEX_SPINAL_DIR = hw/spinal/rt68ice/memory
 HEX_CLASS_DIR = target/scala-2.13/classes/rt68ice/memory
 ASSEMBLIES = blink mem_test stack_test serial_hello serial_echo monitor
 
-.PHONY: all clean rom prog prog-flash view-wave
+.PHONY: all clean rom prog prog-flash view-wave monitor
 
 all: $(TARGET).bit
 
@@ -76,7 +76,7 @@ $(HEX_CLASS_DIR)/%.hex: $(ASM_SRC_DIR)/%.asm
 	# Assemble the 68000 code to an ELF object file
 	vasmm68k_mot -Felf $< -o $(BIN_GEN_DIR)/$*.o
 	# Link object file
-	vlink -T $(ASM_SRC_DIR)/fw.ld -b rawbin1 -M$(BIN_GEN_DIR)/$*.sym -o $(BIN_GEN_DIR)/$*.bin $(BIN_GEN_DIR)/$*.o
+	vlink -T $(ASM_SRC_DIR)/generic.ld -b rawbin1 -M$(BIN_GEN_DIR)/$*.sym -o $(BIN_GEN_DIR)/$*.bin $(BIN_GEN_DIR)/$*.o
 	# Convert binary to a two-byte-per-line hex file, convert to uppercase
 	xxd -p -c 2 $(BIN_GEN_DIR)/$*.bin | awk '{print toupper($$0)}' > $(HEX_SPINAL_DIR)/$*.hex
 	# Ensure the destination directory exists
@@ -84,5 +84,8 @@ $(HEX_CLASS_DIR)/%.hex: $(ASM_SRC_DIR)/%.asm
 	# Copy the hex file to the Scala classes path for resource loading
 	cp $(HEX_SPINAL_DIR)/$*.hex $@
 
+# TODO:  monitor needs to use a custom ld file
+
 clean:
-	rm -rf *.json *.config *.bit hw/gen/*.v hw/gen/*.vhd target hw/spinal/rt68ice/memory/*.hex
+	rm -rf *.json *.config *.bit target hw/spinal/rt68ice/memory/*.hex
+	rm -rf hw/gen/*.v hw/gen/*.vhd hw/gen/*.o hw/gen/*.bin hw/gen/*.sym hw/spinal/rt68ice/memory/*.hex
