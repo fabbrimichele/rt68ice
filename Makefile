@@ -19,6 +19,9 @@ HEX_SPINAL_DIR = hw/spinal/rt68ice/memory
 HEX_CLASS_DIR = target/scala-2.13/classes/rt68ice/memory
 ASSEMBLIES = blink mem_test stack_test serial_hello serial_echo monitor
 
+# Default linker script for generic programs
+LDSCRIPT = $(ASM_SRC_DIR)/generic.ld
+
 .PHONY: all clean rom prog prog-flash view-wave monitor
 
 all: $(TARGET).bit
@@ -69,6 +72,10 @@ view-wave: simWorkspace/Blink/test/wave.fst
 ROM_HEX_FILES = $(patsubst %, $(HEX_CLASS_DIR)/%.hex, $(ASSEMBLIES))
 rom: $(ROM_HEX_FILES)
 
+# Target-Specific Variable Override:
+# When building the monitor hex file, temporarily replace the generic linker script
+$(HEX_CLASS_DIR)/monitor.hex: LDSCRIPT = $(ASM_SRC_DIR)/monitor.ld
+
 $(HEX_CLASS_DIR)/%.hex: $(ASM_SRC_DIR)/%.asm
 	@echo "----------------------------------------------"
 	@echo "- Assembling and Converting '$*'"
@@ -76,7 +83,7 @@ $(HEX_CLASS_DIR)/%.hex: $(ASM_SRC_DIR)/%.asm
 	# Assemble the 68000 code to an ELF object file
 	vasmm68k_mot -Felf $< -o $(BIN_GEN_DIR)/$*.o
 	# Link object file
-	vlink -T $(ASM_SRC_DIR)/generic.ld -b rawbin1 -M$(BIN_GEN_DIR)/$*.sym -o $(BIN_GEN_DIR)/$*.bin $(BIN_GEN_DIR)/$*.o
+	vlink -T $(LDSCRIPT) -b rawbin1 -M$(BIN_GEN_DIR)/$*.sym -o $(BIN_GEN_DIR)/$*.bin $(BIN_GEN_DIR)/$*.o
 	# Convert binary to a two-byte-per-line hex file, convert to uppercase
 	xxd -p -c 2 $(BIN_GEN_DIR)/$*.bin | awk '{print toupper($$0)}' > $(HEX_SPINAL_DIR)/$*.hex
 	# Ensure the destination directory exists

@@ -24,7 +24,7 @@ SECTIONS
 
     /* The initial stack pointer is at the top of user RAM */
     _user_ram_end = _bss_start;
-    _reset_sp = _bss_start;
+    _stack_top = _bss_start;
 
     .text ORIGIN(ROM) : {
         *(.text*)

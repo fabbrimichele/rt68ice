@@ -497,7 +497,7 @@ chk_trl_done:
 ; TRAP handlers
 ; ------------------------------
 trap_14_handler:
-    move.l  #SP_START,sp
+    move.l  #_stack_top,sp
     jmp     mon_entry
 
 ; ------------------------------
@@ -567,12 +567,6 @@ fbclr_str       dc.b    'FBCLR',NUL
 ; ===========================
 ; RAM Data Section (bootloader mem)
 ; ===========================
-; TODO: this is OK for a generic program
-;       the monitor needs to have a different memory layout
-;       RAM:
-;       - memory to load programs
-;       - SP top
-;       - monitor working area (256 bytes)
     section .bss
 IN_BUF:
     ds.b    80
@@ -584,13 +578,10 @@ IN_BUF_END:
 MON_MEM_LEN     equ 256                     ; RAM allocated for the monitor
 
 ; Memory Map
-RAM_END         equ $00004000               ; End of RAM address (+1)
-SP_START        equ (RAM_END-MON_MEM_LEN)   ; After sp, allocates monitor RAM
-MON_MEM_START   equ SP_START                ;
+; TODO: move to monitor.ld
 FB_START        equ $00200000               ; Start of Framebuffer (TODO)
 FB_END          equ $0020FA01               ; End of Framebuffer (+1)
 FB_LEN          equ (FB_END-FB_START)       ; Framebuffer length
-; NOTE: do not remove spaces around +
 
 ; Vector Table
 VT_TRAP_14      equ $B8
