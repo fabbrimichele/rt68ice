@@ -1,4 +1,4 @@
-    ORG     $4000            ; Start of ROM
+    org     $4000            ; Start of ROM
 
 ; ===========================
 ; 68000 Vector Table, only initial PC and SP
@@ -25,7 +25,7 @@ set_green:
 ; ===========================
 ; Value Constants
 ; ===========================
-RAM_END     EQU     $00004000   ; End of RAM address (+1)
+RAM_END     equ     $00004000   ; End of RAM address (+1)
 
 ; ===========================
 ; Include files

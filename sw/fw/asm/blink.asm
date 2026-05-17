@@ -1,4 +1,4 @@
-    ORG     $4000            ; Start of ROM
+    org     $4000            ; Start of ROM
 
 ; ===========================
 ; 68000 Vector Table, only initial PC and SP
@@ -27,8 +27,8 @@ start:
 ; ===========================
 ; Value Constants
 ; ===========================
-DLY_VAL     EQU     3125000     ; Delay iterations, 0.5 sec at 25 MHz
-RAM_END     EQU     $00004000   ; End of RAM address (+1)
+DLY_VAL     equ     3125000     ; Delay iterations, 0.5 sec at 25 MHz
+RAM_END     equ     $00004000   ; End of RAM address (+1)
 
 ; ===========================
 ; Include files

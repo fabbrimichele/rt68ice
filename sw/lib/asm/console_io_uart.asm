@@ -79,14 +79,14 @@ uart_init:
 ; ===========================
 ; Constants
 ; ===========================
-CR          EQU     $0D
-LF          EQU     $0A
-NUL         EQU     $00
-ESC         EQU     $1B
-BS          EQU     $08
-DEL         EQU     $7F
-SPACE       EQU     $20
-BEL         EQU     $07
+CR          equ     $0D
+LF          equ     $0A
+NUL         equ     $00
+ESC         equ     $1B
+BS          equ     $08
+DEL         equ     $7F
+SPACE       equ     $20
+BEL         equ     $07
 
 ; ===========================
 ; Include files
