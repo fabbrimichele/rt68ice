@@ -232,8 +232,8 @@ run_cmd:
     jmp     (a1)
 
 fbclr_cmd:
-    lea     FB_START,a0         ; Framebuffer pointer
-    move.w  #((FB_LEN/2)-1),d1  ; Framebuffer size in words - 1 (dbra)
+    lea     _fb_start,a0            ; Framebuffer pointer
+    move.w  #(_fb_len_words-1),d1   ; Framebuffer size in words - 1 (dbra)
     move.w  #0,d0
 fbclr_cmd_loop:
     move.w  d0,(a0)+            ; Clear FB
@@ -575,14 +575,6 @@ IN_BUF_END:
 ; ===========================
 ; Constants
 ; ===========================
-MON_MEM_LEN     equ 256                     ; RAM allocated for the monitor
-
-; Memory Map
-; TODO: move to monitor.ld
-FB_START        equ $00200000               ; Start of Framebuffer (TODO)
-FB_END          equ $0020FA01               ; End of Framebuffer (+1)
-FB_LEN          equ (FB_END-FB_START)       ; Framebuffer length
-
 ; Vector Table
 VT_TRAP_14      equ $B8
 
