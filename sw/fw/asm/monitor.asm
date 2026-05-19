@@ -182,21 +182,6 @@ help_cmd:
 ; 00 00 08 10 ; Load Address: $00000810
 ; 00 00 00 02 ; Content Length: 2 bytes (it doesn't include the headers)
 ; 55 55       ; Actual Content: Two bytes ($55, $55)
-; GTKTerm format:
-; 00;00;08;10;00;00;00;02;55;55
-;
-; Actual program to write to LED and then loop
-; Address (Hex) Instruction Opcode (Hex)    Comment
-; 0810          bra loop    60FE            Branch Always back to $0810 (FE=−2).
-; GTKTerm format: 00;00;08;10;00;00;00;02;60;FE
-; TODO: it doesn't swith the leds on!
-; Address (Hex) Instruction             Opcode (Hex)    Comment
-; 0900          move.b #$0A,$00010000   13FC            Opcode for move.b Immediate to Absolute Long
-; 0902          000A                    000A            16-bit Immediate Data (where the assembler places the 0A)
-; 0904          00010000                0001 0000       32-bit destination address
-; 0908          bra loop                60FE            Branch Always back to $0818
-; GTKTerm format:
-; 00;00;09;00;00;00;00;0A;13;FC;00;0A;00;01;00;00;60;FE
 ; -------------------------------------------------------------------------
 load_cmd:
     lea     msg_loading,a0
@@ -545,24 +530,24 @@ init_vector_table:
 ; Messages
 msg_title       dc.b    'RT68F Monitor v0.1',CR,LF,NUL
 msg_unknown     dc.b    'Error: Unknown command or syntax',CR,LF,NUL
-msg_help        dc.b    'DUMP  <ADDR>       - Dump from ADDR (HEX)',CR,LF
-                dc.b    'WRITE <ADDR> <VAL> - Write to ADDR (HEX) the VALUE (HEX)',CR,LF
-                dc.b    'LOAD               - Load from UART to memory',CR,LF
-                dc.b    'RUN   <ADDR>       - Run program at ADDR (HEX)',CR,LF
-                dc.b    'FBCLR              - Clear framebuffer',CR,LF
-                dc.b    'HELP               - Print this list of commands',CR,LF
+msg_help        dc.b    'dump  <ADDR>       - Dump from ADDR (HEX)',CR,LF
+                dc.b    'write <ADDR> <VAL> - Write to ADDR (HEX) the VALUE (HEX)',CR,LF
+                dc.b    'load               - Load from UART to memory',CR,LF
+                dc.b    'run   <ADDR>       - Run program at ADDR (HEX)',CR,LF
+                dc.b    'fbclr              - Clear framebuffer',CR,LF
+                dc.b    'help               - Print this list of commands',CR,LF
                 dc.b    NUL
 msg_loading     dc.b    'Loading...',CR,LF,NUL
 msg_load_done   dc.b    'Done.',CR,LF,NUL
 
 ; Commands
 ; They must be null terminated
-dump_str        dc.b    'DUMP',NUL
-write_str       dc.b    'WRITE',NUL
-help_str        dc.b    'HELP',NUL
-load_str        dc.b    'LOAD',NUL
-run_str         dc.b    'RUN',NUL,NUL
-fbclr_str       dc.b    'FBCLR',NUL
+dump_str        dc.b    'dump',NUL
+write_str       dc.b    'write',NUL
+help_str        dc.b    'help',NUL
+load_str        dc.b    'load',NUL
+run_str         dc.b    'run',NUL,NUL
+fbclr_str       dc.b    'fbclr',NUL
 
 ; ===========================
 ; RAM Data Section (bootloader mem)

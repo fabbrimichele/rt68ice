@@ -85,16 +85,16 @@ serial-load: apps
 		find target/app/ -maxdepth 1 -name "*.bin" ! -name "*_raw.bin" | xargs -n 1 basename; \
 		exit 1; \
 	fi
-	# 1. Send LOAD command to prepare the device
+	# Send `load` command to prepare the device
 	@echo "--- Loading $(BIN) to $(SERIAL_PORT) ---"
-	printf "LOAD\r" > $(SERIAL_PORT)
+	printf "load\r" > $(SERIAL_PORT)
 	sleep 0.5
-	# 2. Transfer the contents of the chosen binary file
+	# Transfer the contents of the chosen binary file
 	cat $(TARGET_APP_DIR)/$(BIN) > $(SERIAL_PORT)
 	sleep 0.5
-	# 3. Send RUN command
+	# Send RUN command
 	@echo "--- Running application at $(PROGRAM_ADDRESS) ---"
-	printf "RUN $(PROGRAM_ADDRESS)\r" > $(SERIAL_PORT)
+	printf "run $(PROGRAM_ADDRESS)\r" > $(SERIAL_PORT)
 
 clean:
 	rm -rf *.json *.config *.bit target hw/spinal/rt68ice/memory/*.hex
