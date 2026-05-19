@@ -1,26 +1,20 @@
     section .text, code
 
 ; ===========================
-; 68000 Vector Table, only initial PC and SP
-; Each vector is 32 bits (long)
-; ===========================
-    dc.l   _stack_top   ; 0: Initial Stack Pointer (SP)
-    dc.l   start        ; 1: Reset vector (PC start address)
-
-; ===========================
 ; Program code
 ; ===========================
 start:
-    move.w  #1,d0
-    move.b  d0,LED          ; Red -> NOT OK
-    bsr     set_green
-    move.b  d0,LED          ; Green -> OK
-.loop:
-    bra     .loop
-
-set_green:
-    move.w  #2,d0
-    rts
+    move.w  #$55,buffer
+    move.w  buffer,D0
+    cmp.w   #$55,D0
+    beq     .ok
+.not_ok:
+    move.b  #1,LED          ; memory mismatch, LED red
+    bra     .end
+.ok:
+    move.b  #2,LED          ; memory match, LED green
+.end:
+    trap    #14
 
 ; ===========================
 ; Value Constants
@@ -41,4 +35,4 @@ set_green:
 ; RAM Data Section (bootloader mem)
 ; ===========================
     section .bss
-; Add here variables and buffers, e.g. `buffer ds.b 80`
+buffer  ds.w 1

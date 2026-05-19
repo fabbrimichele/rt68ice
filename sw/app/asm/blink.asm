@@ -1,30 +1,26 @@
     section .text, code
 
 ; ===========================
-; 68000 Vector Table, only initial PC and SP
-; Each vector is 32 bits (long)
-; ===========================
-    dc.l   _stack_top   ; 0: Initial Stack Pointer (SP)
-    dc.l   start        ; 1: Reset vector (PC start address)
-
-; ===========================
 ; Program code
 ; ===========================
 start:
-    move.w  #1,d0
-    move.b  d0,LED          ; Red -> NOT OK
-    bsr     set_green
-    move.b  d0,LED          ; Green -> OK
-.loop:
-    bra     .loop
+    lea     LED,a0          ; Load LED register address into a0
+    move.b  #1,d1
 
-set_green:
-    move.w  #2,d0
-    rts
+.loop:
+    move.b  d1,(a0)         ; Write d1 into LED register
+    addq.b  #1,d1           ; Increment register
+    move.l  #DLY_VAL,d0     ;
+.dly_loop:
+    subq.l  #1,d0           ; 4 cycles
+    bne     .dly_loop        ; 10 cycles when taken
+    jmp     .loop            ; Infinite loop
+
 
 ; ===========================
 ; Value Constants
 ; ===========================
+DLY_VAL     equ     3125000     ; Delay iterations, 0.5 sec at 25 MHz
 
 ; ===========================
 ; Include files
@@ -42,3 +38,4 @@ set_green:
 ; ===========================
     section .bss
 ; Add here variables and buffers, e.g. `buffer ds.b 80`
+

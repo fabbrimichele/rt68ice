@@ -1,12 +1,12 @@
 ; ------------------------------
 ; ROM Monitor (ROM version)
 ; ------------------------------
-    org    $4000          ; ROM Start Address
+    section .text, code
 
 ; ------------------------------
 ; Initial Reset sp and PC in Vector Table
 ; ------------------------------
-    dc.l RAM_END            ; Reset Stack Pointer (sp, sp move downward far from SO_RAM)
+    dc.l _stack_top         ; Reset Stack Pointer (sp, sp move downward far from SO_RAM)
     dc.l start              ; Reset Program counter (PC) (point to the beginning of code)
 
 ; ------------------------------
@@ -232,8 +232,8 @@ run_cmd:
     jmp     (a1)
 
 fbclr_cmd:
-    lea     FB_START,a0         ; Framebuffer pointer
-    move.w  #((FB_LEN/2)-1),d1  ; Framebuffer size in words - 1 (dbra)
+    lea     _fb_start,a0            ; Framebuffer pointer
+    move.w  #(_fb_len_words-1),d1   ; Framebuffer size in words - 1 (dbra)
     move.w  #0,d0
 fbclr_cmd_loop:
     move.w  d0,(a0)+            ; Clear FB
@@ -497,7 +497,7 @@ chk_trl_done:
 ; TRAP handlers
 ; ------------------------------
 trap_14_handler:
-    move.l  #SP_START,sp
+    move.l  #_stack_top,sp
     jmp     mon_entry
 
 ; ------------------------------
@@ -565,30 +565,18 @@ run_str         dc.b    'RUN',NUL,NUL
 fbclr_str       dc.b    'FBCLR',NUL
 
 ; ===========================
+; RAM Data Section (bootloader mem)
+; ===========================
+    section .bss
+IN_BUF:
+    ds.b    80
+IN_BUF_END:
+
+; ===========================
 ; Constants
 ; ===========================
-MON_MEM_LEN     equ 256                     ; RAM allocated for the monitor
-
-; Memory Map
-RAM_START       equ $00000400               ; Start of RAM address (after the vector table)
-RAM_END         equ $00004000               ; End of RAM address (+1)
-SP_START        equ (RAM_END-MON_MEM_LEN)   ; After sp, allocates monitor RAM
-MON_MEM_START   equ SP_START                ;
-FB_START        equ $00200000               ; Start of Framebuffer (TODO)
-FB_END          equ $0020FA01               ; End of Framebuffer (+1)
-FB_LEN          equ (FB_END-FB_START)       ; Framebuffer length
-; NOTE: do not remove spaces around +
-
 ; Vector Table
 VT_TRAP_14      equ $B8
-
-; Monitor RAM
-; Allocated after the stack point, if the monitor needs
-; more memory it's sufficient to move the stack pointer
-; Buffer
-IN_BUF          equ MON_MEM_START           ; IN_BUF start after the stack pointer
-IN_BUF_LEN      equ 80                      ; BUFFER LEN should be less than MON_MEM_LEN equ
-IN_BUF_END      equ IN_BUF+IN_BUF_LEN       ;
 
 ; Program Constants
 DLY_VAL         equ 1333333     ; Delay iterations, 1.33 million = 0.5 sec at 32MHz
