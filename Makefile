@@ -12,22 +12,30 @@ DEVICE  = --25k
 PACKAGE = --package CABGA256
 LPF     = hw/constraints/$(TOP).lpf
 
-#Software settings
+# Software settings
+# Firmware (FW)
 ASM_SRC_DIR = sw/fw/asm
 BIN_GEN_DIR = hw/gen
 HEX_SPINAL_DIR = hw/spinal/rt68ice/memory
 HEX_CLASS_DIR = target/scala-2.13/classes/rt68ice/memory
-ASSEMBLIES = blink mem_test stack_test serial_hello serial_echo monitor
+# Default linker script for firmware (fw) programs
+LD_SCRIPT = $(ASM_SRC_DIR)/fw.ld
+# Applications (App)
+ASM_APP_DIR := sw/app/asm
+TARGET_APP_DIR := target/app
+# Define the memory starting address for the program, used in the header
+PROGRAM_ADDRESS := 00000400
+# Where the board is connected
+SERIAL_PORT = /dev/ttyACM0
+SERIAL_BAUD = 19200
 
-# Default linker script for generic programs
-LDSCRIPT = $(ASM_SRC_DIR)/generic.ld
 
 .PHONY: all clean rom prog prog-flash view-wave monitor
 
 all: $(TARGET).bit
 
 # 1. Generate Verilog from SpinalHDL (The bridge)
-$(VERILOG_SOURCES) $(MERGED_VHDL): hw/spinal/rt68ice/*.scala rom
+$(VERILOG_SOURCES) $(MERGED_VHDL): hw/spinal/rt68ice/*.scala rom apps
 	sbt "runMain $(SCALA_PACKAGE).$(TOP)Verilog"
 
 # 2. Synthesis
@@ -56,7 +64,7 @@ prog-flash: $(TARGET).bit
 	openFPGALoader -f -c cmsisdap --vid=0x1d50 --pid=0x602b $<
 
 serial-open:
-	picocom -b 19200 /dev/ttyACM0
+	picocom -b $(SERIAL_BAUD) $(SERIAL_PORT)
 
 reset:
 	openFPGALoader -c cmsisdap --vid=0x1d50 --pid=0x602b --reset
@@ -68,13 +76,40 @@ view-wave: simWorkspace/Blink/test/wave.fst
 		echo "Error: Waveform file not found. Run simulation first."; \
 	fi
 
-# TODO: simplify this, why am I creating an hex file? Can't I just load binary file into the Mem16bit?
-ROM_HEX_FILES = $(patsubst %, $(HEX_CLASS_DIR)/%.hex, $(ASSEMBLIES))
+serial-load: apps
+	@if [ -z "$(BIN)" ]; then \
+		echo "Error: Please specify BIN (e.g., make serial-load BIN=blink)"; \
+		echo "Valid BIN files:"; \
+		ls $(TARGET_APP_DIR); \
+		exit 1; \
+	fi
+	# 1. Send LOAD command to prepare the device
+	@echo "--- Loading $(BIN) to $(SERIAL_PORT) ---"
+	printf "LOAD\r" > $(SERIAL_PORT)
+	sleep 0.5
+	# 2. Transfer the contents of the chosen binary file
+	cat $(TARGET_APP_DIR)/$(BIN) > $(SERIAL_PORT)
+	sleep 0.5
+	# 3. Send RUN command
+	@echo "--- Running application at $(PROGRAM_ADDRESS) ---"
+	printf "RUN $(PROGRAM_ADDRESS)\r" > $(SERIAL_PORT)
+
+clean:
+	rm -rf *.json *.config *.bit target hw/spinal/rt68ice/memory/*.hex
+	rm -rf hw/gen/*.v hw/gen/*.vhd hw/gen/*.o hw/gen/*.bin hw/gen/*.sym hw/spinal/rt68ice/memory/*.hex
+
+
+# =========================================================================
+# SW PIPELINE 1: Firmware / ROM Initializers (.asm -> .hex)
+# =========================================================================
+ASM_SOURCES := $(wildcard $(ASM_SRC_DIR)/*.asm)
+# Convert 'sw/fw/asm/filename.asm' targets into 'target/scala-2.13/classes/rt68ice/memory/filename.hex'
+ROM_HEX_FILES := $(patsubst $(ASM_SRC_DIR)/%.asm,$(HEX_CLASS_DIR)/%.hex,$(ASM_SOURCES))
+
 rom: $(ROM_HEX_FILES)
 
-# Target-Specific Variable Override:
 # When building the monitor hex file, temporarily replace the generic linker script
-$(HEX_CLASS_DIR)/monitor.hex: LDSCRIPT = $(ASM_SRC_DIR)/monitor.ld
+$(HEX_CLASS_DIR)/monitor.hex: LD_SCRIPT = $(ASM_SRC_DIR)/monitor.ld
 
 $(HEX_CLASS_DIR)/%.hex: $(ASM_SRC_DIR)/%.asm
 	@echo "----------------------------------------------"
@@ -83,7 +118,7 @@ $(HEX_CLASS_DIR)/%.hex: $(ASM_SRC_DIR)/%.asm
 	# Assemble the 68000 code to an ELF object file
 	vasmm68k_mot -Felf $< -o $(BIN_GEN_DIR)/$*.o
 	# Link object file
-	vlink -T $(LDSCRIPT) -b rawbin1 -M$(BIN_GEN_DIR)/$*.sym -o $(BIN_GEN_DIR)/$*.bin $(BIN_GEN_DIR)/$*.o
+	vlink -T $(LD_SCRIPT) -b rawbin1 -M$(BIN_GEN_DIR)/$*.sym -o $(BIN_GEN_DIR)/$*.bin $(BIN_GEN_DIR)/$*.o
 	# Convert binary to a two-byte-per-line hex file, convert to uppercase
 	xxd -p -c 2 $(BIN_GEN_DIR)/$*.bin | awk '{print toupper($$0)}' > $(HEX_SPINAL_DIR)/$*.hex
 	# Ensure the destination directory exists
@@ -91,8 +126,29 @@ $(HEX_CLASS_DIR)/%.hex: $(ASM_SRC_DIR)/%.asm
 	# Copy the hex file to the Scala classes path for resource loading
 	cp $(HEX_SPINAL_DIR)/$*.hex $@
 
-# TODO:  monitor needs to use a custom ld file
+# =========================================================================
+# SW PIPELINE 2: User Apps via UART (.asm -> Custom Headered .bin)
+# =========================================================================
+# Define the list of assembly files (e.g., if you have blinker.asm and main.asm)
+ASM_APP_SOURCES := $(wildcard $(ASM_APP_DIR)/*.asm)
+# Target: Create the final .bin files from the list of sources
+BIN_APP_TARGETS := $(patsubst $(ASM_APP_DIR)/%.asm, $(TARGET_APP_DIR)/%.bin, $(ASM_APP_SOURCES))
+RAW_FILE_NAME := $(TARGET_APP_DIR)/$*_raw.bin
 
-clean:
-	rm -rf *.json *.config *.bit target hw/spinal/rt68ice/memory/*.hex
-	rm -rf hw/gen/*.v hw/gen/*.vhd hw/gen/*.o hw/gen/*.bin hw/gen/*.sym hw/spinal/rt68ice/memory/*.hex
+apps: $(BIN_APP_TARGETS)
+
+# TODO: use linker file (app.ld)
+# TODO: parse PROGRAM_ADDRESS from *.sym files?
+
+$(TARGET_APP_DIR)/%.bin: $(ASM_APP_DIR)/%.asm
+	@mkdir -p $(TARGET_APP_DIR)
+	# 1. Assemble to a raw binary image (*_raw.bin)
+	vasmm68k_mot -Fbin -o $(RAW_FILE_NAME) $<
+	# 2. Calculate length and prepend the header. All steps in ONE shell session.
+	SHELL_RAW_FILE="$(RAW_FILE_NAME)"; \
+	FILE_SIZE=$$(stat -c %s $$SHELL_RAW_FILE); \
+	HEX_SIZE=$$(printf "%08X" "$$FILE_SIZE"); \
+	HEADER_HEX="$(PROGRAM_ADDRESS)"$$HEX_SIZE; \
+	echo "$$HEADER_HEX" | xxd -r -p | cat - $$SHELL_RAW_FILE > $@
+	# 3. Clean up the intermediate raw file
+	@rm $(RAW_FILE_NAME)
