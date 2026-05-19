@@ -482,7 +482,7 @@ chk_trl_done:
 ; TRAP handlers
 ; ------------------------------
 ; 02 - Bus Error
-trap_02_handler:
+int_bs_handler:
     lea     msg_bus_err,a0
     bsr     put_str
     jmp     mon_entry
@@ -496,6 +496,8 @@ trap_14_handler:
 ; ------------------------------
     include '../../lib/asm/console_io_uart.asm'
     include '../../lib/asm/conversions.asm'
+    include '../../lib/asm/isr_vector.asm'
+
 
 ; -------------------------------------------------------------
 ; read_32bit_word: Reads 4 bytes from UART and assembles into d1.L
@@ -525,7 +527,7 @@ read_loop:
 
 
 init_vector_table:
-    move.l  #trap_02_handler,VT_TRAP_02
+    move.l  #int_bs_handler,VT_INT_BE
     move.l  #trap_14_handler,VT_TRAP_14
     rts
 
@@ -568,9 +570,5 @@ IN_BUF_END:
 ; ===========================
 ; Constants
 ; ===========================
-; Vector Table
-VT_TRAP_14      equ $B8
-VT_TRAP_02      equ $08
-
 ; Program Constants
 DLY_VAL         equ 1333333     ; Delay iterations, 1.33 million = 0.5 sec at 32MHz
