@@ -22,6 +22,7 @@ HEX_CLASS_DIR = target/scala-2.13/classes/rt68ice/memory
 LD_SCRIPT = $(ASM_SRC_DIR)/fw.ld
 # Applications (App)
 ASM_APP_DIR := sw/app/asm
+LD_SCRIPT_APP = $(ASM_APP_DIR)/app.ld
 TARGET_APP_DIR := target/app
 # Define the memory starting address for the program, used in the header
 PROGRAM_ADDRESS := 00000400
@@ -133,22 +134,20 @@ $(HEX_CLASS_DIR)/%.hex: $(ASM_SRC_DIR)/%.asm
 ASM_APP_SOURCES := $(wildcard $(ASM_APP_DIR)/*.asm)
 # Target: Create the final .bin files from the list of sources
 BIN_APP_TARGETS := $(patsubst $(ASM_APP_DIR)/%.asm, $(TARGET_APP_DIR)/%.bin, $(ASM_APP_SOURCES))
-RAW_FILE_NAME := $(TARGET_APP_DIR)/$*_raw.bin
 
 apps: $(BIN_APP_TARGETS)
 
-# TODO: use linker file (app.ld)
 # TODO: parse PROGRAM_ADDRESS from *.sym files?
 
 $(TARGET_APP_DIR)/%.bin: $(ASM_APP_DIR)/%.asm
 	@mkdir -p $(TARGET_APP_DIR)
-	# 1. Assemble to a raw binary image (*_raw.bin)
-	vasmm68k_mot -Fbin -o $(RAW_FILE_NAME) $<
-	# 2. Calculate length and prepend the header. All steps in ONE shell session.
+	# Assemble to a raw binary image (*_raw.bin)
+	vasmm68k_mot -Felf $< -o $(TARGET_APP_DIR)/$*.o
+	# Link object file
+	vlink -T $(LD_SCRIPT_APP) -b rawbin1 -M$(TARGET_APP_DIR)/$*.sym -o $(TARGET_APP_DIR)/$*.bin $(TARGET_APP_DIR)/$*.o
+	# Calculate length and prepend the header. All steps in ONE shell session.
 	SHELL_RAW_FILE="$(RAW_FILE_NAME)"; \
 	FILE_SIZE=$$(stat -c %s $$SHELL_RAW_FILE); \
 	HEX_SIZE=$$(printf "%08X" "$$FILE_SIZE"); \
 	HEADER_HEX="$(PROGRAM_ADDRESS)"$$HEX_SIZE; \
 	echo "$$HEADER_HEX" | xxd -r -p | cat - $$SHELL_RAW_FILE > $@
-	# 3. Clean up the intermediate raw file
-	@rm $(RAW_FILE_NAME)
