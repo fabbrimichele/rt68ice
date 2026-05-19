@@ -481,6 +481,12 @@ chk_trl_done:
 ; ------------------------------
 ; TRAP handlers
 ; ------------------------------
+; 02 - Bus Error
+trap_02_handler:
+    lea     msg_bus_err,a0
+    bsr     put_str
+    jmp     mon_entry
+
 trap_14_handler:
     move.l  #_stack_top,sp
     jmp     mon_entry
@@ -519,6 +525,7 @@ read_loop:
 
 
 init_vector_table:
+    move.l  #trap_02_handler,VT_TRAP_02
     move.l  #trap_14_handler,VT_TRAP_14
     rts
 
@@ -539,6 +546,7 @@ msg_help        dc.b    'dump  <ADDR>       - Dump from ADDR (HEX)',CR,LF
                 dc.b    NUL
 msg_loading     dc.b    'Loading...',CR,LF,NUL
 msg_load_done   dc.b    'Done.',CR,LF,NUL
+msg_bus_err     dc.b    'Bus Error!',CR,LF,NUL
 
 ; Commands
 ; They must be null terminated
@@ -562,6 +570,7 @@ IN_BUF_END:
 ; ===========================
 ; Vector Table
 VT_TRAP_14      equ $B8
+VT_TRAP_02      equ $08
 
 ; Program Constants
 DLY_VAL         equ 1333333     ; Delay iterations, 1.33 million = 0.5 sec at 32MHz

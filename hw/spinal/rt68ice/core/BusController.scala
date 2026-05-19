@@ -13,6 +13,7 @@ case class BusController() extends Component {
     val cpuBus    = slave(M68KBus())
     val busState	= in Bits(2 bits)  // 00-> fetch code 10->read data 11->write data 01->no memaccess
     val clockEn   = out Bool()
+    val busErr    = out Bool()
 
     // Slave buses
     val romBus    = master(M68KBus())
@@ -72,6 +73,7 @@ case class BusController() extends Component {
   io.romSel := False
   io.ledSel := False
   io.uartSel := False
+  io.busErr := False
   when (address(31 downto 3) === 0) { // ROM:  Accessing initial SP and PC values
     io.romSel := True
   } elsewhen (sectionAddress === 0) { // RAM:  $0008 - $3FFF
@@ -83,7 +85,7 @@ case class BusController() extends Component {
   } elsewhen(sectionAddress === 3) {  // UART: $C000 - $FFFF
     io.uartSel := True
   } otherwise {
-    // TODO: busErr?
+    io.busErr := True
   }
 
   // ----------------------
