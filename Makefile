@@ -36,6 +36,7 @@ SERIAL_BAUD = 19200
 all: $(TARGET).bit
 
 # 1. Generate Verilog from SpinalHDL (The bridge)
+spinal: $(VERILOG_SOURCES) $(MERGED_VHDL)
 $(VERILOG_SOURCES) $(MERGED_VHDL): hw/spinal/rt68ice/*.scala rom apps
 	sbt "runMain $(SCALA_PACKAGE).$(TOP)Verilog"
 
@@ -79,9 +80,9 @@ view-wave: simWorkspace/Blink/test/wave.fst
 
 serial-load: apps
 	@if [ -z "$(BIN)" ]; then \
-		echo "Error: Please specify BIN (e.g., make serial-load BIN=blink)"; \
+		echo "Error: Please specify BIN (e.g., make serial-load BIN=blink.bin)"; \
 		echo "Valid BIN files:"; \
-		ls $(TARGET_APP_DIR); \
+		find target/app/ -maxdepth 1 -name "*.bin" ! -name "*_raw.bin" | xargs -n 1 basename; \
 		exit 1; \
 	fi
 	# 1. Send LOAD command to prepare the device
@@ -138,13 +139,14 @@ BIN_APP_TARGETS := $(patsubst $(ASM_APP_DIR)/%.asm, $(TARGET_APP_DIR)/%.bin, $(A
 apps: $(BIN_APP_TARGETS)
 
 # TODO: parse PROGRAM_ADDRESS from *.sym files?
-
+# We use target-specific assignment (= or :=) so $* is evaluated inside the rule context
+$(TARGET_APP_DIR)/%.bin: RAW_FILE_NAME = $(TARGET_APP_DIR)/$*_raw.bin
 $(TARGET_APP_DIR)/%.bin: $(ASM_APP_DIR)/%.asm
 	@mkdir -p $(TARGET_APP_DIR)
 	# Assemble to a raw binary image (*_raw.bin)
 	vasmm68k_mot -Felf $< -o $(TARGET_APP_DIR)/$*.o
 	# Link object file
-	vlink -T $(LD_SCRIPT_APP) -b rawbin1 -M$(TARGET_APP_DIR)/$*.sym -o $(TARGET_APP_DIR)/$*.bin $(TARGET_APP_DIR)/$*.o
+	vlink -T $(LD_SCRIPT_APP) -b rawbin1 -M$(TARGET_APP_DIR)/$*.sym -o $(RAW_FILE_NAME) $(TARGET_APP_DIR)/$*.o
 	# Calculate length and prepend the header. All steps in ONE shell session.
 	SHELL_RAW_FILE="$(RAW_FILE_NAME)"; \
 	FILE_SIZE=$$(stat -c %s $$SHELL_RAW_FILE); \

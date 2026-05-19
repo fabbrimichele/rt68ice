@@ -1,4 +1,4 @@
-    ORG    $400             ; Start of RAM
+    section .text, code
 
 ; ===========================
 ; Program code
@@ -36,6 +36,6 @@ DLY_VAL     equ     3125000     ; Delay iterations, 0.5 sec at 25 MHz
 ; ===========================
 ; RAM Data Section (bootloader mem)
 ; ===========================
-;    section .bss
+    section .bss
 ; Add here variables and buffers, e.g. `buffer ds.b 80`
 

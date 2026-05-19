@@ -7,16 +7,12 @@ MEMORY
 
 SECTIONS
 {
-    .bss 0x00000400 (NOLOAD) : {
-        _bss_start = .;         /* Mark the start of uninitialized RAM */
-        *(.bss*)                /* buffers and variables go here */
-        _bss_end = .;           /* Mark where your variables end */
-        /* Calculate the Initial Stack Pointer at the very top edge of RAM */
-        _stack_top = ORIGIN(RAM) + LENGTH(RAM);
-    } > RAM
-
-    .text : {
+    .text 0x00000400 : {
         *(.text*)
         *(.rodata*)
-    } > ROM
+    } > RAM
+
+    .bss (NOLOAD) : {
+        *(.bss*)                /* buffers and variables go here */
+    } > RAM
 }
