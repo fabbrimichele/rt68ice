@@ -24,8 +24,6 @@ LD_SCRIPT = $(ASM_SRC_DIR)/fw.ld
 ASM_APP_DIR := sw/app/asm
 LD_SCRIPT_APP = $(ASM_APP_DIR)/app.ld
 TARGET_APP_DIR := target/app
-# Define the memory starting address for the program, used in the header
-PROGRAM_ADDRESS := 00000400
 # Where the board is connected
 SERIAL_PORT = /dev/ttyACM0
 SERIAL_BAUD = 19200
@@ -85,6 +83,8 @@ serial-load: apps
 		find target/app/ -maxdepth 1 -name "*.bin" ! -name "*_raw.bin" | xargs -n 1 basename; \
 		exit 1; \
 	fi
+	# Test file existence
+	test -f $(TARGET_APP_DIR)/$(BIN)
 	# Send `load` command to prepare the device
 	@echo "--- Loading $(BIN) to $(SERIAL_PORT) ---"
 	printf "load\r" > $(SERIAL_PORT)
@@ -93,8 +93,9 @@ serial-load: apps
 	cat $(TARGET_APP_DIR)/$(BIN) > $(SERIAL_PORT)
 	sleep 0.5
 	# Send RUN command
-	@echo "--- Running application at $(PROGRAM_ADDRESS) ---"
-	printf "run $(PROGRAM_ADDRESS)\r" > $(SERIAL_PORT)
+	@PROGRAM_ADDRESS=$$(hexdump -vn 4 -e '4/1 "%02X"' $(TARGET_APP_DIR)/$(BIN)); \
+	echo "--- Running application at 0x$$PROGRAM_ADDRESS ---"; \
+	printf "run $$PROGRAM_ADDRESS\r" > $(SERIAL_PORT)
 
 clean:
 	rm -rf *.json *.config *.bit target hw/spinal/rt68ice/memory/*.hex
@@ -138,7 +139,6 @@ BIN_APP_TARGETS := $(patsubst $(ASM_APP_DIR)/%.asm, $(TARGET_APP_DIR)/%.bin, $(A
 
 apps: $(BIN_APP_TARGETS)
 
-# TODO: parse PROGRAM_ADDRESS from *.sym files?
 # We use target-specific assignment (= or :=) so $* is evaluated inside the rule context
 $(TARGET_APP_DIR)/%.bin: RAW_FILE_NAME = $(TARGET_APP_DIR)/$*_raw.bin
 $(TARGET_APP_DIR)/%.bin: $(ASM_APP_DIR)/%.asm
@@ -149,7 +149,9 @@ $(TARGET_APP_DIR)/%.bin: $(ASM_APP_DIR)/%.asm
 	vlink -T $(LD_SCRIPT_APP) -b rawbin1 -M$(TARGET_APP_DIR)/$*.sym -o $(RAW_FILE_NAME) $(TARGET_APP_DIR)/$*.o
 	# Calculate length and prepend the header. All steps in ONE shell session.
 	SHELL_RAW_FILE="$(RAW_FILE_NAME)"; \
+	SYM_FILE="$(TARGET_APP_DIR)/$*.sym"; \
 	FILE_SIZE=$$(stat -c %s $$SHELL_RAW_FILE); \
 	HEX_SIZE=$$(printf "%08X" "$$FILE_SIZE"); \
-	HEADER_HEX="$(PROGRAM_ADDRESS)"$$HEX_SIZE; \
+	DETECTED_ADDR=$$(awk '/^[[:space:]]*[0-9a-fA-F]{8}[[:space:]]+\.text/ {print $$1; exit}' "$$SYM_FILE"); \
+	HEADER_HEX=$$DETECTED_ADDR$$HEX_SIZE; \
 	echo "$$HEADER_HEX" | xxd -r -p | cat - $$SHELL_RAW_FILE > $@
