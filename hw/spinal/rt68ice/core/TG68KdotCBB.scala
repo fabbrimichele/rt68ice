@@ -8,9 +8,6 @@ import scala.language.postfixOps
 //noinspection TypeAnnotation
 //noinspection ScalaWeakerAccess
 class TG68KdotCBB extends BlackBox {
-  // TODO: Add  generics
-  // addGeneric("MUL_Hardware", hardwareMul)
-
   val io = new Bundle {
     val clk						  = in Bool()
     val nReset				  = in Bool()

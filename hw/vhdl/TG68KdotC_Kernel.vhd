@@ -1763,7 +1763,6 @@ PROCESS (clk, cpu, OP1out, OP2out, opcode, exe_condition, nextpass, micro_state,
 				ELSIF opcode(11 downto 9)="111" THEN		--MOVES not in 68000
 					IF cpu(0)='1' AND opcode(7 downto 6)/="11" AND opcode(5 downto 4)/="00" AND (opcode(5 downto 3)/="111" OR opcode(2 downto 1)="00") THEN
 						IF SVmode='1' THEN
-							--TODO: implement MOVES
 							trap_illegal <= '1';
 							trapmake <= '1';
 						ELSE
