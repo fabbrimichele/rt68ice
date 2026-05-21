@@ -3,7 +3,7 @@ package rt68ice
 import rt68ice.core._
 import rt68ice.io.{LedDevice, T16450Device}
 import rt68ice.memory.Mem16Bit
-import rt68ice.video.VideoDevice
+import rt68ice.video.{Gpdi, VideoDevice}
 import spinal.core._
 import spinal.lib.com.uart.Uart
 import spinal.lib.master
@@ -16,20 +16,10 @@ case class Rt68IceTopLevel(romFile: String) extends Component {
   val io = new Bundle {
     val led = out Bits(3 bits)
     val uart = master(Uart()) // Expose UART pins (txd, rxd), must be defined in the constraints file
-    val gpdi_dp = out Bits(4 bits)
-    val gpdi_dn = out Bits(4 bits)
+    val gpdi = master(Gpdi())
   }
 
   val clockCtrl = ClockCtrl()
-
-  // Video
-  val videoDevice = VideoDevice(
-    vgaCd = clockCtrl.cd25MHz,
-    hdmiCd = clockCtrl.cd125MHz,
-  )
-
-  io.gpdi_dp := videoDevice.io.gpdi_dp
-  io.gpdi_dn := videoDevice.io.gpdi_dn
 
   clockCtrl.cd20MHz {
     // Bus Controller
@@ -64,6 +54,12 @@ case class Rt68IceTopLevel(romFile: String) extends Component {
     uartDevice.io.uart <> io.uart
     uartDevice.io.sel := bus.io.uartSel
     bus.io.uartBus <> uartDevice.io.bus
+
+    // Video Device
+    val videoDevice = VideoDevice(vgaCd = clockCtrl.cd25MHz, hdmiCd = clockCtrl.cd125MHz)
+    io.gpdi <> videoDevice.io.gpdi
+
+
   }
 
   // Remove io_ prefix

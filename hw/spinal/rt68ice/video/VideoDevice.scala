@@ -2,14 +2,13 @@ package rt68ice.video
 
 import rt68ice.core.M68KBus
 import rt68ice.video.VgaDevice.rgbConfig
-import spinal.core.{Area, ClockDomain, ClockingArea, Component, False, IntToBuilder, Reg, True, UInt, crossClockDomain, in, out, when}
+import spinal.core._
 import spinal.lib.experimental.chisel.Bundle
 import spinal.lib.graphic.RgbConfig
 import spinal.lib.graphic.vga._
 import spinal.lib.graphic.hdmi._
 import spinal.lib._
 
-import scala.annotation.unused
 import scala.language.postfixOps
 
 object VgaDevice {
@@ -20,12 +19,13 @@ object VgaDevice {
 //noinspection ScalaWeakerAccess
 case class VideoDevice(vgaCd : ClockDomain, hdmiCd : ClockDomain) extends Component {
   val io = new Bundle {
-    val gpdi_dp, gpdi_dn = out Bits (4 bits)
+    val bus   = slave(M68KBus())
+    val sel   = in Bool()
+    val gpdi  = master(Gpdi())
   }
 
-
-
-  // new ClockingArea(vgaCd) { ... } => vgaCd { ... }
+  // ------ VGA side ------
+  // vgaCd { ... } equivalent to new ClockingArea(vgaCd) { ... }
   vgaCd {
     // Blinker
     val counter = Reg(UInt(rgbConfig.gWidth bits))
@@ -47,7 +47,7 @@ case class VideoDevice(vgaCd : ClockDomain, hdmiCd : ClockDomain) extends Compon
     hdmiBridge.TMDS_blue.addTag(crossClockDomain)
 
     hdmiBridge.io.vga <> ctrl.io.vga
-    io.gpdi_dp := hdmiBridge.io.gpdi_dp
-    io.gpdi_dn := hdmiBridge.io.gpdi_dn
+    io.gpdi.dp := hdmiBridge.io.gpdi_dp
+    io.gpdi.dn := hdmiBridge.io.gpdi_dn
   }
 }
