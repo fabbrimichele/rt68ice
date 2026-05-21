@@ -28,17 +28,8 @@ case class VideoDevice(vgaCd : ClockDomain, hdmiCd : ClockDomain) extends Compon
   bridge.TMDS_green.addTag(crossClockDomain)
   bridge.TMDS_blue.addTag(crossClockDomain)
 
-  /*
-  TODO: what function is this?
-    I believe it replaces `new ClockingArea(vgaCd) { ... }`
-    To be tested once the VGA works
-    vgaCd {
-      ...
-    }
-  */
-
-  @unused
-  val vgaArea = new ClockingArea(vgaCd) {
+  // new ClockingArea(vgaCd) { ... } => vgaCd { ... }
+  vgaCd {
     // Blinker
     val counter = Reg(UInt(rgbConfig.gWidth bits))
     val ctrl = VgaCtrl(rgbConfig)

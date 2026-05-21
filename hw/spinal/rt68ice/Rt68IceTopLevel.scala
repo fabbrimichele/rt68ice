@@ -8,7 +8,6 @@ import spinal.core._
 import spinal.lib.com.uart.Uart
 import spinal.lib.master
 
-import scala.annotation.unused
 import scala.language.postfixOps
 
 //noinspection TypeAnnotation
@@ -32,9 +31,7 @@ case class Rt68IceTopLevel(romFile: String) extends Component {
   io.gpdi_dp := videoDevice.io.gpdi_dp
   io.gpdi_dn := videoDevice.io.gpdi_dn
 
-  // Area with reset
-  @unused
-  val coreArea = new ClockingArea(clockCtrl.cd20MHz) {
+  clockCtrl.cd20MHz {
     // Bus Controller
     val bus = new BusController
 
