@@ -25,6 +25,8 @@ case class VideoDevice(vgaCd : ClockDomain, hdmiCd : ClockDomain) extends Compon
   }
 
   val framebuffer = Mem(Bits(16 bits), 32768) // 64 KB
+
+  // --- 68000 bus side ---
   io.bus.dataIn := framebuffer.readWriteSync(
     address = io.bus.address(15 downto 1).asUInt,
     data = io.bus.dataOut,
@@ -32,9 +34,6 @@ case class VideoDevice(vgaCd : ClockDomain, hdmiCd : ClockDomain) extends Compon
     write = io.bus.wr,
     mask = io.bus.uds ## io.bus.lds,
   )
-
-  // --- 68000 bus side ---
-
 
   // ------ VGA side ------
   // vgaCd { ... } equivalent to new ClockingArea(vgaCd) { ... }
