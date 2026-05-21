@@ -2,7 +2,7 @@ package rt68ice.video
 
 import rt68ice.core.M68KBus
 import rt68ice.video.VgaDevice.rgbConfig
-import spinal.core.{ClockDomain, ClockingArea, Component, False, IntToBuilder, Reg, True, UInt, crossClockDomain, in, out, when}
+import spinal.core.{Area, ClockDomain, ClockingArea, Component, False, IntToBuilder, Reg, True, UInt, crossClockDomain, in, out, when}
 import spinal.lib.experimental.chisel.Bundle
 import spinal.lib.graphic.RgbConfig
 import spinal.lib.graphic.vga._
@@ -23,10 +23,7 @@ case class VideoDevice(vgaCd : ClockDomain, hdmiCd : ClockDomain) extends Compon
     val gpdi_dp, gpdi_dn = out Bits (4 bits)
   }
 
-  val bridge = VgaToHdmiEcp5(vgaCd, hdmiCd)
-  bridge.TMDS_red.addTag(crossClockDomain)
-  bridge.TMDS_green.addTag(crossClockDomain)
-  bridge.TMDS_blue.addTag(crossClockDomain)
+
 
   // new ClockingArea(vgaCd) { ... } => vgaCd { ... }
   vgaCd {
@@ -44,8 +41,13 @@ case class VideoDevice(vgaCd : ClockDomain, hdmiCd : ClockDomain) extends Compon
       counter := counter + 1
     }
 
-    bridge.io.vga <> ctrl.io.vga
-    io.gpdi_dp := bridge.io.gpdi_dp
-    io.gpdi_dn := bridge.io.gpdi_dn
+    val hdmiBridge = VgaToHdmiEcp5(vgaCd, hdmiCd)
+    hdmiBridge.TMDS_red.addTag(crossClockDomain)
+    hdmiBridge.TMDS_green.addTag(crossClockDomain)
+    hdmiBridge.TMDS_blue.addTag(crossClockDomain)
+
+    hdmiBridge.io.vga <> ctrl.io.vga
+    io.gpdi_dp := hdmiBridge.io.gpdi_dp
+    io.gpdi_dn := hdmiBridge.io.gpdi_dn
   }
 }
