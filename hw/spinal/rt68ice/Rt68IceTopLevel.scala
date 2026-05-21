@@ -57,7 +57,9 @@ case class Rt68IceTopLevel(romFile: String) extends Component {
 
     // Video Device
     val videoDevice = VideoDevice(vgaCd = clockCtrl.cd25MHz, hdmiCd = clockCtrl.cd125MHz)
-    io.gpdi <> videoDevice.io.gpdi
+    videoDevice.io.gpdi <> io.gpdi
+    videoDevice.io.sel := bus.io.videoSel
+    videoDevice.io.bus <> bus.io.videoBus
 
 
   }
