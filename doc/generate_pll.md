@@ -11,9 +11,19 @@ ecppll -i 25 -o 50 --file pll.v
 * -o: Desired output frequency (up to 3 clocks)
 * --file: The filename for the generated Verilog wrapper.
 
-To generate 2 output clocks
+To generate multiple output clocks with names (up to `--clkout3`):
 ```Bash
-ecppll -i 25 -o 16 -o 32 --file pll.v
+ecppll --clkin 25 --clkin_name clkin25 \
+       --clkout0 125 --clkout0_name clockout125 \
+       --clkout1 25 --clkout1_name clockout25 \
+       --clkout2 20 --clkout2_name clockout20 \
+       --file pll.v
+```
+**Note:** Order matters. Put the highest frequency on `clkout0` to force the internal math solver to scale up the VCO.
+
+For more details:
+```Bash
+ecppll -h
 ```
 
 ## Details

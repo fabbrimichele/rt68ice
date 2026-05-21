@@ -2,16 +2,20 @@ package rt68ice.core
 
 import spinal.core._
 
+//noinspection TypeAnnotation
+//noinspection ScalaWeakerAccess
 class PllBB extends BlackBox {
   val io = new Bundle {
-    val clkin   = in Bool()   // 25 MHz, 0 deg
-    val clkout0 = out Bool()  // 20 MHz, 0 deg
+    val clkin25   = in Bool()   // 25 MHz, 0 deg
+    val clockout125 = out Bool()  // 20 MHz, 0 deg
+    val clockout25 = out Bool()  // 20 MHz, 0 deg
+    val clockout20 = out Bool()  // 20 MHz, 0 deg
     val locked  = out Bool()
   }
 
-  mapClockDomain(clock = io.clkin)
+  mapClockDomain(clock = io.clkin25)
 
-  setDefinitionName("pll_i25_o20") // This tells SpinalHDL which Verilog module to instantiate
-  addRTLPath("hw/verilog/pll_i25_o20.v")   // Merge the file to the generated 'mergeRTL.vhdl' file
+  setDefinitionName("pll") // This tells SpinalHDL which Verilog module to instantiate
+  addRTLPath("hw/verilog/pll.v")   // Merge the file to the generated 'mergeRTL.vhdl' file
   noIoPrefix() // Remove io_ prefix
 }
