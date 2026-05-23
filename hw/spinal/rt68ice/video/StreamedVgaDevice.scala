@@ -1,7 +1,7 @@
 package rt68ice.video
 
 import rt68ice.core.M68KBus
-import rt68ice.video.VgaDevice.rgbConfig
+import rt68ice.video.StreamedVgaDevice.rgbConfig
 import spinal.core._
 import spinal.lib._
 import spinal.lib.experimental.chisel.Bundle
@@ -10,28 +10,20 @@ import spinal.lib.graphic.vga._
 
 import scala.language.postfixOps
 
-object VgaDevice {
+object StreamedVgaDevice {
   val rgbConfig = RgbConfig(8, 8, 8)
 }
 
 //noinspection TypeAnnotation
 //noinspection ScalaWeakerAccess
-case class VgaDevice(vgaCd : ClockDomain) extends Component {
+case class StreamedVgaDevice(vgaCd : ClockDomain) extends Component {
   val io = new Bundle {
     val bus   = slave(M68KBus())
     val sel   = in Bool()
-    val vga = master(Vga(VgaDevice.rgbConfig))
+    val vga = master(Vga(StreamedVgaDevice.rgbConfig))
   }
 
   val framebuffer = Mem(Bits(16 bits), 32768) // 64 KB
-  framebuffer.init(
-    Array.tabulate(32768) {
-      case 0 => B"16'xF81F" // Word 0: Magenta
-      case 1 => B"16'x07E0" // Word 1: Green
-      case 2 => B"16'xFFFF" // Word 2: White
-      case _ => B"16'x0000" // Rest of the screen: Black
-    }
-  )
 
   // --- 68000 bus side ---
   io.bus.dataIn := framebuffer.readWriteSync(

@@ -7,14 +7,14 @@ import scala.language.postfixOps
 
 //noinspection TypeAnnotation
 //noinspection ScalaWeakerAccess
-object VgaDeviceSim extends App {
+object StreamedVgaDeviceSim extends App {
   // 1. Configure the simulation with support for multi-clock structures
   val simConfig = SimConfig
     .withWave // Generates a VCD wave file to trace video signals
     .allOptimisation
 
   simConfig.compile {
-    val vgaDevice = VgaDevice(
+    val vgaDevice = StreamedVgaDevice(
       vgaCd  = ClockDomain.external("vgaCd", frequency = FixedFrequency(25 MHz)),
     )
     vgaDevice.vgaArea.addressCounter.simPublic()
