@@ -13,9 +13,15 @@ object VgaDeviceSim extends App {
     .withWave // Generates a VCD wave file to trace video signals
     .allOptimisation
 
-  simConfig.compile(VgaDevice(
-    vgaCd  = ClockDomain.external("vgaCd", frequency = FixedFrequency(25 MHz)),
-  )).doSim { dut =>
+  simConfig.compile {
+    val vgaDevice = VgaDevice(
+      vgaCd  = ClockDomain.external("vgaCd", frequency = FixedFrequency(25 MHz)),
+    )
+    vgaDevice.vgaArea.addressCounter.simPublic()
+    vgaDevice.vgaArea.memReadStream.simPublic()
+
+    vgaDevice
+  }.doSim { dut =>
 
     // ------------------------------------------------------------
     // 2. Initialize and Fork All Clock Domains
