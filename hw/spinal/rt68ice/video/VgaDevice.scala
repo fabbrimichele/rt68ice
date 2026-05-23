@@ -16,7 +16,7 @@ object VgaDevice {
 
 //noinspection TypeAnnotation
 //noinspection ScalaWeakerAccess
-case class VideoDevice(vgaCd : ClockDomain) extends Component {
+case class VgaDevice(vgaCd : ClockDomain) extends Component {
   val io = new Bundle {
     val bus   = slave(M68KBus())
     val sel   = in Bool()

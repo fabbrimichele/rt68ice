@@ -4,15 +4,14 @@ import spinal.core._
 import spinal.core.sim._
 
 import scala.language.postfixOps
-import scala.util.Random
 
-object VideoDeviceSim extends App {
+object VgaDeviceSim extends App {
   // 1. Configure the simulation with support for multi-clock structures
   val simConfig = SimConfig
     .withWave // Generates a VCD wave file to trace video signals
     .allOptimisation
 
-  simConfig.compile(VideoDevice(
+  simConfig.compile(VgaDevice(
     vgaCd  = ClockDomain.external("vgaCd", frequency = FixedFrequency(25 MHz)),
   )).doSim { dut =>
 

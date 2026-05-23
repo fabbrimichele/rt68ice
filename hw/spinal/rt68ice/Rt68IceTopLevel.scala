@@ -3,7 +3,7 @@ package rt68ice
 import rt68ice.core._
 import rt68ice.io.{LedDevice, T16450Device}
 import rt68ice.memory.Mem16Bit
-import rt68ice.video.{Gpdi, VideoDevice}
+import rt68ice.video.{Gpdi, VgaDevice}
 import spinal.core._
 import spinal.lib.com.uart.Uart
 import spinal.lib.graphic.hdmi.VgaToHdmiEcp5
@@ -57,9 +57,9 @@ case class Rt68IceTopLevel(romFile: String) extends Component {
     bus.io.uartBus <> uartDevice.io.bus
 
     // Video Device
-    val videoDevice = VideoDevice(vgaCd = clockCtrl.cd25MHz)
-    videoDevice.io.sel := bus.io.videoSel
-    videoDevice.io.bus <> bus.io.videoBus
+    val vgaDevice = VgaDevice(vgaCd = clockCtrl.cd25MHz)
+    vgaDevice.io.sel := bus.io.videoSel
+    vgaDevice.io.bus <> bus.io.videoBus
 
     // VGA-HDMI Bridge
     val hdmiBridge = VgaToHdmiEcp5(vgaCd = clockCtrl.cd25MHz, hdmiCd = clockCtrl.cd125MHz)
@@ -67,7 +67,7 @@ case class Rt68IceTopLevel(romFile: String) extends Component {
     hdmiBridge.TMDS_green.addTag(crossClockDomain)
     hdmiBridge.TMDS_blue.addTag(crossClockDomain)
 
-    hdmiBridge.io.vga <> videoDevice.io.vga
+    hdmiBridge.io.vga <> vgaDevice.io.vga
     io.gpdi.dp := hdmiBridge.io.gpdi_dp
     io.gpdi.dn := hdmiBridge.io.gpdi_dn
   }
