@@ -6,7 +6,6 @@ import spinal.core._
 import spinal.lib._
 import spinal.lib.experimental.chisel.Bundle
 import spinal.lib.graphic.RgbConfig
-import spinal.lib.graphic.hdmi._
 import spinal.lib.graphic.vga._
 
 import scala.language.postfixOps
@@ -17,11 +16,11 @@ object VgaDevice {
 
 //noinspection TypeAnnotation
 //noinspection ScalaWeakerAccess
-case class VideoDevice(vgaCd : ClockDomain, hdmiCd : ClockDomain) extends Component {
+case class VideoDevice(vgaCd : ClockDomain) extends Component {
   val io = new Bundle {
     val bus   = slave(M68KBus())
     val sel   = in Bool()
-    val gpdi  = master(Gpdi())
+    val vga = master(Vga(VgaDevice.rgbConfig))
   }
 
   val framebuffer = Mem(Bits(16 bits), 32768) // 64 KB
@@ -38,7 +37,8 @@ case class VideoDevice(vgaCd : ClockDomain, hdmiCd : ClockDomain) extends Compon
 
   // ------ VGA side ------
   // vgaCd { ... } equivalent to new ClockingArea(vgaCd) { ... }
-  vgaCd {
+  //vgaCd {
+  val vgaArea = new ClockingArea(vgaCd) {
     // VGA Controller
     val ctrl = VgaCtrl(rgbConfig)
     ctrl.io.softReset := False
@@ -82,14 +82,6 @@ case class VideoDevice(vgaCd : ClockDomain, hdmiCd : ClockDomain) extends Compon
     ctrl.io.pixels.g := (pixelFifo.io.pop.payload(10 downto  5) ## B"00").asUInt
     ctrl.io.pixels.b := (pixelFifo.io.pop.payload(4  downto  0) ## B"000").asUInt
 
-    // HDMI Bridge
-    val hdmiBridge = VgaToHdmiEcp5(vgaCd, hdmiCd)
-    hdmiBridge.TMDS_red.addTag(crossClockDomain)
-    hdmiBridge.TMDS_green.addTag(crossClockDomain)
-    hdmiBridge.TMDS_blue.addTag(crossClockDomain)
-
-    hdmiBridge.io.vga <> ctrl.io.vga
-    io.gpdi.dp := hdmiBridge.io.gpdi_dp
-    io.gpdi.dn := hdmiBridge.io.gpdi_dn
+    io.vga <> ctrl.io.vga
   }
 }
