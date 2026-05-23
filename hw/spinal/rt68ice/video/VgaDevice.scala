@@ -24,6 +24,14 @@ case class VgaDevice(vgaCd : ClockDomain) extends Component {
   }
 
   val framebuffer = Mem(Bits(16 bits), 32768) // 64 KB
+  framebuffer.init(
+    Array.tabulate(32768) {
+      case 0 => B"16'xF81F" // Word 0: Magenta
+      case 1 => B"16'x07E0" // Word 1: Green
+      case 2 => B"16'xFFFF" // Word 2: White
+      case _ => B"16'x0000" // Rest of the screen: Black
+    }
+  )
 
   // --- 68000 bus side ---
   io.bus.dataIn := framebuffer.readWriteSync(
@@ -37,7 +45,6 @@ case class VgaDevice(vgaCd : ClockDomain) extends Component {
 
   // ------ VGA side ------
   // vgaCd { ... } equivalent to new ClockingArea(vgaCd) { ... }
-  //vgaCd {
   val vgaArea = new ClockingArea(vgaCd) {
     // VGA Controller
     val ctrl = VgaCtrl(rgbConfig)
@@ -82,6 +89,13 @@ case class VgaDevice(vgaCd : ClockDomain) extends Component {
     ctrl.io.pixels.g := (pixelFifo.io.pop.payload(10 downto  5) ## B"00").asUInt
     ctrl.io.pixels.b := (pixelFifo.io.pop.payload(4  downto  0) ## B"000").asUInt
 
-    io.vga <> ctrl.io.vga
+    //io.vga <> ctrl.io.vga
+    io.vga.color := ctrl.io.vga.color
+
+    // Delay to compensate for the StreamFifo
+    val delay = 29
+    io.vga.hSync := History(ctrl.io.vga.hSync, delay).last
+    io.vga.vSync := History(ctrl.io.vga.vSync, delay).last
+    io.vga.colorEn := History(ctrl.io.vga.colorEn, delay).last
   }
 }
