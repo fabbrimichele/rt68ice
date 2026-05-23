@@ -5,6 +5,8 @@ import spinal.core.sim._
 
 import scala.language.postfixOps
 
+//noinspection TypeAnnotation
+//noinspection ScalaWeakerAccess
 object VgaDeviceSim extends App {
   // 1. Configure the simulation with support for multi-clock structures
   val simConfig = SimConfig
