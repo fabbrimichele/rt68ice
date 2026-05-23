@@ -88,21 +88,43 @@ object VgaDeviceSim extends App {
     val videoMonitor = fork {
       println("[SIM] Video output monitor active...")
 
-      // Loop for a duration long enough to track active lines ticking out
-      for (_ <- 0 until 500) {
+      // Keep checking until we have successfully verified our 3 target pixels
+      // or verified up to a safe portion of the active line (e.g., 20 pixels)
+      while (activePixelsObserved < 10) {
+
+        // 1. ALWAYS wait for the clock edge first to let hardware settle cleanly
         dut.vgaCd.waitRisingEdge()
 
-        // Read signals generated inside the vgaCd clocking area
-        // Note: Accessing internal variables via standard dot notation is supported in simulation
-        val currentAddr = dut.vgaCd { dut.vgaArea.addressCounter.toInt }
-        val fifoPushValid = dut.vgaCd { dut.vgaArea.memReadStream.valid.toBoolean }
-        val fifoPushData = dut.vgaCd { dut.vgaArea.memReadStream.payload.toInt }
+        // 2. Capture fresh, safe states immediately following the edge
+        val hSync = dut.io.vga.hSync.toBoolean
+        val vSync = dut.io.vga.vSync.toBoolean
+        val colorEn = dut.io.vga.colorEn.toBoolean
 
-        // Track valid data pushes into the pixel processing pipeline
-        if (fifoPushValid) {
+        val r = dut.io.vga.color.r.toInt
+        val g = dut.io.vga.color.g.toInt
+        val b = dut.io.vga.color.b.toInt
+
+        // 3. Main Verification Logic
+        if (colorEn) {
           activePixelsObserved += 1
-          if (activePixelsObserved <= 5) {
-            println(s"[VGA MATCH] Pixel #$activePixelsObserved - Read Addr: 0x${currentAddr.toHexString.toUpperCase}, Data: 0x${fifoPushData.toHexString.toUpperCase}")
+
+          activePixelsObserved match {
+            case 1 => // First pixel: Magenta (0xF81F)
+              assert(r == 248 && g == 0 && b == 248, s"Pixel 1 mismatch! Got R:$r G:$g B:$b")
+              println(s"[VGA MATCH] Pixel #1 is correct Magenta (248, 0, 248)")
+
+            case 2 => // Second pixel: Green (0x07E0)
+              assert(r == 0 && g == 252 && b == 0, s"Pixel 2 mismatch! Got R:$r G:$g B:$b")
+              println(s"[VGA MATCH] Pixel #2 is correct Green (0, 252, 0)")
+
+            case 3 => // Third pixel: White (0xFFFF)
+              assert(r == 248 && g == 252 && b == 248, s"Pixel 3 mismatch! Got R:$r G:$g B:$b")
+              println(s"[VGA MATCH] Pixel #3 is correct White (248, 252, 248)")
+
+            case _ =>
+              if (activePixelsObserved <= 10) {
+                println(s"[VGA INFO] Pixel #$activePixelsObserved seen at IO - R:$r G:$g B:$b")
+              }
           }
         }
       }
