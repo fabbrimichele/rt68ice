@@ -58,7 +58,8 @@ case class VgaDevice(vgaCd : ClockDomain, testPatter: Boolean = true) extends Co
 
     val memData = framebuffer.readSync(
       address = addressGen.wordAddress.resized,
-      enable  = addressGen.colorEn,
+      //enable = addressGen.colorEn,
+      enable = True,
       clockCrossing = true,
     )
 
@@ -66,17 +67,15 @@ case class VgaDevice(vgaCd : ClockDomain, testPatter: Boolean = true) extends Co
     io.vga.color.g := (memData(10 downto  5) ## B"00").asUInt
     io.vga.color.b := (memData(4  downto  0) ## B"000").asUInt
 
-
-    // TODO: the first pixel (0,0) is missing, not matters centering the display or the delay
     io.vga.hSync := vgaCounter.io.hSync
     io.vga.vSync := vgaCounter.io.vSync
     io.vga.colorEn := vgaCounter.io.colorEn
-
-    /*
+/*
     val delay = 1
     io.vga.hSync := Delay(vgaCounter.io.hSync, delay)
     io.vga.vSync := Delay(vgaCounter.io.vSync, delay)
     io.vga.colorEn := Delay(vgaCounter.io.colorEn, delay)
-     */
+
+ */
   }
 }
