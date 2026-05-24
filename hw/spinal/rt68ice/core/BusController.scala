@@ -1,7 +1,9 @@
 package rt68ice.core
 
+import rt68ice.util.MemoryMapReporter.saveMemoryLayout
 import spinal.core._
 import spinal.lib._
+import spinal.lib.bus.misc.{MaskMapping, SizeMapping}
 
 import scala.language.postfixOps
 
@@ -68,39 +70,49 @@ case class BusController() extends Component {
   // ------------------------
   //    Address Decoding
   // ------------------------
-  val address = io.cpuBus.address.asUInt
-
-  /*
-    TODO:
-     Try SpinalHDL mapping tool
-      val isMapping = new Area {
-        val romVectorRange = M"32'x0000000[0-7]"
-        val ramRange       = M"32'x0000[0-3]???"
-        // SpinalHDL can directly check if a bus matches a hex mask layout
-        when(address === ramRange) { ... }
-      }
-   */
-
+  // Default assignments
   io.ramSel := False
   io.romSel := False
   io.ledSel := False
   io.uartSel := False
   io.videoSel := False
   io.busErr := False
-  when(address(31 downto 3) === 0) { // ROM:  Accessing initial SP and PC values
+
+  // Address Bitmask Definitions
+  // Boot vectors look at the absolute first 8 bytes via a 3-bit wildcard mask
+  val bootMapping  = MaskMapping(0x00000000L, 0xFFFFFFF8L)
+  val ramMapping   = SizeMapping(0x00000000L, 16 KiB) // $000000 - $003FFF
+  val romMapping   = SizeMapping(0x00004000L, 16 KiB) // $004000 - $007FFF
+  val ledMapping   = SizeMapping(0x00008000L, 16 KiB) // $008000 - $00BFFF
+  val uartMapping  = SizeMapping(0x0000C000L, 16 KiB) // $00C000 - $00FFFF
+  val videoMapping = SizeMapping(0x00010000L, 64 KiB) // $010000 - $01FFFF
+
+  saveMemoryLayout(
+    "doc/memory_layout.md",
+    "BOOT VECTORS" -> bootMapping,
+    "MAIN RAM" -> ramMapping,
+    "MAIN ROM" -> romMapping,
+    "LED PERIPH" -> ledMapping,
+    "UART PERIPH" -> uartMapping,
+    "FRAMEBUFFER" -> videoMapping,
+  )
+
+  // Decoder Execution Logic
+  val address = io.cpuBus.address.asUInt
+  when(bootMapping.hit(address)) {
     io.romSel := True
-  } elsewhen(address(31 downto 14) === 0) { // RAM:   $000008 - $003FFF (16 KB)
+  } elsewhen ramMapping.hit(address) {
     io.ramSel := True
-  } elsewhen(address(31 downto 14) === 1) {  // ROM:   $004000 - $007FFF (16 KB)
+  } elsewhen romMapping.hit(address) {
     io.romSel := True
-  } elsewhen(address(31 downto 14) === 2) {  // LED:   $008000 - $00BFFF (16 KB)
+  } elsewhen ledMapping.hit(address) {
     io.ledSel := True
-  } elsewhen(address(31 downto 14) === 3) {  // UART:  $00C000 - $00FFFF (16 KB)
+  } elsewhen uartMapping.hit(address) {
     io.uartSel := True
-  } elsewhen(address(31 downto 16) === 1) {  // Video: $010000 - $01FFFF (64 KB)
+  } elsewhen videoMapping.hit(address) {
     io.videoSel := True
   } otherwise {
-    io.busErr := True
+    io.busErr := True // Out of bounds access! Trigger BERR
   }
 
   // ----------------------
