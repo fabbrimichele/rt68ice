@@ -23,5 +23,5 @@ SECTIONS
         _fb_end = .;
     } > FB
 
-    _fb_len_words = (_fb_end - _fb_start) / 2;
+    _fb_len_words = LENGTH(FB) / 2;
 }

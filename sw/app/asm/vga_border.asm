@@ -4,6 +4,7 @@
 ; Program code
 ; ===========================
 start:
+    bsr     clr_screen
     lea     _fb_start,a0
     bsr     hline
     lea     (_fb_start+19160*2),a0 ; Addresses are in bytes not words
@@ -16,6 +17,15 @@ start:
     bsr     lvline
 .end:
     trap    #14
+
+; Clear screen
+clr_screen:
+    lea     _fb_start,a0            ; Framebuffer pointer
+    move.w  #(_fb_len_words-1),d0   ; Framebuffer size in words - 1 (dbra)
+.loop:
+    move.w  #0,(a0)+                ; Clear FB
+    dbra    d0,.loop                ; Decrement and loop
+    rts
 
 ; Draw a full horizontal line
 ; Input: a0 starting address
@@ -57,4 +67,4 @@ lvline:
 ; RAM Data Section (bootloader mem)
 ; ===========================
     section .bss
-buffer  ds.w 1
+;   buffer  ds.w 1
