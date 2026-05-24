@@ -70,12 +70,12 @@ case class VgaDevice(vgaCd : ClockDomain, testPatter: Boolean = true) extends Co
     io.vga.hSync := vgaCounter.io.hSync
     io.vga.vSync := vgaCounter.io.vSync
     io.vga.colorEn := vgaCounter.io.colorEn
-/*
+
+    /*
     val delay = 1
     io.vga.hSync := Delay(vgaCounter.io.hSync, delay)
     io.vga.vSync := Delay(vgaCounter.io.vSync, delay)
     io.vga.colorEn := Delay(vgaCounter.io.colorEn, delay)
-
- */
+    */
   }
 }
