@@ -5,8 +5,8 @@ SCALA_PACKAGE = rt68ice
 VERILOG_SOURCES = hw/gen/$(TOP).v
 MERGED_VHDL = hw/gen/mergeRTL.vhd
 MERGED_VERILOG = hw/gen/mergeRTL.v
-# TODO
-##WAVE_FILE = simWorkspace/Blink/test/wave.fst
+#WAVE_FILE = simWorkspace/Blink/test/wave.fst
+WAVE_FILE = simWorkspace/VgaDevice/test/wave.fst
 # ECP5 Specifics
 DEVICE  = --25k
 PACKAGE = --package CABGA256
@@ -69,7 +69,7 @@ serial-open:
 reset:
 	openFPGALoader -c cmsisdap --vid=0x1d50 --pid=0x602b --reset
 
-view-wave: simWorkspace/Blink/test/wave.fst
+view-wave: $(WAVE_FILE)
 	@if [ -f $(WAVE_FILE) ]; then \
 		gtkwave $(WAVE_FILE) & \
 	else \

@@ -16,6 +16,24 @@ IOBUF PORT "uart_txd" IO_TYPE=LVCMOS33;
 LOCATE COMP "uart_rxd" SITE "A9";
 IOBUF PORT "uart_rxd" IO_TYPE=LVCMOS33;
 
+// HDMI
+LOCATE COMP "gpdi_dp[0]" SITE "G1"; # Blue +
+LOCATE COMP "gpdi_dn[0]" SITE "F1"; # Blue -
+LOCATE COMP "gpdi_dp[1]" SITE "J1"; # Green +
+LOCATE COMP "gpdi_dn[1]" SITE "H2"; # Green -
+LOCATE COMP "gpdi_dp[2]" SITE "L1"; # Red +
+LOCATE COMP "gpdi_dn[2]" SITE "K2"; # Red -
+LOCATE COMP "gpdi_dp[3]" SITE "E2"; # Clock +
+LOCATE COMP "gpdi_dn[3]" SITE "D3"; # Clock -
+IOBUF PORT "gpdi_dp[0]" IO_TYPE=LVCMOS33 DRIVE=4;
+IOBUF PORT "gpdi_dn[0]" IO_TYPE=LVCMOS33 DRIVE=4;
+IOBUF PORT "gpdi_dp[1]" IO_TYPE=LVCMOS33 DRIVE=4;
+IOBUF PORT "gpdi_dn[1]" IO_TYPE=LVCMOS33 DRIVE=4;
+IOBUF PORT "gpdi_dp[2]" IO_TYPE=LVCMOS33 DRIVE=4;
+IOBUF PORT "gpdi_dn[2]" IO_TYPE=LVCMOS33 DRIVE=4;
+IOBUF PORT "gpdi_dp[3]" IO_TYPE=LVCMOS33 DRIVE=4;
+IOBUF PORT "gpdi_dn[3]" IO_TYPE=LVCMOS33 DRIVE=4;
+
 // For other mappings, refer to:
 // - https://github.com/wuxx/icesugar-pro/blob/master/src/litex_linux/top_bg256.lpf
 // - https://github.com/litex-hub/litex-boards/blob/master/litex_boards/platforms/muselab_icesugar_pro.py

@@ -3,11 +3,12 @@ package rt68ice
 import rt68ice.core._
 import rt68ice.io.{LedDevice, T16450Device}
 import rt68ice.memory.Mem16Bit
+import rt68ice.video.{Gpdi, StreamedVgaDevice, VgaDevice}
 import spinal.core._
 import spinal.lib.com.uart.Uart
+import spinal.lib.graphic.hdmi.VgaToHdmiEcp5
 import spinal.lib.master
 
-import scala.annotation.unused
 import scala.language.postfixOps
 
 //noinspection TypeAnnotation
@@ -16,13 +17,12 @@ case class Rt68IceTopLevel(romFile: String) extends Component {
   val io = new Bundle {
     val led = out Bits(3 bits)
     val uart = master(Uart()) // Expose UART pins (txd, rxd), must be defined in the constraints file
+    val gpdi = master(Gpdi())
   }
 
   val clockCtrl = ClockCtrl()
 
-  // Area with reset
-  @unused
-  val coreArea = new ClockingArea(clockCtrl.clk20Domain) {
+  clockCtrl.cd20MHz {
     // Bus Controller
     val bus = new BusController
 
@@ -55,6 +55,21 @@ case class Rt68IceTopLevel(romFile: String) extends Component {
     uartDevice.io.uart <> io.uart
     uartDevice.io.sel := bus.io.uartSel
     bus.io.uartBus <> uartDevice.io.bus
+
+    // Video Device
+    val vgaDevice = VgaDevice(vgaCd = clockCtrl.cd25MHz)
+    vgaDevice.io.sel := bus.io.videoSel
+    vgaDevice.io.bus <> bus.io.videoBus
+
+    // VGA-HDMI Bridge
+    val hdmiBridge = VgaToHdmiEcp5(vgaCd = clockCtrl.cd25MHz, hdmiCd = clockCtrl.cd125MHz)
+    hdmiBridge.TMDS_red.addTag(crossClockDomain)
+    hdmiBridge.TMDS_green.addTag(crossClockDomain)
+    hdmiBridge.TMDS_blue.addTag(crossClockDomain)
+
+    hdmiBridge.io.vga <> vgaDevice.io.vga
+    io.gpdi.dp := hdmiBridge.io.gpdi_dp
+    io.gpdi.dn := hdmiBridge.io.gpdi_dn
   }
 
   // Remove io_ prefix
