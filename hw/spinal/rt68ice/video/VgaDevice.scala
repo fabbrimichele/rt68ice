@@ -4,7 +4,6 @@ import rt68ice.core.M68KBus
 import rt68ice.video.StreamedVgaDevice.rgbConfig
 import spinal.core._
 import spinal.lib._
-import spinal.lib.experimental.chisel.Bundle
 import spinal.lib.graphic.RgbConfig
 import spinal.lib.graphic.vga._
 
@@ -16,15 +15,14 @@ object VgaDevice {
 
 //noinspection TypeAnnotation
 //noinspection ScalaWeakerAccess
-case class VgaDevice(vgaCd : ClockDomain, testPatter: Boolean = true) extends Component {
+case class VgaDevice(vgaCd : ClockDomain) extends Component {
   val io = new Bundle {
-    val bus   = slave(M68KBus())
-    val sel   = in Bool()
+    val bus = slave(M68KBus())
+    val sel = in Bool()
     val vga = master(Vga(StreamedVgaDevice.rgbConfig))
   }
 
   val framebuffer = Mem(Bits(16 bits), 32768) // 64 KB
-  framebuffer.init(new TestPatterns(sizeInWords = 32768, width = 640, height = 51).box())
 
   // --- 68000 bus side ---
   io.bus.dataIn := framebuffer.readWriteSync(
@@ -47,25 +45,38 @@ case class VgaDevice(vgaCd : ClockDomain, testPatter: Boolean = true) extends Co
       val timings = vgaCounter.io.timings
       val hCounter = vgaCounter.io.hCounter
       val vCounter = vgaCounter.io.vCounter
-      val colorEn = vgaCounter.io.colorEn
 
       val pixelX = hCounter - timings.h.colorStart
       val pixelY = vCounter - timings.v.colorStart
 
-      //val wordAddress = (pixelY.resized * 40) + (pixelX.resized >> 4) // This is for 1 bpp
-      val wordAddress = (pixelY * 640) + pixelX
+      // 1 bpp Word Address calculation:
+      // Each line has 640 pixels / 16 pixels per word = 40 words per line.
+      val wordAddress = (pixelY * 40) + (pixelX >> 4) // 640x480 1 bpp
+
+      // We need to keep track of which bit within the 16-bit word we want.
+      // Because RAM read takes 1 cycle, we delay this bit index selector by 1 cycle
+      // so it matches the moment memData becomes valid.
+      //val pixelBitIdx = Delay(pixelX(3 downto 0), 1)
+      val pixelBitIdx = Delay(15 - pixelX(3 downto 0), 1)
     }
 
     val memData = framebuffer.readSync(
       address = addressGen.wordAddress.resized,
-      //enable = addressGen.colorEn,
       enable = True,
       clockCrossing = true,
     )
 
-    io.vga.color.r := (memData(15 downto 11) ## B"000").asUInt
-    io.vga.color.g := (memData(10 downto  5) ## B"00").asUInt
-    io.vga.color.b := (memData(4  downto  0) ## B"000").asUInt
+    // Extract the exact monochrome pixel bit.
+    // To match 68000 big-endian layout: Bit index 0 is mapped to memData(15)
+    //val pixelBit = memData(U"4'd15" - addressGen.pixelBitIdx)
+    val pixelBit = memData(addressGen.pixelBitIdx)
+
+    // Map the 1-bit pixel to full 24-bit RGB (White when true, Black when false)
+    val colorValue = Mux(pixelBit, U(0xFF, 8 bits), U(0x00, 8 bits))
+
+    io.vga.color.r := colorValue
+    io.vga.color.g := colorValue
+    io.vga.color.b := colorValue
 
     io.vga.hSync := vgaCounter.io.hSync
     io.vga.vSync := vgaCounter.io.vSync
