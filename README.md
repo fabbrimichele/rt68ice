@@ -1,6 +1,9 @@
 # rt68ice
 RT68 IceSugar Pro version
 
+## Memory Layout
+See the generated [System Memory Layout](./doc/memory_layout.md).
+
 ## How to Install
 1. **Install OSS CAD Suite:** follow the official [installation instructions](https://github.com/yosyshq/oss-cad-suite-build#installation).
 2. **Configure openFPGALoader:** (Refer to the [install guide](https://trabucayre.github.io/openFPGALoader/guide/install.html#udev-rules) for more details)

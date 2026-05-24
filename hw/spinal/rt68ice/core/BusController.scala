@@ -1,9 +1,9 @@
 package rt68ice.core
 
-import rt68ice.util.MemoryMapReporter.printMemoryLayout
+import rt68ice.util.MemoryMapReporter.saveMemoryLayout
 import spinal.core._
 import spinal.lib._
-import spinal.lib.bus.misc.{AddressMapping, MaskMapping, SizeMapping}
+import spinal.lib.bus.misc.{MaskMapping, SizeMapping}
 
 import scala.language.postfixOps
 
@@ -87,7 +87,8 @@ case class BusController() extends Component {
   val uartMapping  = SizeMapping(0x0000C000L, 16 KiB) // $00C000 - $00FFFF
   val videoMapping = SizeMapping(0x00010000L, 64 KiB) // $010000 - $01FFFF
 
-  printMemoryLayout(
+  saveMemoryLayout(
+    "doc/memory_layout.md",
     "BOOT VECTORS" -> bootMapping,
     "MAIN RAM" -> ramMapping,
     "MAIN ROM" -> romMapping,
