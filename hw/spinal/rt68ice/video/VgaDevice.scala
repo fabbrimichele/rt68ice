@@ -56,8 +56,7 @@ case class VgaDevice(vgaCd : ClockDomain) extends Component {
       // We need to keep track of which bit within the 16-bit word we want.
       // Because RAM read takes 1 cycle, we delay this bit index selector by 1 cycle
       // so it matches the moment memData becomes valid.
-      //val pixelBitIdx = Delay(pixelX(3 downto 0), 1)
-      val pixelBitIdx = Delay(15 - pixelX(3 downto 0), 1)
+      val pixelBitIdx = Delay(pixelX(3 downto 0), 1)
     }
 
     val memData = framebuffer.readSync(
@@ -68,8 +67,7 @@ case class VgaDevice(vgaCd : ClockDomain) extends Component {
 
     // Extract the exact monochrome pixel bit.
     // To match 68000 big-endian layout: Bit index 0 is mapped to memData(15)
-    //val pixelBit = memData(U"4'd15" - addressGen.pixelBitIdx)
-    val pixelBit = memData(addressGen.pixelBitIdx)
+    val pixelBit = memData(15 - addressGen.pixelBitIdx)
 
     // Map the 1-bit pixel to full 24-bit RGB (White when true, Black when false)
     val colorValue = Mux(pixelBit, U(0xFF, 8 bits), U(0x00, 8 bits))
@@ -81,12 +79,5 @@ case class VgaDevice(vgaCd : ClockDomain) extends Component {
     io.vga.hSync := vgaCounter.io.hSync
     io.vga.vSync := vgaCounter.io.vSync
     io.vga.colorEn := vgaCounter.io.colorEn
-
-    /*
-    val delay = 1
-    io.vga.hSync := Delay(vgaCounter.io.hSync, delay)
-    io.vga.vSync := Delay(vgaCounter.io.vSync, delay)
-    io.vga.colorEn := Delay(vgaCounter.io.colorEn, delay)
-    */
   }
 }
