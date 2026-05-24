@@ -4,14 +4,14 @@
 ; Program code
 ; ===========================
 start:
-    lea     FB,a0
+    lea     _fb_start,a0
     bsr     hline
-    lea     (FB+19160*2),a0 ; Addresses are in bytes not words
+    lea     (_fb_start+19160*2),a0 ; Addresses are in bytes not words
     bsr     hline
-    lea     FB,a0
+    lea     _fb_start,a0
     move.w  #$8000,d1
     bsr     lvline
-    lea     (FB+39*2),a0    ; Last column
+    lea     (_fb_start+39*2),a0    ; Last column
     move.w  #$1,d1
     bsr     lvline
 .end:
@@ -38,13 +38,9 @@ lvline:
     rts
 
 
-
-
-
 ; ===========================
 ; Value Constants
 ; ===========================
-FB          equ $10000
 
 ; ===========================
 ; Include files
