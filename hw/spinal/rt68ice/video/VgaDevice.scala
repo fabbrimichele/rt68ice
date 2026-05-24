@@ -49,11 +49,8 @@ case class VgaDevice(vgaCd : ClockDomain, testPatter: Boolean = true) extends Co
       val vCounter = vgaCounter.io.vCounter
       val colorEn = vgaCounter.io.colorEn
 
-      val pixelX = UInt(timings.h.timingsWidth bits)
-      val pixelY = UInt(timings.v.timingsWidth bits)
-
-      pixelX := hCounter - timings.h.colorStart
-      pixelY := vCounter - timings.v.colorStart
+      val pixelX = hCounter - timings.h.colorStart
+      val pixelY = vCounter - timings.v.colorStart
 
       //val wordAddress = (pixelY.resized * 40) + (pixelX.resized >> 4) // This is for 1 bpp
       val wordAddress = (pixelY * 640) + pixelX

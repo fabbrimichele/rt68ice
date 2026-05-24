@@ -10,9 +10,9 @@ class TestPatterns(sizeInWords: Int, width: Int, height: Int) {
 
     // 1. Define rectangle geometry parameters
     val boxLeft   = 0
-    val boxRight  = width
+    val boxRight  = width - 1
     val boxTop    = 0
-    val boxBottom = height
+    val boxBottom = height - 1
 
     // Border Color: Bright Green in RGB565 (R=0, G=63, B=0) -> 0x07E0
     val borderColor = (0 << 11) | (63 << 5) | 0
