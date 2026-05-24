@@ -16,7 +16,7 @@ object VgaDevice {
 
 //noinspection TypeAnnotation
 //noinspection ScalaWeakerAccess
-case class VgaDevice(vgaCd : ClockDomain) extends Component {
+case class VgaDevice(vgaCd : ClockDomain, testPatter: Boolean = true) extends Component {
   val io = new Bundle {
     val bus   = slave(M68KBus())
     val sel   = in Bool()
@@ -24,6 +24,7 @@ case class VgaDevice(vgaCd : ClockDomain) extends Component {
   }
 
   val framebuffer = Mem(Bits(16 bits), 32768) // 64 KB
+  framebuffer.init(new TestPatterns(sizeInWords = 32768, width = 640, height = 51).box())
 
   // --- 68000 bus side ---
   io.bus.dataIn := framebuffer.readWriteSync(
@@ -51,13 +52,11 @@ case class VgaDevice(vgaCd : ClockDomain) extends Component {
       val pixelX = UInt(timings.h.timingsWidth bits)
       val pixelY = UInt(timings.v.timingsWidth bits)
 
-      //pixelX := colorEn ? (hCounter - timings.h.colorStart) | 0
-      //pixelY := colorEn ? (vCounter - timings.v.colorStart) | 0
       pixelX := hCounter - timings.h.colorStart
       pixelY := vCounter - timings.v.colorStart
 
       //val wordAddress = (pixelY.resized * 40) + (pixelX.resized >> 4) // This is for 1 bpp
-      val wordAddress = (pixelY.resized * 640) + pixelX.resized
+      val wordAddress = (pixelY * 640) + pixelX
     }
 
     val memData = framebuffer.readSync(

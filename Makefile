@@ -6,7 +6,7 @@ VERILOG_SOURCES = hw/gen/$(TOP).v
 MERGED_VHDL = hw/gen/mergeRTL.vhd
 MERGED_VERILOG = hw/gen/mergeRTL.v
 #WAVE_FILE = simWorkspace/Blink/test/wave.fst
-WAVE_FILE = simWorkspace/VgaCounter/test/wave.fst
+WAVE_FILE = simWorkspace/VgaDevice/test/wave.fst
 # ECP5 Specifics
 DEVICE  = --25k
 PACKAGE = --package CABGA256

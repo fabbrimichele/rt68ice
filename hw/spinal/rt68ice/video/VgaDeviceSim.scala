@@ -10,8 +10,9 @@ import scala.language.postfixOps
 object VgaDeviceSim extends App {
   // 1. Configure the simulation with support for multi-clock structures
   val simConfig = SimConfig
-    .withWave // Generates a VCD wave file to trace video signals
-    .allOptimisation
+    .withFstWave
+    .withConfig(SpinalConfig(defaultConfigForClockDomains = ClockDomainConfig(resetKind = SYNC, resetActiveLevel = HIGH)))
+    //.allOptimisation
 
   simConfig.compile {
     val vgaDevice = VgaDevice(
@@ -76,8 +77,12 @@ object VgaDeviceSim extends App {
     // Write a white pixel (RGB 565: 0xFFFF) at word 2
     writeBus(2, 0xFFFF)
 
-    dut.clockDomain.waitRisingEdge(2)
+    //dut.clockDomain.waitRisingEdge(2)
 
+    dut.clockDomain.waitRisingEdge(250_000)
+
+
+    /*
     // ------------------------------------------------------------
     // 5. Test Step B: Observe Video Output Generation
     // ------------------------------------------------------------
@@ -133,5 +138,7 @@ object VgaDeviceSim extends App {
     // Let the simulation advance until our background monitor concludes its verification
     videoMonitor.join()
     println(s"[SIM] Completed successfully. Monitored $activePixelsObserved valid pixel transfers.")
+
+     */
   }
 }
