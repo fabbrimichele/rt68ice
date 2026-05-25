@@ -19,8 +19,6 @@ object VgaDeviceSim extends App {
       vgaCd  = ClockDomain.external("vgaCd", frequency = FixedFrequency(25 MHz)),
     )
 
-    vgaDevice.vgaArea.addressGen.wordAddress.simPublic()
-
     vgaDevice
   }.doSim { dut =>
 
