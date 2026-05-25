@@ -58,7 +58,8 @@ case class Rt68IceTopLevel(romFile: String) extends Component {
 
     // Video Device
     val vgaDevice = VgaDevice(vgaCd = clockCtrl.cd25MHz)
-    vgaDevice.io.sel := bus.io.videoSel
+    vgaDevice.io.fbSel := bus.io.vidFbSel
+    vgaDevice.io.palSel := bus.io.vidPalSel
     vgaDevice.io.bus <> bus.io.videoBus
 
     // VGA-HDMI Bridge

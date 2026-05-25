@@ -37,7 +37,7 @@ object VgaDeviceSim extends App {
     // ------------------------------------------------------------
     // 3. Initialize Inputs to Safe Default States
     // ------------------------------------------------------------
-    dut.io.sel #= false
+    dut.io.fbSel #= false
     dut.io.bus.wr #= false
     dut.io.bus.address #= 0
     dut.io.bus.dataOut #= 0
@@ -61,12 +61,12 @@ object VgaDeviceSim extends App {
       dut.io.bus.wr #= true
       dut.io.bus.uds #= true
       dut.io.bus.lds #= true
-      dut.io.sel #= true
+      dut.io.fbSel #= true
 
       dut.clockDomain.waitRisingEdge()
 
       // Deassert control wires
-      dut.io.sel #= false
+      dut.io.fbSel #= false
       dut.io.bus.wr #= false
     }
 
