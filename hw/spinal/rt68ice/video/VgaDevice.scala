@@ -22,11 +22,11 @@ case class VgaDevice(vgaCd : ClockDomain) extends Component {
     val vga = master(Vga(StreamedVgaDevice.rgbConfig))
   }
 
-  val framebuffer = Mem(Bits(16 bits), 32768) // 64 KB
+  val framebuffer = Mem(Bits(16 bits), 38400) // 75 KB -> 640x480 2bpp
 
   // --- 68000 bus side ---
   io.bus.dataIn := framebuffer.readWriteSync(
-    address = io.bus.address(15 downto 1).asUInt,
+    address = io.bus.address(16 downto 1).asUInt,
     data = io.bus.dataOut,
     enable = io.sel,
     write = io.bus.wr,
