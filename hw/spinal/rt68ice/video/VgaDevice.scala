@@ -15,6 +15,7 @@ case class VgaDevice(vgaCd : ClockDomain) extends Component {
     val bus     = slave(M68KBus())
     val fbSel   = in Bool()
     val palSel  = in Bool()
+    val ctrlSel = in Bool()
     val vga     = master(Vga(rgbConfig))
   }
 
@@ -34,10 +35,20 @@ case class VgaDevice(vgaCd : ClockDomain) extends Component {
   palette.io.dataOut := io.bus.dataOut
   palette.io.sel := io.palSel
 
-  // ----------------------
-  // 68000 bus side
-  // ----------------------
-  // Framebuffer
+  // Mode Register
+  // bit 0: screen mode (0 = 640x240 4bpp, 1 = 640x480 2bpp)
+  val ctrlReg = Reg(Bits(16 bits)) init 0
+  val isLowRes = ctrlReg(0)
+
+  // Read is handled below, after the banks, along with the other memory reads
+  when(io.ctrlSel && io.bus.wr) {
+    when(io.bus.uds) { ctrlReg(15 downto 8) := io.bus.dataOut(15 downto 8) }
+    when(io.bus.lds) { ctrlReg(7 downto 0)  := io.bus.dataOut(7 downto 0) }
+  }
+
+  // ------------------------------------------------------------------
+  // 68000 bus side: Framebuffer (Interleaved) + Device data out
+  // ------------------------------------------------------------------
   val bankSelect = io.bus.address(1)
   val ramAddress = io.bus.address(16 downto 2).asUInt
 
@@ -60,11 +71,12 @@ case class VgaDevice(vgaCd : ClockDomain) extends Component {
   )
 
   // Memory blocks routing when reading
-  // neither io.fbSel nor io.palSel case is managed by the bus controller
   when (io.fbSel) {
     io.bus.dataIn := Mux(bankSelect, cpuBank1Data, cpuBank0Data)
   } elsewhen io.palSel {
     io.bus.dataIn := palette.io.dataIn
+  } elsewhen io.ctrlSel {
+    io.bus.dataIn := ctrlReg
   } otherwise {
     io.bus.dataIn := 0
   }
