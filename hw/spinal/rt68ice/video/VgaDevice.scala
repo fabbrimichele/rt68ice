@@ -30,12 +30,14 @@ case class VgaDevice(vgaCd : ClockDomain) extends Component {
   val bank0 = Mem(Bits(16 bits), 19200)
   val bank1 = Mem(Bits(16 bits), 19200)
 
-  // Palette: 4 colors * 3 bytes = 12 bytes
-  val palette = Vec(Reg(Bits(24 bits)), 4)
-  palette(0).init(B"24'x000000") // 00: Black
-  palette(1).init(B"24'x00FF00") // 01: Green
-  palette(2).init(B"24'xFF0000") // 10: Red
-  palette(3).init(B"24'xFFFFFF") // 11: White
+  // Palette: 4 colors
+  val palette = VgaPalette(vgaCd)
+  palette.io.address := io.bus.address
+  palette.io.lds := io.bus.lds
+  palette.io.uds := io.bus.uds
+  palette.io.wr := io.bus.wr
+  palette.io.dataOut := io.bus.dataOut
+  palette.io.sel := io.palSel
 
   // ----------------------
   // 68000 bus side
@@ -62,43 +64,12 @@ case class VgaDevice(vgaCd : ClockDomain) extends Component {
     clockCrossing = true
   )
 
-  // Palette
-  // each entry is mapped as 32 bits but only 24 bits are used
-  val palAddress = io.bus.address(3 downto 2).asUInt
-  val isLowerWord = io.bus.address(1)
-
-  when(io.palSel) {
-    when(io.bus.wr) {
-      // Write
-      when(isLowerWord) {
-        // Lower Word: D15-D8 maps to Green, D7-D0 maps to Blue
-        when(io.bus.uds) { palette(palAddress)(15 downto 8) := io.bus.dataOut(15 downto 8) }
-        when(io.bus.lds) { palette(palAddress)(7 downto 0)   := io.bus.dataOut(7 downto 0) }
-      } otherwise {
-        // Upper Word: D7-D0 maps to Red (Big Endian longword formatting)
-        when(io.bus.lds) { palette(palAddress)(23 downto 16) := io.bus.dataOut(7 downto 0) }
-      }
-    } otherwise {
-      when(isLowerWord) {
-        // Lower word, mapping full word (green+blue)
-        io.bus.dataIn := palette(palAddress)(15 downto 0)
-      } otherwise {
-        // Upper word, mapping only lower bytes (red)
-        io.bus.dataIn := B"8'x00" ## palette(palAddress)(23 downto 16)
-      }
-    }
-  }
-
   // Memory blocks routing when reading
   // neither io.fbSel nor io.palSel case is managed by the bus controller
   when (io.fbSel) {
     io.bus.dataIn := Mux(bankSelect, cpuBank1Data, cpuBank0Data)
   } otherwise {
-    when(isLowerWord) {
-      io.bus.dataIn := palette(palAddress)(15 downto 0).resized
-    } otherwise {
-      io.bus.dataIn := palette(palAddress)(23 downto 16).resized
-    }
+    io.bus.dataIn := palette.io.dataIn
   }
 
   // ----------------------
@@ -145,9 +116,8 @@ case class VgaDevice(vgaCd : ClockDomain) extends Component {
 
     // Map the 1-bit pixel to full 24-bit RGB with palette
     // BufferCC for clock cross domain handling
-    val vgaPalette = Vec(BufferCC(palette(0)), BufferCC(palette(1)), BufferCC(palette(2)), BufferCC(palette(3)))
-    val colorIndex = (plane1Bit ## plane0Bit).asUInt
-    val pixelColor = vgaPalette(colorIndex)
+    palette.io.colorIndex := (plane1Bit ## plane0Bit)
+    val pixelColor = palette.io.pixelColor
 
     io.vga.color.r := pixelColor(23 downto 16).asUInt
     io.vga.color.g := pixelColor(15 downto 8).asUInt

@@ -7,7 +7,7 @@ import spinal.lib._
 import scala.language.postfixOps
 
 object M68KBus {
-  private val ADDRESS_WIDTH: Int = 32
+  val ADDRESS_WIDTH: Int = 32
   val DATA_WIDTH: Int = 16
 }
 
