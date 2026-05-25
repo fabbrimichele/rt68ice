@@ -70,13 +70,13 @@ case class VgaDevice(vgaCd : ClockDomain) extends Component {
   when(io.palSel) {
     when(io.bus.wr) {
       // Write
-      // TODO: manage LDS/UDS
       when(isLowerWord) {
-        // Lower word, mapping full word (green+blue)
-        palette(palAddress)(15 downto 0) := io.bus.dataOut
+        // Lower Word: D15-D8 maps to Green, D7-D0 maps to Blue
+        when(io.bus.uds) { palette(palAddress)(15 downto 8) := io.bus.dataOut(15 downto 8) }
+        when(io.bus.lds) { palette(palAddress)(7 downto 0)   := io.bus.dataOut(7 downto 0) }
       } otherwise {
-        // Upper word, mapping only lower bytes (red)
-        palette(palAddress)(23 downto 16) := io.bus.dataOut(7 downto 0)
+        // Upper Word: D7-D0 maps to Red (Big Endian longword formatting)
+        when(io.bus.lds) { palette(palAddress)(23 downto 16) := io.bus.dataOut(7 downto 0) }
       }
     } otherwise {
       when(isLowerWord) {
