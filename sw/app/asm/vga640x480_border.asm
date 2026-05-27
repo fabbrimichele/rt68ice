@@ -1,0 +1,99 @@
+    section .text, code
+
+; ===========================
+; Program code
+; ===========================
+start:
+    bsr     clr_screen
+    bsr     draw_bands
+    bsr     draw_border
+    trap    #14
+
+; Draw bands
+draw_bands:
+    lea     (_fb_start+(180*40*4)),a0
+
+    ; Green band
+    move.l  #$FFFF0000,d1               ; Green
+    move.w  #59,d2                      ; 60 horizonatl lines (-1 for dbra)
+.green_loop:
+    bsr     hline
+    dbra    d2,.green_loop
+
+    ; Red band
+    move.l  #$0000FFFF,d1               ; Red
+    move.w  #59,d2                      ; 60 horizonatl lines (-1 for dbra)
+.red_loop:
+    bsr     hline
+    dbra    d2,.red_loop
+
+    rts
+
+; Draw white border
+draw_border:
+    ; Horizontal lines
+    move.l  #$FFFFFFFF,d1
+    lea     _fb_start,a0
+    bsr     hline
+    lea     (_fb_start+(479*40*4)),a0   ; Line 479 * 40 blocks * 4 bytes per block
+    bsr     hline
+    ; Vertical lines
+    move.l  #$80008000,d1
+    lea     _fb_start,a0
+    bsr     lvline
+    move.l  #$00010001,d1
+    lea     (_fb_start+39*4),a0         ; Last column
+    bsr     lvline
+    rts
+
+; Clear screen
+clr_screen:
+    lea     _fb_start,a0            ; Framebuffer pointer
+    move.w  #(_fb_len_words-1),d0   ; Framebuffer size in words - 1 (dbra)
+.loop:
+    move.w  #0,(a0)+                ; Clear FB
+    dbra    d0,.loop                ; Decrement and loop
+    rts
+
+; Draw a full horizontal line
+; Input: a0 starting address
+;        d1.w pattern
+hline:
+    move.w  #39,d0                  ; 40 - 1 for dbra (640px/16bits = 39 words)
+.loop:
+    move.l  d1,(a0)+        ; Draw 16 white pixels (2 interleaved bitplanes -> 32 bits)
+    dbra    d0,.loop
+    rts
+
+; Draw a full vertical line
+; Input: a0   starting address
+;        d1.w pattern
+lvline:
+    move.w  #479,d0                 ; 470 - 1 for dbra
+.loop:
+    or.l    d1,(a0)
+    add.w   #160,a0
+    dbra    d0,.loop
+    rts
+
+
+; ===========================
+; Value Constants
+; ===========================
+
+; ===========================
+; Include files
+; ===========================
+    include '../../lib/asm/mem_map_led.asm'
+
+; ===========================
+; Data Constants
+; Must be after code to avoid alignment issues
+; ===========================
+; Add here data costants, e.g. `msg_hello dc.b    "Type something:",CR,LF,NUL`
+
+; ===========================
+; RAM Data Section (bootloader mem)
+; ===========================
+    section .bss
+;   buffer  ds.w 1

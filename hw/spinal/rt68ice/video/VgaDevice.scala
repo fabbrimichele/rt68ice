@@ -23,8 +23,7 @@ case class VgaDevice(vgaCd : ClockDomain) extends Component {
   // Memory definitions
   // ----------------------
   // Framebuffer: 640x480 2bpp = 75 KB
-  val bank0 = Mem(Bits(16 bits), 19200)
-  val bank1 = Mem(Bits(16 bits), 19200)
+  val framebuffer = Mem(Bits(16 bits), 38400)
 
   // Palette: 4 colors
   val palette = VgaPalette(vgaCd)
@@ -37,8 +36,8 @@ case class VgaDevice(vgaCd : ClockDomain) extends Component {
 
   // Mode Register
   // bit 0: screen mode (0 = 640x240 4bpp, 1 = 640x480 2bpp)
-  val ctrlReg = Reg(Bits(16 bits)) init 0
-  val isLowRes = ctrlReg(0)
+  val ctrlReg = Reg(Bits(16 bits)) init 1
+  val resolution = ctrlReg(0)
 
   // Read is handled below, after the banks, along with the other memory reads
   when(io.ctrlSel && io.bus.wr) {
@@ -49,36 +48,25 @@ case class VgaDevice(vgaCd : ClockDomain) extends Component {
   // ------------------------------------------------------------------
   // 68000 bus side: Framebuffer (Interleaved) + Device data out
   // ------------------------------------------------------------------
-  val bankSelect = io.bus.address(1)
-  val ramAddress = io.bus.address(16 downto 2).asUInt
+  val ramAddress = io.bus.address(16 downto 1).asUInt
 
-  val cpuBank0Data = bank0.readWriteSync(
+  val cpuRamData = framebuffer.readWriteSync(
     address = ramAddress,
     data    = io.bus.dataOut,
-    enable  = io.fbSel && !bankSelect,
-    write   = io.bus.wr,
-    mask    = io.bus.uds ## io.bus.lds,
-    clockCrossing = true
-  )
-
-  val cpuBank1Data = bank1.readWriteSync(
-    address = ramAddress,
-    data    = io.bus.dataOut,
-    enable  = io.fbSel && bankSelect,
+    enable  = io.fbSel,
     write   = io.bus.wr,
     mask    = io.bus.uds ## io.bus.lds,
     clockCrossing = true
   )
 
   // Memory blocks routing when reading
+  io.bus.dataIn := 0
   when (io.fbSel) {
-    io.bus.dataIn := Mux(bankSelect, cpuBank1Data, cpuBank0Data)
+    io.bus.dataIn := cpuRamData
   } elsewhen io.palSel {
     io.bus.dataIn := palette.io.dataIn
   } elsewhen io.ctrlSel {
     io.bus.dataIn := ctrlReg
-  } otherwise {
-    io.bus.dataIn := 0
   }
 
   // ----------------------
@@ -86,15 +74,10 @@ case class VgaDevice(vgaCd : ClockDomain) extends Component {
   // ----------------------
   val vgaArea = new ClockingArea(vgaCd) {
     val rasterEngine = VgaRasterEngine()
+    rasterEngine.io.resolution := BufferCC(resolution)
 
-    rasterEngine.io.bank0Data := bank0.readSync(
-      address = rasterEngine.io.wordAddress,
-      enable = True,
-      clockCrossing = true,
-    )
-
-    rasterEngine.io.bank1Data := bank1.readSync(
-      address = rasterEngine.io.wordAddress,
+    rasterEngine.io.memData := framebuffer.readSync(
+      address = rasterEngine.io.memAddress,
       enable = True,
       clockCrossing = true,
     )

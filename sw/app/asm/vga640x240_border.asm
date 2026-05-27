@@ -9,7 +9,7 @@ start:
     bsr     draw_border
     trap    #14
 
-; Draw vertical bands
+; Draw bands
 draw_bands:
     lea     (_fb_start+(180*40*4)),a0
 
