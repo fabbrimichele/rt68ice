@@ -4,6 +4,7 @@
 ; Program code
 ; ===========================
 start:
+    move.w  $1,VIDEO_CTRL               ; Set high-res (640*480px 2bpp)
     bsr     clr_screen
     bsr     draw_bands
     bsr     draw_border
@@ -85,6 +86,7 @@ lvline:
 ; Include files
 ; ===========================
     include '../../lib/asm/mem_map_led.asm'
+    include '../../lib/asm/mem_map_video.asm'
 
 ; ===========================
 ; Data Constants
