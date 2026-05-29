@@ -4,8 +4,9 @@
 ; Program code
 ; ===========================
 start:
+    move.w  #0,VIDEO_CTRL
     bsr     clr_screen
-    bsr     draw_bands
+    ;bsr     draw_bands
     bsr     draw_border
     trap    #14
 
@@ -33,17 +34,17 @@ draw_bands:
 draw_border:
     ; Horizontal lines
     move.l  #$FFFFFFFF,d1
-    lea     _fb_start,a0
+    lea     _fb_start,a0                ; First line
     bsr     hline
-    lea     (_fb_start+(479*40*4)),a0   ; Line 479 * 40 blocks * 4 bytes per block
+    lea     (_fb_start+(239*160)),a0    ; Last line
     bsr     hline
     ; Vertical lines
     move.l  #$80008000,d1
     lea     _fb_start,a0
-    bsr     lvline
+    ;bsr     lvline
     move.l  #$00010001,d1
     lea     (_fb_start+39*4),a0         ; Last column
-    bsr     lvline
+    ;bsr     lvline
     rts
 
 ; Clear screen
@@ -59,9 +60,9 @@ clr_screen:
 ; Input: a0 starting address
 ;        d1.w pattern
 hline:
-    move.w  #39,d0                  ; 40 - 1 for dbra (640px/16bits = 39 words)
+    move.w  #79,d0
 .loop:
-    move.l  d1,(a0)+        ; Draw 16 white pixels (2 interleaved bitplanes -> 32 bits)
+    move.l  d1,(a0)+                ; Draw 16 white pixels (2 interleaved bitplanes -> 32 bits)
     dbra    d0,.loop
     rts
 
@@ -80,6 +81,7 @@ lvline:
 ; ===========================
 ; Value Constants
 ; ===========================
+VIDEO_CTRL  equ $14000
 
 ; ===========================
 ; Include files

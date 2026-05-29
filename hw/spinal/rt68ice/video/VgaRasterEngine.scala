@@ -38,36 +38,43 @@ case class VgaRasterEngine() extends Component {
     val hCounter = vgaCounter.io.hCounter
     val vCounter = vgaCounter.io.vCounter
 
-    val pixelX = hCounter - timings.h.colorStart
-    val pixelY = vCounter - timings.v.colorStart
+    val isActiveX = hCounter >= timings.h.colorStart
+    val pixelX = isActiveX ? (hCounter - timings.h.colorStart) | U(0)
+    val pixelY = (vCounter > timings.v.colorStart) ? (vCounter - timings.v.colorStart) | U(0)
     val virtualY = io.resolution ? pixelY | (pixelY >> 1)
 
-    // SEQUENTIAL FETCH BUFFERS
-    val cycleCounter = pixelX(3 downto 0)
     val planeStride  = io.resolution ? U(2, 3 bits) | U(4, 3 bits)
 
     // Calculate vertical line baseline offset based on line width
-    // High-Res (2bpp) = Y * 80 words per line
-    // Low-Res  (4bpp) = Y * 160 words per line
     val lineBaseAddress = io.resolution ?
-      ((virtualY << 6) + (virtualY << 4)) | // (Y * 64) + (Y * 16)  = Y * 80
-      ((virtualY << 7) + (virtualY << 5))   // (Y * 128) + (Y * 32) = Y * 160
+      ((virtualY << 6) + (virtualY << 4)) | // Y * 80
+      ((virtualY << 7) + (virtualY << 5))   // Y * 160
 
-    // Both resolutions span all 40 columns (0 to 39) across the 640-pixel screen
-    val currentGroupIdx = (pixelX >> 4)
-    val maxGroupIdx     = U(39, 6 bits)
-    val nextGroupIdx    = (currentGroupIdx >= maxGroupIdx) ? U(0) | (currentGroupIdx + 1)
+    // --- ROBUST FETCH ENGINE COUNTERS ---
+    // Instead of computing look-ahead purely combinatorially from pixelX,
+    // we manage a clear 16-step cycle counter that runs continuously.
+    val cycleCounter = pixelX(3 downto 0)
 
-    val nextWordGroupOffset = nextGroupIdx * planeStride
-    val currentPlaneAddress = lineBaseAddress + nextWordGroupOffset + cycleCounter(1 downto 0)
+    // Robust Look-Ahead: We are fetching Group 0 during the 16 cycles BEFORE active video,
+    // and advancing to group N+1 when the shift registers dump at cycle 15.
+    val fetchGroupIdx = Reg(UInt(6 bits)) init 0
+
+    when(!isActiveX) {
+      fetchGroupIdx := 0 // Hold at group 0 during blanking/back porch to pre-fetch safely
+    } elsewhen(cycleCounter === 15) {
+      fetchGroupIdx := fetchGroupIdx + 1
+    }
+
+    // Address generation is now steady and won't glitch at the edge of the screen
+    val currentPlaneAddress = lineBaseAddress + (fetchGroupIdx * planeStride) + cycleCounter(1 downto 0)
     io.memAddress := currentPlaneAddress.resized
 
     // The Fetch Team: Updates sequentially, one cycle at a time
     val fetchRegs = Vec(Reg(Bits(16 bits)) init 0, 4)
-    when(Delay(cycleCounter === 0, 1)) { fetchRegs(0) := io.memData }
-    when(Delay(cycleCounter === 1, 1)) { fetchRegs(1) := io.memData }
-    when(Delay(cycleCounter === 2, 1)) { fetchRegs(2) := io.memData }
-    when(Delay(cycleCounter === 3, 1)) { fetchRegs(3) := io.memData }
+    when(cycleCounter === 1) { fetchRegs(0) := io.memData }
+    when(cycleCounter === 2) { fetchRegs(1) := io.memData }
+    when(cycleCounter === 3) { fetchRegs(2) := io.memData }
+    when(cycleCounter === 4) { fetchRegs(3) := io.memData }
 
     // THE DOUBLE-BUFFER SHIFT LATCH
     val shiftRegs = Vec(Reg(Bits(16 bits)) init 0, 4)
@@ -91,15 +98,7 @@ case class VgaRasterEngine() extends Component {
     (B"2'b00" ## videoPipeline.plane1Bit ## videoPipeline.plane0Bit) |
     (videoPipeline.plane3Bit ## videoPipeline.plane2Bit ## videoPipeline.plane1Bit ## videoPipeline.plane0Bit)
 
-  // No delay required, it might be that VgaCounter
-  // already take 1 cycle delay in account.
-  io.hSync   := vgaCounter.io.hSync
-  io.vSync   := vgaCounter.io.vSync
-  io.colorEn := vgaCounter.io.colorEn
-
-  // CRITICAL TIMING LATENCY MATCHING
-  //io.hSync   := Delay(vgaCounter.io.hSync, 1)
-  //io.vSync   := Delay(vgaCounter.io.vSync, 1)
-  //io.colorEn := Delay(vgaCounter.io.colorEn, 1)
+  io.hSync   := Delay(vgaCounter.io.hSync, 15)
+  io.vSync   := Delay(vgaCounter.io.vSync, 15)
+  io.colorEn := Delay(vgaCounter.io.colorEn, 15)
 }
-
