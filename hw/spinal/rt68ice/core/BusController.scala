@@ -25,12 +25,13 @@ case class BusController() extends Component {
     val videoBus  = master(M68KBus())
 
     // Slave select signals (to peripherals)
-    val romSel    = out Bool()
-    val ledSel    = out Bool()
-    val ramSel    = out Bool()
-    val uartSel   = out Bool()
-    val vidPalSel = out Bool()
-    val vidFbSel  = out Bool()
+    val romSel      = out Bool()
+    val ledSel      = out Bool()
+    val ramSel      = out Bool()
+    val uartSel     = out Bool()
+    val vidPalSel   = out Bool()
+    val vidCtrlSel  = out Bool()
+    val vidFbSel    = out Bool()
   }
 
   // ---------------------------
@@ -77,18 +78,20 @@ case class BusController() extends Component {
   io.ledSel     := False
   io.uartSel    := False
   io.vidPalSel  := False
+  io.vidCtrlSel := False
   io.vidFbSel   := False
   io.busErr     := False
 
   // Address Bitmask Definitions
   // Boot vectors look at the absolute first 8 bytes via a 3-bit wildcard mask
-  val bootMapping   = MaskMapping(0x00000000L, 0xFFFFFFF8L)
-  val ramMapping    = SizeMapping(0x00000000L, 16 KiB)   // $000000 - $003FFF
-  val romMapping    = SizeMapping(0x00004000L, 16 KiB)   // $004000 - $007FFF
-  val ledMapping    = SizeMapping(0x00008000L, 16 KiB)   // $008000 - $00BFFF
-  val uartMapping   = SizeMapping(0x0000C000L, 16 KiB)   // $00C000 - $00FFFF
-  val vidPalMapping = SizeMapping(0x00010000L, 16 KiB)   // $010000 - $013FFF
-  val vidFbMapping  = SizeMapping(0x00020000L, 128 KiB)  // $020000 - $03FFFF - only the first 75KB are available
+  val bootMapping     = MaskMapping(0x00000000L, 0xFFFFFFF8L)
+  val ramMapping      = SizeMapping(0x00000000L, 16 KiB)   // $000000 - $003FFF
+  val romMapping      = SizeMapping(0x00004000L, 16 KiB)   // $004000 - $007FFF
+  val ledMapping      = SizeMapping(0x00008000L, 16 KiB)   // $008000 - $00BFFF
+  val uartMapping     = SizeMapping(0x0000C000L, 16 KiB)   // $00C000 - $00FFFF
+  val vidPalMapping   = SizeMapping(0x00010000L, 16 KiB)   // $010000 - $013FFF
+  val vidCtrlMapping  = SizeMapping(0x00014000L, 16 KiB)   // $014000 - $017FFF
+  val vidFbMapping    = SizeMapping(0x00020000L, 128 KiB)  // $020000 - $03FFFF - only the first 75KB are available
 
   saveMemoryLayout(
     "doc/memory_layout.md",
@@ -98,6 +101,7 @@ case class BusController() extends Component {
     "LED PERIPH" -> ledMapping,
     "UART PERIPH" -> uartMapping,
     "VIDEO PALETTE" -> vidPalMapping,
+    "VIDEO CONTROL" -> vidCtrlMapping,
     "VIDEO FB" -> vidFbMapping,
   )
 
@@ -115,6 +119,8 @@ case class BusController() extends Component {
     io.uartSel := True
   } elsewhen vidPalMapping .hit(address) {
     io.vidPalSel := True
+  } elsewhen vidCtrlMapping .hit(address) {
+    io.vidCtrlSel := True
   } elsewhen vidFbMapping.hit(address) {
     io.vidFbSel := True
   } otherwise {
@@ -142,7 +148,7 @@ case class BusController() extends Component {
     io.cpuBus.dataIn := io.ledBus.dataIn
   } elsewhen io.uartSel {
     io.cpuBus.dataIn := io.uartBus.dataIn
-  } elsewhen (io.vidPalSel || io.vidFbSel) {
+  } elsewhen (io.vidPalSel || io.vidCtrlSel || io.vidFbSel) {
     io.cpuBus.dataIn := io.videoBus.dataIn
   }
 }

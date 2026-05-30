@@ -20,21 +20,37 @@ case class VgaPalette(vgaCd : ClockDomain) extends Component {
     val dataIn  = out Bits(DATA_WIDTH bits)
 
     // VGA side (VGA clock)
-    val colorIndex  = in Bits(2 bits)
+    val colorIndex  = in Bits(4 bits)
     val pixelColor  = out Bits(24 bits)
   }
 
-  // Palette: 4 colors * 3 bytes = 12 bytes
-  val palette = Vec(Reg(Bits(24 bits)), 4)
-  palette(0).init(B"24'x000000") // 00: Black
-  palette(1).init(B"24'x00FF00") // 01: Green
-  palette(2).init(B"24'xFF0000") // 10: Red
-  palette(3).init(B"24'xFFFFFF") // 11: White
+  // ------------------------------------------------------------------
+  // Memory definitions: 16 colors * 3 bytes = 48 bytes total
+  // ------------------------------------------------------------------
+  val palette = Vec(Reg(Bits(24 bits)), 16)
+
+  // Initialize with a standard 16-color retro palette baseline
+  palette(0).init(B"24'x000000")  // 0: Black
+  palette(1).init(B"24'x0000AA")  // 1: Blue
+  palette(2).init(B"24'x00AA00")  // 2: Green
+  palette(3).init(B"24'x00AAAA")  // 3: Cyan
+  palette(4).init(B"24'xAA0000")  // 4: Red
+  palette(5).init(B"24'xAA00AA")  // 5: Magenta
+  palette(6).init(B"24'xAA5500")  // 6: Brown
+  palette(7).init(B"24'xAAAAAA")  // 7: Light Gray
+  palette(8).init(B"24'x555555")  // 8: Dark Gray
+  palette(9).init(B"24'x5555FF")  // 9: Bright Blue
+  palette(10).init(B"24'x55FF55") // 10: Bright Green
+  palette(11).init(B"24'x55FFFF") // 11: Bright Cyan
+  palette(12).init(B"24'xFF5555") // 12: Bright Red
+  palette(13).init(B"24'xFF55FF") // 13: Bright Magenta
+  palette(14).init(B"24'xFFFF55") // 14: Yellow
+  palette(15).init(B"24'xFFFFFF") // 15: White
 
   // ----------------------
   // 68000 bus side
   // ----------------------
-  val palAddress = io.address(3 downto 2).asUInt
+  val palAddress = io.address(5 downto 2).asUInt
   val isLowerWord = io.address(1)
 
   io.dataIn := 0
@@ -62,8 +78,9 @@ case class VgaPalette(vgaCd : ClockDomain) extends Component {
 
   // Vga side
   vgaCd {
-    val vgaPalette = Vec(BufferCC(palette(0)), BufferCC(palette(1)), BufferCC(palette(2)), BufferCC(palette(3)))
-    io.pixelColor := vgaPalette(io.colorIndex.asUInt)
+    val synchronizedPalette = Vec(palette.map(reg => BufferCC(reg)))
+
+    io.pixelColor := synchronizedPalette(io.colorIndex.asUInt)
   }
 }
 

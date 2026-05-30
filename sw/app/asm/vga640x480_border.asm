@@ -4,24 +4,25 @@
 ; Program code
 ; ===========================
 start:
+    move.w  $1,VIDEO_CTRL               ; Set high-res (640*480px 2bpp)
     bsr     clr_screen
     bsr     draw_bands
     bsr     draw_border
     trap    #14
 
-; Draw vertical bands
+; Draw bands
 draw_bands:
-    lea     (_fb_start+(180*40*4)),a0
+    lea     (_fb_start+(LINE_WIDTH_B*180)),a0   ; starts at line 180
 
     ; Green band
-    move.l  #$FFFF0000,d1               ; Green
+    move.l  #$0000FFFF,d1               ; Color 2 -> green (01 = 2, plane order is reversed)
     move.w  #59,d2                      ; 60 horizonatl lines (-1 for dbra)
 .green_loop:
     bsr     hline
     dbra    d2,.green_loop
 
-    ; Red band
-    move.l  #$0000FFFF,d1               ; Red
+    ; Blue band
+    move.l  #$FFFF0000,d1               ; Color 1 -> blue (10 = 1, plane order is reversed)
     move.w  #59,d2                      ; 60 horizonatl lines (-1 for dbra)
 .red_loop:
     bsr     hline
@@ -35,15 +36,15 @@ draw_border:
     move.l  #$FFFFFFFF,d1
     lea     _fb_start,a0
     bsr     hline
-    lea     (_fb_start+(479*40*4)),a0   ; Line 479 * 40 blocks * 4 bytes per block
+    lea     (_fb_start+(479*LINE_WIDTH_B)),a0   ; Last line
     bsr     hline
     ; Vertical lines
     move.l  #$80008000,d1
     lea     _fb_start,a0
-    bsr     lvline
+    bsr     vline
     move.l  #$00010001,d1
-    lea     (_fb_start+39*4),a0         ; Last column
-    bsr     lvline
+    lea     (_fb_start+LINE_WIDTH_B-4),a0       ; Last column
+    bsr     vline
     rts
 
 ; Clear screen
@@ -68,11 +69,11 @@ hline:
 ; Draw a full vertical line
 ; Input: a0   starting address
 ;        d1.w pattern
-lvline:
+vline:
     move.w  #479,d0                 ; 470 - 1 for dbra
 .loop:
     or.l    d1,(a0)
-    add.w   #160,a0
+    add.l   #LINE_WIDTH_B,a0
     dbra    d0,.loop
     rts
 
@@ -80,11 +81,15 @@ lvline:
 ; ===========================
 ; Value Constants
 ; ===========================
+; Line width in bytes
+; (640 pixels) / (16 pixels per word) = 40 => 40 * (4 planes per pixel)
+LINE_WIDTH_B    equ     40*4
 
 ; ===========================
 ; Include files
 ; ===========================
     include '../../lib/asm/mem_map_led.asm'
+    include '../../lib/asm/mem_map_video.asm'
 
 ; ===========================
 ; Data Constants
