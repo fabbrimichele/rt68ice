@@ -41,10 +41,10 @@ draw_border:
     ; Vertical lines
     move.l  #$80008000,d1
     lea     _fb_start,a0
-    bsr     lvline
+    bsr     vline
     move.l  #$00010001,d1
     lea     (_fb_start+39*4),a0         ; Last column
-    bsr     lvline
+    bsr     vline
     rts
 
 ; Clear screen
@@ -69,11 +69,11 @@ hline:
 ; Draw a full vertical line
 ; Input: a0   starting address
 ;        d1.w pattern
-lvline:
+vline:
     move.w  #479,d0                 ; 470 - 1 for dbra
 .loop:
     or.l    d1,(a0)
-    add.w   #160,a0
+    add.l   #160,a0
     dbra    d0,.loop
     rts
 

@@ -36,15 +36,16 @@ draw_border:
     move.l  #$FFFFFFFF,d1
     lea     _fb_start,a0                ; First line
     bsr     hline
-    lea     (_fb_start+(239*160)),a0    ; Last line
+    lea     (_fb_start+(239*320)),a0    ; Last line (in bytes)
     bsr     hline
     ; Vertical lines
+    move.b  #0,LED
     move.l  #$80008000,d1
     lea     _fb_start,a0
-    ;bsr     lvline
+    bsr     vline
     move.l  #$00010001,d1
-    lea     (_fb_start+39*4),a0         ; Last column
-    ;bsr     lvline
+    lea     (_fb_start+39*8),a0
+    bsr     vline
     rts
 
 ; Clear screen
@@ -69,11 +70,12 @@ hline:
 ; Draw a full vertical line
 ; Input: a0   starting address
 ;        d1.w pattern
-lvline:
-    move.w  #479,d0                 ; 470 - 1 for dbra
+vline:
+    move.w  #239,d0                 ; 470 - 1 for dbra
 .loop:
     or.l    d1,(a0)
-    add.w   #160,a0
+    or.l    d1,4(a0)
+    add.l   #320,a0
     dbra    d0,.loop
     rts
 
@@ -81,12 +83,12 @@ lvline:
 ; ===========================
 ; Value Constants
 ; ===========================
-VIDEO_CTRL  equ $14000
 
 ; ===========================
 ; Include files
 ; ===========================
     include '../../lib/asm/mem_map_led.asm'
+    include '../../lib/asm/mem_map_video.asm'
 
 ; ===========================
 ; Data Constants
