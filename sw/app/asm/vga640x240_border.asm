@@ -12,18 +12,18 @@ start:
 
 ; Draw bands
 draw_bands:
-    lea     (_fb_start+(40*8*90)),a0
+    lea     (_fb_start+(LINE_WIDTH_B*90)),a0    ; starts at line 90
 
     ; Green band
-    move.l  #$FFFF0000,d1               ; Green
-    move.w  #29,d2                      ; 30 horizonatl lines (-1 for dbra)
+    move.l  #$FFFF0000,d1                   ; Green
+    move.w  #29,d2                          ; 30 horizonatl lines (-1 for dbra)
 .green_loop:
     bsr     hline
     dbra    d2,.green_loop
 
     ; Red band
-    move.l  #$0000FFFF,d1               ; Red
-    move.w  #29,d2                      ; 30 horizonatl lines (-1 for dbra)
+    move.l  #$0000FFFF,d1                   ; Red
+    move.w  #29,d2                          ; 30 horizonatl lines (-1 for dbra)
 .red_loop:
     bsr     hline
     dbra    d2,.red_loop
@@ -34,9 +34,9 @@ draw_bands:
 draw_border:
     ; Horizontal lines
     move.l  #$FFFFFFFF,d1
-    lea     _fb_start,a0                ; First line
+    lea     _fb_start,a0                        ; First line
     bsr     hline
-    lea     (_fb_start+(239*320)),a0    ; Last line (in bytes)
+    lea     (_fb_start+(239*LINE_WIDTH_B)),a0   ; Last line (in bytes)
     bsr     hline
     ; Vertical lines
     move.b  #0,LED
@@ -44,7 +44,7 @@ draw_border:
     lea     _fb_start,a0
     bsr     vline
     move.l  #$00010001,d1
-    lea     (_fb_start+39*8),a0
+    lea     (_fb_start+LINE_WIDTH_B-8),a0
     bsr     vline
     rts
 
@@ -71,11 +71,11 @@ hline:
 ; Input: a0   starting address
 ;        d1.w pattern
 vline:
-    move.w  #239,d0                 ; 470 - 1 for dbra
+    move.w  #239,d0                 ; 240 - 1 for dbra
 .loop:
     or.l    d1,(a0)
     or.l    d1,4(a0)
-    add.l   #320,a0
+    add.l   #LINE_WIDTH_B,a0
     dbra    d0,.loop
     rts
 
@@ -83,7 +83,9 @@ vline:
 ; ===========================
 ; Value Constants
 ; ===========================
-
+; Line width in bytes
+; (640 pixels) / (16 pixels per word) = 40 => 40 * (8 planes per pixel)
+LINE_WIDTH_B    equ     40*8
 
 ; ===========================
 ; Include files

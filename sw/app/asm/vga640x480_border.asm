@@ -12,7 +12,7 @@ start:
 
 ; Draw bands
 draw_bands:
-    lea     (_fb_start+(180*40*4)),a0
+    lea     (_fb_start+(LINE_WIDTH_B*180)),a0   ; starts at line 180
 
     ; Green band
     move.l  #$FFFF0000,d1               ; Green
@@ -36,14 +36,14 @@ draw_border:
     move.l  #$FFFFFFFF,d1
     lea     _fb_start,a0
     bsr     hline
-    lea     (_fb_start+(479*40*4)),a0   ; Line 479 * 40 blocks * 4 bytes per block
+    lea     (_fb_start+(479*LINE_WIDTH_B)),a0   ; Last line
     bsr     hline
     ; Vertical lines
     move.l  #$80008000,d1
     lea     _fb_start,a0
     bsr     vline
     move.l  #$00010001,d1
-    lea     (_fb_start+39*4),a0         ; Last column
+    lea     (_fb_start+LINE_WIDTH_B-4),a0       ; Last column
     bsr     vline
     rts
 
@@ -73,7 +73,7 @@ vline:
     move.w  #479,d0                 ; 470 - 1 for dbra
 .loop:
     or.l    d1,(a0)
-    add.l   #160,a0
+    add.l   #LINE_WIDTH_B,a0
     dbra    d0,.loop
     rts
 
@@ -81,6 +81,9 @@ vline:
 ; ===========================
 ; Value Constants
 ; ===========================
+; Line width in bytes
+; (640 pixels) / (16 pixels per word) = 40 => 40 * (4 planes per pixel)
+LINE_WIDTH_B    equ     40*4
 
 ; ===========================
 ; Include files
