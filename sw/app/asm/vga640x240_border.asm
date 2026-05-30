@@ -6,24 +6,24 @@
 start:
     move.w  #0,VIDEO_CTRL
     bsr     clr_screen
-    ;bsr     draw_bands
+    bsr     draw_bands
     bsr     draw_border
     trap    #14
 
 ; Draw bands
 draw_bands:
-    lea     (_fb_start+(180*40*4)),a0
+    lea     (_fb_start+(40*8*90)),a0
 
     ; Green band
     move.l  #$FFFF0000,d1               ; Green
-    move.w  #59,d2                      ; 60 horizonatl lines (-1 for dbra)
+    move.w  #29,d2                      ; 30 horizonatl lines (-1 for dbra)
 .green_loop:
     bsr     hline
     dbra    d2,.green_loop
 
     ; Red band
     move.l  #$0000FFFF,d1               ; Red
-    move.w  #59,d2                      ; 60 horizonatl lines (-1 for dbra)
+    move.w  #29,d2                      ; 30 horizonatl lines (-1 for dbra)
 .red_loop:
     bsr     hline
     dbra    d2,.red_loop
@@ -83,6 +83,7 @@ vline:
 ; ===========================
 ; Value Constants
 ; ===========================
+
 
 ; ===========================
 ; Include files
