@@ -22,7 +22,7 @@ case class VgaRasterEngine() extends Component {
     val memData     = in Bits(16 bits)
 
     // Pixel color index routed out to the Palette
-    val colorIndex = out Bits(4 bits)
+    val colorIndex = out Bits(8 bits)
 
     // VGA signals
     val vSync   = out Bool()
@@ -95,10 +95,10 @@ case class VgaRasterEngine() extends Component {
 
   // Combine planes into color index
   io.colorIndex := io.resolution ?
-    (B"2'b00" ## videoPipeline.plane1Bit ## videoPipeline.plane0Bit) |
-    (videoPipeline.plane3Bit ## videoPipeline.plane2Bit ## videoPipeline.plane1Bit ## videoPipeline.plane0Bit)
+    (B"6'b000000" ## videoPipeline.plane1Bit ## videoPipeline.plane0Bit) |
+    (B"4'b0000" ## videoPipeline.plane3Bit ## videoPipeline.plane2Bit ## videoPipeline.plane1Bit ## videoPipeline.plane0Bit)
 
-  io.hSync   := Delay(vgaCounter.io.hSync, 15)
-  io.vSync   := Delay(vgaCounter.io.vSync, 15)
-  io.colorEn := Delay(vgaCounter.io.colorEn, 15)
+  io.hSync   := Delay(vgaCounter.io.hSync, 16)
+  io.vSync   := Delay(vgaCounter.io.vSync, 16)
+  io.colorEn := Delay(vgaCounter.io.colorEn, 16)
 }

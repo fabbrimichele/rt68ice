@@ -35,7 +35,7 @@ case class Rt68IceTopLevel(romFile: String) extends Component {
     bus.io.cpuBus <> cpu.io.bus
 
     // ROM
-    val rom = Mem16Bit(sizeInWords = 8192, initFile = Some(romFile), readOnly = true)
+    val rom = Mem16Bit(sizeInWords = 4096, initFile = Some(romFile), readOnly = true)
     rom.io.sel := bus.io.romSel
     bus.io.romBus  <> rom.io.bus
 

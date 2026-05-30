@@ -14,6 +14,7 @@
 ; ------------------------------
 start:
     jsr     init_vector_table
+    jsr     init_palette
     jsr     uart_init
     lea     msg_title,a0
     bsr     put_str
@@ -494,6 +495,7 @@ trap_14_handler:
 ; ------------------------------
 ; Libraries
 ; ------------------------------
+    include '../../lib/asm/mem_map_video.asm'
     include '../../lib/asm/console_io_uart.asm'
     include '../../lib/asm/conversions.asm'
     include '../../lib/asm/isr_vector.asm'
@@ -531,6 +533,14 @@ init_vector_table:
     move.l  #trap_14_handler,VT_TRAP_14
     rts
 
+init_palette:
+    lea     VIDEO_PLTE,a0       ; Point to start of palette memory ($10000)
+    lea     DEFAULT_COLORS,a1   ; Point to our ROM data table
+    move.w  #15,d0              ; 16 colors to process (-1 for dbra)
+.loop:
+    move.l  (a1)+,(a0)+         ; Copy 32-bit color data to palette register
+    dbra    d0,.loop            ; Loop until all 16 are copied
+    rts
 
 ; ------------------------------
 ; ROM Data Section
@@ -572,3 +582,26 @@ IN_BUF_END:
 ; ===========================
 ; Program Constants
 DLY_VAL         equ 1333333     ; Delay iterations, 1.33 million = 0.5 sec at 32MHz
+
+; -------------------------------------------
+; Palette Data Table
+; Formatted as 32-bit Longwords: 0x00RRGGBB
+; -------------------------------------------
+    align   2                   ; Ensure word alignment for data reads
+DEFAULT_COLORS:
+    dc.l    $00000000           ; 0: Black
+    dc.l    $000000AA           ; 1: Blue
+    dc.l    $0000AA00           ; 2: Green
+    dc.l    $0000AAAA           ; 3: Cyan
+    dc.l    $00AA0000           ; 4: Red
+    dc.l    $00AA00AA           ; 5: Magenta
+    dc.l    $00AA5500           ; 6: Brown
+    dc.l    $00AAAAAA           ; 7: Light Gray
+    dc.l    $00555555           ; 8: Dark Gray
+    dc.l    $005555FF           ; 9: Bright Blue
+    dc.l    $0055FF55           ; 10: Bright Green
+    dc.l    $0055FFFF           ; 11: Bright Cyan
+    dc.l    $00FF5555           ; 12: Bright Red
+    dc.l    $00FF55FF           ; 13: Bright Magenta
+    dc.l    $00FFFF55           ; 14: Yellow
+    dc.l    $00FFFFFF           ; 15: White
