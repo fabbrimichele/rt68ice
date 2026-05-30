@@ -569,20 +569,6 @@ load_str        dc.b    'load',NUL
 run_str         dc.b    'run',NUL,NUL
 fbclr_str       dc.b    'fbclr',NUL
 
-; ===========================
-; RAM Data Section (bootloader mem)
-; ===========================
-    section .bss
-IN_BUF:
-    ds.b    80
-IN_BUF_END:
-
-; ===========================
-; Constants
-; ===========================
-; Program Constants
-DLY_VAL         equ 1333333     ; Delay iterations, 1.33 million = 0.5 sec at 32MHz
-
 ; -------------------------------------------
 ; Palette Data Table
 ; Formatted as 32-bit Longwords: 0x00RRGGBB
@@ -605,3 +591,17 @@ DEFAULT_COLORS:
     dc.l    $00FF55FF           ; 13: Bright Magenta
     dc.l    $00FFFF55           ; 14: Yellow
     dc.l    $00FFFFFF           ; 15: White
+
+; ===========================
+; RAM Data Section (bootloader mem)
+; ===========================
+    section .bss
+IN_BUF:
+    ds.b    80
+IN_BUF_END:
+
+; ===========================
+; Constants
+; ===========================
+; Program Constants
+DLY_VAL         equ 1333333     ; Delay iterations, 1.33 million = 0.5 sec at 32MHz
