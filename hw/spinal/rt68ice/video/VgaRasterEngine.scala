@@ -1,21 +1,25 @@
 package rt68ice.video
 
-import rt68ice.video.VgaRasterEngine.rgbConfig
+import rt68ice.video.VgaRasterEngine._
 import spinal.core._
 import spinal.lib._
 import spinal.lib.graphic.RgbConfig
 
 import scala.language.postfixOps
 
+//noinspection ScalaWeakerAccess
 object VgaRasterEngine {
   val rgbConfig = RgbConfig(8, 8, 8)
+  val RES_LOW   = 0
+  val RES_MED   = 1
+  val RES_HIGH  = 2
 }
 
 //noinspection TypeAnnotation
 //noinspection ScalaWeakerAccess
 case class VgaRasterEngine() extends Component {
   val io = new Bundle {
-    val resolution  = in Bool()
+    val resolution  = in Bits(2 bits)
 
     // Interface to the top-level memory blocks
     val memAddress = out UInt(16 bits)
@@ -41,14 +45,25 @@ case class VgaRasterEngine() extends Component {
     val isActiveX = hCounter >= timings.h.colorStart
     val pixelX = isActiveX ? (hCounter - timings.h.colorStart) | U(0)
     val pixelY = (vCounter > timings.v.colorStart) ? (vCounter - timings.v.colorStart) | U(0)
-    val virtualY = io.resolution ? pixelY | (pixelY >> 1)
 
-    val planeStride  = io.resolution ? U(2, 3 bits) | U(4, 3 bits)
+    val virtualY = io.resolution.mux(
+      RES_LOW -> (pixelY >> 1).resized,
+      RES_MED -> (pixelY >> 1).resized,
+      default -> pixelY
+    )
 
-    // Calculate vertical line baseline offset based on line width
-    val lineBaseAddress = io.resolution ?
-      ((virtualY << 6) + (virtualY << 4)) | // Y * 80
-      ((virtualY << 7) + (virtualY << 5))   // Y * 160
+    val planeStride  = io.resolution.mux(
+      RES_LOW -> U(4, 3 bits), // TODO
+      RES_MED -> U(4, 3 bits),
+      default -> U(2, 3 bits).resized
+    )
+
+    // Calculate vertical line baseline offset based on the line width
+    val lineBaseAddress = io.resolution.mux(
+      RES_LOW -> ((virtualY << 7) + (virtualY << 5)),         // Y * 160 TODO
+      RES_MED -> ((virtualY << 7) + (virtualY << 5)),         // Y * 160
+      default -> ((virtualY << 6) + (virtualY << 4)).resized  // Y * 80
+    )
 
     // --- ROBUST FETCH ENGINE COUNTERS ---
     // Instead of computing look-ahead purely combinatorially from pixelX,
@@ -94,9 +109,12 @@ case class VgaRasterEngine() extends Component {
   }
 
   // Combine planes into color index
-  io.colorIndex := io.resolution ?
-    (B"6'b000000" ## videoPipeline.plane1Bit ## videoPipeline.plane0Bit) |
-    (B"4'b0000" ## videoPipeline.plane3Bit ## videoPipeline.plane2Bit ## videoPipeline.plane1Bit ## videoPipeline.plane0Bit)
+  io.colorIndex := io.resolution.mux(
+      // TODO: RES_LOW
+      RES_LOW -> (B"4'b0000" ## videoPipeline.plane3Bit ## videoPipeline.plane2Bit ## videoPipeline.plane1Bit ## videoPipeline.plane0Bit), // TODO
+      RES_MED -> (B"4'b0000" ## videoPipeline.plane3Bit ## videoPipeline.plane2Bit ## videoPipeline.plane1Bit ## videoPipeline.plane0Bit),
+      default -> (B"6'b000000" ## videoPipeline.plane1Bit ## videoPipeline.plane0Bit)
+    )
 
   io.hSync   := Delay(vgaCounter.io.hSync, 16)
   io.vSync   := Delay(vgaCounter.io.vSync, 16)
