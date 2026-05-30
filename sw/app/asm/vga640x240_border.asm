@@ -16,7 +16,7 @@ draw_bands:
 
     ; Green band
     move.l  #$0000FFFF,d1                       ; Color 2 -> green
-    move.l  #$00000000,d2                       ;
+    move.l  #$00000000,d2                       ; plan0, plane1, plane2, plane3 -> 0100 = 2 (order is reversed)
     move.w  #29,d3                              ; 30 horizonatl lines (-1 for dbra)
 .green_loop:
     bsr     hline
@@ -24,7 +24,7 @@ draw_bands:
 
     ; Red band
     move.l  #$00000000,d1                       ; Color 4 -> red
-    move.l  #$FFFF0000,d2                       ;
+    move.l  #$FFFF0000,d2                       ; plan0, plane1, plane2, plane3 -> 0010 = 4 (order is reversed)
     move.w  #29,d3                              ; 30 horizonatl lines (-1 for dbra)
 .red_loop:
     bsr     hline
