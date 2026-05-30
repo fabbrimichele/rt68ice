@@ -15,14 +15,14 @@ draw_bands:
     lea     (_fb_start+(LINE_WIDTH_B*180)),a0   ; starts at line 180
 
     ; Green band
-    move.l  #$FFFF0000,d1               ; Green
+    move.l  #$0000FFFF,d1               ; Color 2 -> green (01 = 2, plane order is reversed)
     move.w  #59,d2                      ; 60 horizonatl lines (-1 for dbra)
 .green_loop:
     bsr     hline
     dbra    d2,.green_loop
 
-    ; Red band
-    move.l  #$0000FFFF,d1               ; Red
+    ; Blue band
+    move.l  #$FFFF0000,d1               ; Color 1 -> blue (10 = 1, plane order is reversed)
     move.w  #59,d2                      ; 60 horizonatl lines (-1 for dbra)
 .red_loop:
     bsr     hline
