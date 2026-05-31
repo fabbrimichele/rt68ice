@@ -15,6 +15,11 @@ object VgaRasterEngine {
   val RES_HIGH  = 2
 }
 
+/*
+  TODO: There is one bug pixel starts reading from address 1 instead of 0
+        to see it write to the palette and change the background from black to something else
+ */
+
 //noinspection TypeAnnotation
 //noinspection ScalaWeakerAccess
 case class VgaRasterEngine() extends Component {
@@ -59,8 +64,18 @@ case class VgaRasterEngine() extends Component {
       default -> pixelX
     )
 
-    // 1. Slow down the master 16-step cycle counter for low resolution mode
-    val cycleCounter = pixelX(3 downto 0)
+    // THE FIX: Stretch the internal pipeline counter to match the physical clock scaling
+    // In low-res, the pipeline takes 2 physical clock cycles to advance 1 step.
+    val cycleCounter = io.resolution.mux(
+      RES_LOW -> pixelX(4 downto 1), // 16 steps spanning 32 physical cycles
+      default -> pixelX(3 downto 0)  // 16 steps spanning 16 physical cycles
+    )
+
+    // The block latch trigger needs to hit at the very end of the physical block width
+    val isEndOfBlock = io.resolution.mux(
+      RES_LOW -> (pixelX(4 downto 0) === 31),
+      default -> (pixelX(3 downto 0) === 15)
+    )
 
     val planeStride = io.resolution.mux(
       RES_LOW -> U(8, 4 bits).resized,  // 8 words per block line segment
@@ -68,11 +83,11 @@ case class VgaRasterEngine() extends Component {
       default -> U(2, 4 bits).resized   // 2 words per block line segment
     )
 
-    // Mask the cycleCounter slice so it doesn't overshoot your stride boundaries
+    // Address offset pointer steps evenly across words
     val planeFetchOffset = io.resolution.mux(
-      RES_LOW -> pixelX(2 downto 0),                  // Steps 0-7 once over physical cycles 0-15
-      RES_MED -> pixelX(1 downto 0).resized,          // Steps 0-3
-      default -> (B"2'0" ## pixelX(0)).asUInt.resized // Steps 0-1
+      RES_LOW -> cycleCounter(2 downto 0),                  // Steps 0-7 once per block
+      RES_MED -> cycleCounter(1 downto 0).resized,          // Steps 0-3
+      default -> (B"2'0" ## cycleCounter(0)).asUInt.resized // Steps 0-1
     )
 
     // Calculate vertical line baseline offset based on the line width
@@ -82,15 +97,15 @@ case class VgaRasterEngine() extends Component {
       default -> ((virtualY << 6) + (virtualY << 4)).resized  // Y * 80
     )
 
-    // Group updates advance consistently on cycle 15 across all modes
+    // Safely increment only when the physical block is completely finished rendering
     val fetchGroupIdx = Reg(UInt(6 bits)) init 0
     when(!isActiveX) {
       fetchGroupIdx := 0
-    } elsewhen(isActiveX && (cycleCounter === 15)) {
+    } elsewhen(isActiveX && isEndOfBlock) {
       fetchGroupIdx := fetchGroupIdx + 1
     }
 
-    // Address generation is now steady and won't glitch at the edge of the screen
+    // Address generation is gated safely to prevent look-ahead address leaking out of bounds
     val currentPlaneAddress = lineBaseAddress + (fetchGroupIdx * planeStride) + planeFetchOffset
     io.memAddress := currentPlaneAddress.resized
 
@@ -139,7 +154,7 @@ case class VgaRasterEngine() extends Component {
   )
 
   when(io.resolution === RES_LOW) {
-    val delay = 16
+    val delay = 32
     io.hSync   := Delay(vgaCounter.io.hSync, delay)
     io.vSync   := Delay(vgaCounter.io.vSync, delay)
     io.colorEn := Delay(vgaCounter.io.colorEn, delay)
