@@ -15,11 +15,6 @@ object VgaRasterEngine {
   val RES_HIGH  = 2
 }
 
-/*
-  TODO: There is one bug pixel starts reading from address 1 instead of 0
-        to see it write to the palette and change the background from black to something else
- */
-
 //noinspection TypeAnnotation
 //noinspection ScalaWeakerAccess
 case class VgaRasterEngine() extends Component {
@@ -110,19 +105,27 @@ case class VgaRasterEngine() extends Component {
     io.memAddress := currentPlaneAddress.resized
 
     // The Fetch Team: Updates sequentially, one cycle at a time
+    val fetchEnable = Vec(Bool(), 8)
+    for(i <- 0 until 8) {
+      fetchEnable(i) := io.resolution.mux(
+        RES_LOW -> (pixelX(4 downto 0) === (i * 2 + 1)), // Pulses on 1, 3, 5, 7, 9, 11, 13, 15
+        default -> (pixelX(3 downto 0) === (i + 1))      // Pulses on 1, 2, 3, 4, 5, 6, 7, 8
+      )
+    }
+
     val fetchRegs = Vec(Reg(Bits(16 bits)) init 0, 8)
-    when(cycleCounter === 1) { fetchRegs(0) := io.memData }
-    when(cycleCounter === 2) { fetchRegs(1) := io.memData }
-    when(cycleCounter === 3) { fetchRegs(2) := io.memData }
-    when(cycleCounter === 4) { fetchRegs(3) := io.memData }
-    when(cycleCounter === 5) { fetchRegs(4) := io.memData }
-    when(cycleCounter === 6) { fetchRegs(5) := io.memData }
-    when(cycleCounter === 7) { fetchRegs(6) := io.memData }
-    when(cycleCounter === 8) { fetchRegs(7) := io.memData }
+    when(fetchEnable(0)) { fetchRegs(0) := io.memData }
+    when(fetchEnable(1)) { fetchRegs(1) := io.memData }
+    when(fetchEnable(2)) { fetchRegs(2) := io.memData }
+    when(fetchEnable(3)) { fetchRegs(3) := io.memData }
+    when(fetchEnable(4)) { fetchRegs(4) := io.memData }
+    when(fetchEnable(5)) { fetchRegs(5) := io.memData }
+    when(fetchEnable(6)) { fetchRegs(6) := io.memData }
+    when(fetchEnable(7)) { fetchRegs(7) := io.memData }
 
     // THE DOUBLE-BUFFER SHIFT LATCH
     val shiftRegs = Vec(Reg(Bits(16 bits)) init 0, 8)
-    when(cycleCounter === 15) {
+    when(isEndOfBlock) {
       shiftRegs(0) := fetchRegs(0)
       shiftRegs(1) := fetchRegs(1)
       shiftRegs(2) := fetchRegs(2)
