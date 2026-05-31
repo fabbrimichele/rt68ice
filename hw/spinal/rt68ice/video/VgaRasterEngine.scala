@@ -59,7 +59,11 @@ case class VgaRasterEngine() extends Component {
       default -> pixelX
     )
 
-    val cycleCounter = pixelX(3 downto 0)
+    // 1. Slow down the master 16-step cycle counter for low resolution mode
+    val cycleCounter = io.resolution.mux(
+      RES_LOW -> pixelX(4 downto 1), // Steps every 2 clock cycles (32 cycle loop total)
+      default -> pixelX(3 downto 0)  // Steps every clock cycle (16 cycle loop total)
+    )
 
     val planeStride = io.resolution.mux(
       RES_LOW -> U(8, 4 bits).resized,  // 8 words per block line segment
@@ -84,9 +88,11 @@ case class VgaRasterEngine() extends Component {
     // Robust Look-Ahead: We are fetching Group 0 during the 16 cycles BEFORE active video,
     // and advancing to group N+1 when the shift registers dump at cycle 15.
     val fetchGroupIdx = Reg(UInt(6 bits)) init 0
-
     when(!isActiveX) {
-      fetchGroupIdx := 0 // Hold at group 0 during blanking/back porch to pre-fetch safely
+      fetchGroupIdx := 0
+    } elsewhen(io.resolution === RES_LOW) {
+      // In low-res, only advance on physical cycle 31 (when pixelX ends in %11111)
+      when(pixelX(4 downto 0) === 31) { fetchGroupIdx := fetchGroupIdx + 1 }
     } elsewhen(cycleCounter === 15) {
       fetchGroupIdx := fetchGroupIdx + 1
     }
@@ -139,7 +145,16 @@ case class VgaRasterEngine() extends Component {
       default -> (B"6'0" ## videoPipeline.plane1Bit ## videoPipeline.plane0Bit)
     )
 
-  io.hSync   := Delay(vgaCounter.io.hSync, 16)
-  io.vSync   := Delay(vgaCounter.io.vSync, 16)
-  io.colorEn := Delay(vgaCounter.io.colorEn, 16)
+  when(io.resolution === RES_LOW) {
+    val delay = 32
+    io.hSync   := Delay(vgaCounter.io.hSync, delay)
+    io.vSync   := Delay(vgaCounter.io.vSync, delay)
+    io.colorEn := Delay(vgaCounter.io.colorEn, delay)
+  } otherwise {
+    val delay = 16
+    io.hSync   := Delay(vgaCounter.io.hSync, delay)
+    io.vSync   := Delay(vgaCounter.io.vSync, delay)
+    io.colorEn := Delay(vgaCounter.io.colorEn, delay)
+  }
+
 }
