@@ -30,7 +30,8 @@ object VgaRasterEngineSim extends App {
     // ------------------------------------------------------------
     // 3. Initialize Inputs and Mock Video RAM
     // ------------------------------------------------------------
-    dut.io.resolution #= VgaRasterEngine.RES_HIGH
+    //dut.io.resolution #= VgaRasterEngine.RES_LOW
+    dut.io.resolution #= VgaRasterEngine.RES_MED
 
     // Initialize our mocked VRAM buffer array
     // Word Group 0 (Line 0, Column 0) -> words 0, 1, 2, 3
@@ -67,12 +68,20 @@ object VgaRasterEngineSim extends App {
     fork {
       while(true) {
         dut.clockDomain.waitRisingEdge()
+        //dut.io.memData #= dut.io.memAddress.toInt
+        val addressMod = dut.io.memAddress.toInt % 16
+        if (addressMod == 0 || addressMod == 1 || addressMod  == 2 || addressMod == 3)
+          dut.io.memData #= 1
+        else
+          dut.io.memData #= 0
+        /*
         val requestedAddr = dut.io.memAddress.toInt
         if (requestedAddr < mockVram.length) {
           dut.io.memData #= mockVram(requestedAddr)
         } else {
           dut.io.memData #= 0 // Return blank for unpopulated bounds
         }
+         */
       }
     }
 

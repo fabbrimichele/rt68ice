@@ -60,10 +60,7 @@ case class VgaRasterEngine() extends Component {
     )
 
     // 1. Slow down the master 16-step cycle counter for low resolution mode
-    val cycleCounter = io.resolution.mux(
-      RES_LOW -> pixelX(4 downto 1), // Steps every 2 clock cycles (32 cycle loop total)
-      default -> pixelX(3 downto 0)  // Steps every clock cycle (16 cycle loop total)
-    )
+    val cycleCounter = pixelX(3 downto 0)
 
     val planeStride = io.resolution.mux(
       RES_LOW -> U(8, 4 bits).resized,  // 8 words per block line segment
@@ -73,9 +70,9 @@ case class VgaRasterEngine() extends Component {
 
     // Mask the cycleCounter slice so it doesn't overshoot your stride boundaries
     val planeFetchOffset = io.resolution.mux(
-      RES_LOW -> cycleCounter(2 downto 0),          // 0 to 7 (8 planes)
-      RES_MED -> cycleCounter(1 downto 0).resized,  // 0 to 3 (4 planes)
-      default -> (B"2'0" ## cycleCounter(0)).asUInt     // 0 to 1 (2 planes)
+      RES_LOW -> pixelX(2 downto 0),                  // Steps 0-7 once over physical cycles 0-15
+      RES_MED -> pixelX(1 downto 0).resized,          // Steps 0-3
+      default -> (B"2'0" ## pixelX(0)).asUInt.resized // Steps 0-1
     )
 
     // Calculate vertical line baseline offset based on the line width
@@ -85,15 +82,11 @@ case class VgaRasterEngine() extends Component {
       default -> ((virtualY << 6) + (virtualY << 4)).resized  // Y * 80
     )
 
-    // Robust Look-Ahead: We are fetching Group 0 during the 16 cycles BEFORE active video,
-    // and advancing to group N+1 when the shift registers dump at cycle 15.
+    // Group updates advance consistently on cycle 15 across all modes
     val fetchGroupIdx = Reg(UInt(6 bits)) init 0
     when(!isActiveX) {
       fetchGroupIdx := 0
-    } elsewhen(io.resolution === RES_LOW) {
-      // In low-res, only advance on physical cycle 31 (when pixelX ends in %11111)
-      when(pixelX(4 downto 0) === 31) { fetchGroupIdx := fetchGroupIdx + 1 }
-    } elsewhen(cycleCounter === 15) {
+    } elsewhen(isActiveX && (cycleCounter === 15)) {
       fetchGroupIdx := fetchGroupIdx + 1
     }
 
@@ -139,14 +132,14 @@ case class VgaRasterEngine() extends Component {
 
   // Combine planes into color index
   io.colorIndex := io.resolution.mux(
-      RES_LOW -> (videoPipeline.plane7Bit ## videoPipeline.plane6Bit ## videoPipeline.plane5Bit ## videoPipeline.plane4Bit
-        ## videoPipeline.plane3Bit ## videoPipeline.plane2Bit ## videoPipeline.plane1Bit ## videoPipeline.plane0Bit),
-      RES_MED -> (B"4'0" ## videoPipeline.plane3Bit ## videoPipeline.plane2Bit ## videoPipeline.plane1Bit ## videoPipeline.plane0Bit),
-      default -> (B"6'0" ## videoPipeline.plane1Bit ## videoPipeline.plane0Bit)
-    )
+    RES_LOW -> (videoPipeline.plane7Bit ## videoPipeline.plane6Bit ## videoPipeline.plane5Bit ## videoPipeline.plane4Bit
+      ## videoPipeline.plane3Bit ## videoPipeline.plane2Bit ## videoPipeline.plane1Bit ## videoPipeline.plane0Bit),
+    RES_MED -> (B"4'0" ## videoPipeline.plane3Bit ## videoPipeline.plane2Bit ## videoPipeline.plane1Bit ## videoPipeline.plane0Bit),
+    default -> (B"6'0" ## videoPipeline.plane1Bit ## videoPipeline.plane0Bit)
+  )
 
   when(io.resolution === RES_LOW) {
-    val delay = 32
+    val delay = 16
     io.hSync   := Delay(vgaCounter.io.hSync, delay)
     io.vSync   := Delay(vgaCounter.io.vSync, delay)
     io.colorEn := Delay(vgaCounter.io.colorEn, delay)
@@ -156,5 +149,4 @@ case class VgaRasterEngine() extends Component {
     io.vSync   := Delay(vgaCounter.io.vSync, delay)
     io.colorEn := Delay(vgaCounter.io.colorEn, delay)
   }
-
 }
