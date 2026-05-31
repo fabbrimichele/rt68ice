@@ -30,7 +30,7 @@ object VgaRasterEngineSim extends App {
     // ------------------------------------------------------------
     // 3. Initialize Inputs and Mock Video RAM
     // ------------------------------------------------------------
-    dut.io.resolution #= VgaRasterEngine.RES_MED
+    dut.io.resolution #= VgaRasterEngine.RES_HIGH
 
     // Initialize our mocked VRAM buffer array
     // Word Group 0 (Line 0, Column 0) -> words 0, 1, 2, 3

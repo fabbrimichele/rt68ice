@@ -486,11 +486,32 @@ chk_trl_done:
 int_bs_handler:
     lea     msg_bus_err,a0
     bsr     put_str
+    move.l  #_stack_top,sp
+    bsr     clear_registers
     jmp     mon_entry
 
 trap_14_handler:
     move.l  #_stack_top,sp
+    bsr     clear_registers
     jmp     mon_entry
+
+clear_registers:
+    moveq   #0,d0
+    moveq   #0,d1
+    moveq   #0,d2
+    moveq   #0,d3
+    moveq   #0,d4
+    moveq   #0,d5
+    moveq   #0,d6
+    moveq   #0,d7
+    move.l  #0,a0
+    move.l  #0,a1
+    move.l  #0,a2
+    move.l  #0,a3
+    move.l  #0,a4
+    move.l  #0,a5
+    move.l  #0,a6
+    rts
 
 ; ------------------------------
 ; Libraries
@@ -535,7 +556,7 @@ init_vector_table:
 
 init_palette:
     lea     VIDEO_PLTE,a0       ; Point to start of palette memory ($10000)
-    lea     DEFAULT_COLORS,a1   ; Point to our ROM data table
+    lea     default_colors,a1   ; Point to our ROM data table
     move.w  #15,d0              ; 16 colors to process (-1 for dbra)
 .loop:
     move.l  (a1)+,(a0)+         ; Copy 32-bit color data to palette register
@@ -545,6 +566,25 @@ init_palette:
 ; ------------------------------
 ; ROM Data Section
 ; ------------------------------
+; Palette Data Table
+; Formatted as 32-bit Longwords: 0x00RRGGBB
+default_colors
+    dc.l    $00000000           ; 0: Black
+    dc.l    $000000AA           ; 1: Blue
+    dc.l    $0000AA00           ; 2: Green
+    dc.l    $0000AAAA           ; 3: Cyan
+    dc.l    $00AA0000           ; 4: Red
+    dc.l    $00AA00AA           ; 5: Magenta
+    dc.l    $00AA5500           ; 6: Brown
+    dc.l    $00AAAAAA           ; 7: Light Gray
+    dc.l    $00555555           ; 8: Dark Gray
+    dc.l    $005555FF           ; 9: Bright Blue
+    dc.l    $0055FF55           ; 10: Bright Green
+    dc.l    $0055FFFF           ; 11: Bright Cyan
+    dc.l    $00FF5555           ; 12: Bright Red
+    dc.l    $00FF55FF           ; 13: Bright Magenta
+    dc.l    $00FFFF55           ; 14: Yellow
+    dc.l    $00FFFFFF           ; 15: White
 
 ; Messages
 msg_title       dc.b    'RT68F Monitor v0.1',CR,LF,NUL
@@ -568,29 +608,6 @@ help_str        dc.b    'help',NUL
 load_str        dc.b    'load',NUL
 run_str         dc.b    'run',NUL,NUL
 fbclr_str       dc.b    'fbclr',NUL
-
-; -------------------------------------------
-; Palette Data Table
-; Formatted as 32-bit Longwords: 0x00RRGGBB
-; -------------------------------------------
-    align   2                   ; Ensure word alignment for data reads
-DEFAULT_COLORS:
-    dc.l    $00000000           ; 0: Black
-    dc.l    $000000AA           ; 1: Blue
-    dc.l    $0000AA00           ; 2: Green
-    dc.l    $0000AAAA           ; 3: Cyan
-    dc.l    $00AA0000           ; 4: Red
-    dc.l    $00AA00AA           ; 5: Magenta
-    dc.l    $00AA5500           ; 6: Brown
-    dc.l    $00AAAAAA           ; 7: Light Gray
-    dc.l    $00555555           ; 8: Dark Gray
-    dc.l    $005555FF           ; 9: Bright Blue
-    dc.l    $0055FF55           ; 10: Bright Green
-    dc.l    $0055FFFF           ; 11: Bright Cyan
-    dc.l    $00FF5555           ; 12: Bright Red
-    dc.l    $00FF55FF           ; 13: Bright Magenta
-    dc.l    $00FFFF55           ; 14: Yellow
-    dc.l    $00FFFFFF           ; 15: White
 
 ; ===========================
 ; RAM Data Section (bootloader mem)
