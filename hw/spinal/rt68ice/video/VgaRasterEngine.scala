@@ -52,23 +52,34 @@ case class VgaRasterEngine() extends Component {
       default -> pixelY
     )
 
-    val planeStride  = io.resolution.mux(
-      RES_LOW -> U(4, 3 bits), // TODO
-      RES_MED -> U(4, 3 bits),
-      default -> U(2, 3 bits).resized
+    // virtualX slows down by half ONLY for low-res pixel tracking
+    val virtualX = io.resolution.mux(
+      RES_LOW -> (pixelX >> 1).resized,
+      RES_MED -> pixelX,
+      default -> pixelX
+    )
+
+    val cycleCounter = pixelX(3 downto 0)
+
+    val planeStride = io.resolution.mux(
+      RES_LOW -> U(8, 4 bits).resized,  // 8 words per block line segment
+      RES_MED -> U(4, 4 bits).resized,  // 4 words per block line segment
+      default -> U(2, 4 bits).resized   // 2 words per block line segment
+    )
+
+    // Mask the cycleCounter slice so it doesn't overshoot your stride boundaries
+    val planeFetchOffset = io.resolution.mux(
+      RES_LOW -> cycleCounter(2 downto 0),          // 0 to 7 (8 planes)
+      RES_MED -> cycleCounter(1 downto 0).resized,  // 0 to 3 (4 planes)
+      default -> (B"2'0" ## cycleCounter(0)).asUInt     // 0 to 1 (2 planes)
     )
 
     // Calculate vertical line baseline offset based on the line width
     val lineBaseAddress = io.resolution.mux(
-      RES_LOW -> ((virtualY << 7) + (virtualY << 5)),         // Y * 160 TODO
+      RES_LOW -> ((virtualY << 7) + (virtualY << 5)),         // Y * 160
       RES_MED -> ((virtualY << 7) + (virtualY << 5)),         // Y * 160
       default -> ((virtualY << 6) + (virtualY << 4)).resized  // Y * 80
     )
-
-    // --- ROBUST FETCH ENGINE COUNTERS ---
-    // Instead of computing look-ahead purely combinatorially from pixelX,
-    // we manage a clear 16-step cycle counter that runs continuously.
-    val cycleCounter = pixelX(3 downto 0)
 
     // Robust Look-Ahead: We are fetching Group 0 during the 16 cycles BEFORE active video,
     // and advancing to group N+1 when the shift registers dump at cycle 15.
@@ -81,7 +92,7 @@ case class VgaRasterEngine() extends Component {
     }
 
     // Address generation is now steady and won't glitch at the edge of the screen
-    val currentPlaneAddress = lineBaseAddress + (fetchGroupIdx * planeStride) + cycleCounter(1 downto 0)
+    val currentPlaneAddress = lineBaseAddress + (fetchGroupIdx * planeStride) + planeFetchOffset
     io.memAddress := currentPlaneAddress.resized
 
     // The Fetch Team: Updates sequentially, one cycle at a time
@@ -109,7 +120,7 @@ case class VgaRasterEngine() extends Component {
     }
 
     // PIXEL STREAM OUT
-    val pixelBitIdx = ~pixelX(3 downto 0)
+    val pixelBitIdx = ~virtualX(3 downto 0)
     val plane0Bit = shiftRegs(0)(pixelBitIdx)
     val plane1Bit = shiftRegs(1)(pixelBitIdx)
     val plane2Bit = shiftRegs(2)(pixelBitIdx)
