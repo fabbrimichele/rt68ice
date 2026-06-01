@@ -6,20 +6,8 @@
 start:
     move.w  #0,VIDEO_CTRL                       ; Set low-res (320*240px 8bpp)
     bsr     clr_screen
-    ;bsr     draw_bands
+    bsr     draw_bands
     bsr     draw_border
-
-    ; This works
-    ;lea     _fb_start,a0                        ;
-    ;move.l  #$AAAAAAAA,d1                       ; Color 15 -> white
-    ;move.l  #$AAAAAAAA,d2                       ; and all pixels on
-    ;move.l  #$00000000,d3                       ;
-    ;move.l  #$00000000,d4                       ;
-    ;move.l  d1,(a0)+                            ; Draw 16 white pixels (8 interleaved planes)
-    ;move.l  d2,(a0)+                            ;
-    ;move.l  d3,(a0)+                            ;
-    ;move.l  d4,(a0)+                            ;
-
     trap    #14
 
 ; Draw bands
@@ -28,19 +16,23 @@ draw_bands:
 
     ; Green band
     move.l  #$0000FFFF,d1                       ; Color 2 -> green
-    move.l  #$00000000,d2                       ; plan0, plane1, plane2, plane3 -> 0100 = 2 (order is reversed)
-    move.w  #29,d3                              ; 30 horizonatl lines (-1 for dbra)
+    move.l  #$00000000,d2                       ;
+    move.l  #$00000000,d3                       ;
+    move.l  #$00000000,d4                       ;
+    move.w  #29,d5                              ; 30 horizonatl lines (-1 for dbra)
 .green_loop:
     bsr     hline
-    dbra    d3,.green_loop
+    dbra    d5,.green_loop
 
     ; Red band
     move.l  #$00000000,d1                       ; Color 4 -> red
-    move.l  #$FFFF0000,d2                       ; plan0, plane1, plane2, plane3 -> 0010 = 4 (order is reversed)
-    move.w  #29,d3                              ; 30 horizonatl lines (-1 for dbra)
+    move.l  #$FFFF0000,d2                       ;
+    move.l  #$00000000,d3                       ;
+    move.l  #$00000000,d4                       ;
+    move.w  #29,d5                              ; 30 horizonatl lines (-1 for dbra)
 .red_loop:
     bsr     hline
-    dbra    d3,.red_loop
+    dbra    d5,.red_loop
 
     rts
 
