@@ -138,8 +138,11 @@ case class VgaRasterEngine() extends Component {
 
     // We must delay the shift index so the multiplexer keeps streaming
     // data during the delayed monitor output window.
-    val shiftIndexLow = Delay(virtualX(3 downto 0), 32)
-    val shiftIndexMed = Delay(virtualX(3 downto 0), 16)
+    val lowResDelay = 32
+    val medHighResDelay = 16
+
+    val shiftIndexLow = Delay(virtualX(3 downto 0), lowResDelay)
+    val shiftIndexMed = Delay(virtualX(3 downto 0), medHighResDelay)
 
     val outVirtualX = io.resolution.mux(
       RES_LOW -> shiftIndexLow,
@@ -167,14 +170,12 @@ case class VgaRasterEngine() extends Component {
   )
 
   when(io.resolution === RES_LOW) {
-    val delay = 32
-    io.hSync   := Delay(vgaCounter.io.hSync, delay)
-    io.vSync   := Delay(vgaCounter.io.vSync, delay)
-    io.colorEn := Delay(vgaCounter.io.colorEn, delay)
+    io.hSync   := Delay(vgaCounter.io.hSync, videoPipeline.lowResDelay)
+    io.vSync   := Delay(vgaCounter.io.vSync, videoPipeline.lowResDelay)
+    io.colorEn := Delay(vgaCounter.io.colorEn, videoPipeline.lowResDelay)
   } otherwise {
-    val delay = 16
-    io.hSync   := Delay(vgaCounter.io.hSync, delay)
-    io.vSync   := Delay(vgaCounter.io.vSync, delay)
-    io.colorEn := Delay(vgaCounter.io.colorEn, delay)
+    io.hSync   := Delay(vgaCounter.io.hSync, videoPipeline.medHighResDelay)
+    io.vSync   := Delay(vgaCounter.io.vSync, videoPipeline.medHighResDelay)
+    io.colorEn := Delay(vgaCounter.io.colorEn, videoPipeline.medHighResDelay)
   }
 }
