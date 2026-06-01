@@ -4,20 +4,16 @@ import os
 import struct
 from PIL import Image
 
-def convert_jpeg_to_interleaved_8bp(image_path, output_bin_path, output_pal_path):
+def convert_jpeg_to_interleaved_8bp(image_path, output_bin_path, output_pal_path,
+                                    img_load_addr=0x20000, pal_load_addr=0x10000):
     """
     Converts a JPEG image to a 320x240 8-bitplane word-interleaved binary file
-    suitable for big-endian 68000/FPGA video pipelines.
+    and a 32-bit xxRRGGBB palette file. Both files are prefixed with a
+    custom 8-byte big-endian header for a 68000 loader.
 
-    Layout per 16-pixel block:
-        Word 0: Plane 0 (Bits 15->0 for pixels 0->15)
-        Word 1: Plane 1
-        ...
-        Word 7: Plane 7
-
-    Palette output:
-        1024 bytes total (256 colors * 4 bytes).
-        Format per color: 32-bit Big-Endian Longword (0x00RRGGBB)
+    Header structure (8 bytes):
+        [0:4] -> 32-bit Target Load Address
+        [4:8] -> 32-bit Raw Payload Length (excluding header)
     """
     # 1. Load image and force resize to target resolution
     print(f"Loading '{image_path}'...")
@@ -28,9 +24,9 @@ def convert_jpeg_to_interleaved_8bp(image_path, output_bin_path, output_pal_path
     print("Quantizing to 256 colors...")
     img_indexed = img.convert('P', palette=Image.Palette.ADAPTIVE, colors=256)
 
-    # 3. Extract and save the palette as 32-bit longwords (xxRRGGBB)
+    # 3. Extract and generate the 32-bit palette payload (xxRRGGBB)
     raw_palette = img_indexed.getpalette()[:768]
-    pal_data_32bit = bytearray()
+    pal_payload = bytearray()
 
     print("Formatting palette to 32-bit big-endian longwords (xxRRGGBB)...")
     for i in range(0, len(raw_palette), 3):
@@ -39,18 +35,25 @@ def convert_jpeg_to_interleaved_8bp(image_path, output_bin_path, output_pal_path
         b = raw_palette[i+2]
 
         # Combine into a 32-bit integer: 0x00RRGGBB
-        # Big-endian packing ('>I') ensures it writes to memory as: [0x00, R, G, B]
         color_longword = (r << 16) | (g << 8) | b
-        pal_data_32bit.extend(struct.pack('>I', color_longword))
+        pal_payload.extend(struct.pack('>I', color_longword))
+
+    pal_payload_len = len(pal_payload) # Should be 1024 bytes
+
+    # Prepend 8-byte header to palette
+    pal_header = struct.pack('>II', pal_load_addr, pal_payload_len)
 
     with open(output_pal_path, 'wb') as pal_file:
-        pal_file.write(pal_data_32bit)
-    print(f"Saved 32-bit palette to: {output_pal_path} ({len(pal_data_32bit)} bytes)")
+        pal_file.write(pal_header + pal_payload)
 
-    # 4. Process pixels into interleaved bitplanes
+    print(f"Saved palette to: {output_pal_path}")
+    print(f"  -> Header: Load Address = 0x{pal_load_addr:08X}, Length = {pal_payload_len} bytes")
+    print(f"  -> Total file size (with header): {len(pal_header) + pal_payload_len} bytes")
+
+    # 4. Process pixels into interleaved bitplanes payload
     width, height = img_indexed.size
     pixels = list(img_indexed.getdata())
-    video_data = bytearray()
+    img_payload = bytearray()
 
     print("Processing interleaved bitplanes...")
     for y in range(height):
@@ -74,24 +77,38 @@ def convert_jpeg_to_interleaved_8bp(image_path, output_bin_path, output_pal_path
                         word_val |= (1 << (15 - bit_idx))
 
                 # Pack as an unsigned 16-bit big-endian integer ('>H')
-                video_data.extend(struct.pack('>H', word_val))
+                img_payload.extend(struct.pack('>H', word_val))
 
-    # 5. Save the raw frame buffer binary
+    img_payload_len = len(img_payload) # Should be 76800 bytes
+
+    # Prepend 8-byte header to image binary
+    img_header = struct.pack('>II', img_load_addr, img_payload_len)
+
     with open(output_bin_path, 'wb') as bin_file:
-        bin_file.write(video_data)
+        bin_file.write(img_header + img_payload)
 
-    expected_size = (320 * 240 * 8) // 8
-    print(f"Saved raw interleaved video data to: {output_bin_path}")
-    print(f"Total size: {len(video_data)} bytes (Expected: {expected_size} bytes)")
+    print(f"Saved video data to: {output_bin_path}")
+    print(f"  -> Header: Load Address = 0x{img_load_addr:08X}, Length = {img_payload_len} bytes")
+    print(f"  -> Total file size (with header): {len(img_header) + img_payload_len} bytes")
     print("Conversion complete!")
 
 if __name__ == "__main__":
-    # Example usage configuration
+    # Configure input and output filenames
     INPUT_JPEG = "input.jpg"
     OUTPUT_BIN = "screen_320x240_8bpp.bin"
-    OUTPUT_PAL = "palette_256.pal"
+    OUTPUT_PAL = "palette_256.bin"
+
+    # Set your custom 68000 target memory locations here if needed
+    IMAGE_TARGET_ADDRESS = 0x00020000
+    PALETTE_TARGET_ADDRESS = 0x00010000
 
     if os.path.exists(INPUT_JPEG):
-        convert_jpeg_to_interleaved_8bp(INPUT_JPEG, OUTPUT_BIN, OUTPUT_PAL)
+        convert_jpeg_to_interleaved_8bp(
+            INPUT_JPEG,
+            OUTPUT_BIN,
+            OUTPUT_PAL,
+            img_load_addr=IMAGE_TARGET_ADDRESS,
+            pal_load_addr=PALETTE_TARGET_ADDRESS
+        )
     else:
-        print(f"Error: '{INPUT_JPEG}' not found. Please place a JPEG file in the same directory or update the path.")
+        print(f"Error: '{INPUT_JPEG}' not found. Please place a JPEG file in the directory.")
