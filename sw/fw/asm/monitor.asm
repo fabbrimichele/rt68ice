@@ -196,13 +196,14 @@ load_cmd:
                                 ; d1 content lenght
     cmp     #0,d1
     beq     loa_cmd_done        ; If d1 = 0, exit
-    subq.l  #1,d1               ; Decrement counter (required by dbra)
 
     ; Read content
 loa_cmd_loop:
     jsr     get_chr             ; Read byte from UART to d0
     move.b  d0,(a0)+            ; Copy read byte to memory
-    dbra    d1,loa_cmd_loop     ; Decrement d1, if != -1 exit
+    subq.l  #1,d1               ; Decrement the FULL 32-bit counter
+                                ; (dbra replaced to support long > 64KB)
+    bne     loa_cmd_loop        ; If the counter hasn't reached 0, branch back
 
 loa_cmd_done:
     lea     msg_load_done,a0
