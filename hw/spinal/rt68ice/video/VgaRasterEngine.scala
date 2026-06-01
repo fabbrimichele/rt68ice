@@ -136,8 +136,18 @@ case class VgaRasterEngine() extends Component {
       shiftRegs(7) := fetchRegs(7)
     }
 
+    // We must delay the shift index so the multiplexer keeps streaming
+    // data during the delayed monitor output window.
+    val shiftIndexLow = Delay(virtualX(3 downto 0), 32)
+    val shiftIndexMed = Delay(virtualX(3 downto 0), 16)
+
+    val outVirtualX = io.resolution.mux(
+      RES_LOW -> shiftIndexLow,
+      default -> shiftIndexMed
+    )
+
     // PIXEL STREAM OUT
-    val pixelBitIdx = ~virtualX(3 downto 0)
+    val pixelBitIdx = ~outVirtualX
     val plane0Bit = shiftRegs(0)(pixelBitIdx)
     val plane1Bit = shiftRegs(1)(pixelBitIdx)
     val plane2Bit = shiftRegs(2)(pixelBitIdx)

@@ -7,17 +7,18 @@ start:
     move.w  #0,VIDEO_CTRL                       ; Set low-res (320*240px 8bpp)
     bsr     clr_screen
     ;bsr     draw_bands
-    ;bsr     draw_border
+    bsr     draw_border
 
-    lea     _fb_start,a0                        ;
-    move.l  #$AAAAAAAA,d1                       ; Color 15 -> white
-    move.l  #$AAAAAAAA,d2                       ; and all pixels on
-    move.l  #$00000000,d3                       ;
-    move.l  #$00000000,d4                       ;
-    move.l  d1,(a0)+                            ; Draw 16 white pixels (8 interleaved planes)
-    move.l  d2,(a0)+                            ;
-    move.l  d3,(a0)+                            ;
-    move.l  d4,(a0)+                            ;
+    ; This works
+    ;lea     _fb_start,a0                        ;
+    ;move.l  #$AAAAAAAA,d1                       ; Color 15 -> white
+    ;move.l  #$AAAAAAAA,d2                       ; and all pixels on
+    ;move.l  #$00000000,d3                       ;
+    ;move.l  #$00000000,d4                       ;
+    ;move.l  d1,(a0)+                            ; Draw 16 white pixels (8 interleaved planes)
+    ;move.l  d2,(a0)+                            ;
+    ;move.l  d3,(a0)+                            ;
+    ;move.l  d4,(a0)+                            ;
 
     trap    #14
 
@@ -55,14 +56,18 @@ draw_border:
     lea     (_fb_start+(239*LINE_WIDTH_B)),a0   ; Last line (in bytes)
     bsr     hline
     ; Vertical lines
-    move.b  #0,LED
     move.l  #$80008000,d1                       ; Color 15 -> white
     move.l  #$80008000,d2                       ; most left pixel
+    move.l  #$00000000,d3                       ;
+    move.l  #$00000000,d4                       ;
     lea     _fb_start,a0
     bsr     vline
     move.l  #$00010001,d1                       ; Color 15 -> white
     move.l  #$00010001,d2                       ; most right pixel
-    lea     (_fb_start+LINE_WIDTH_B-8),a0
+    move.l  #$00000000,d3                       ;
+    move.l  #$00000000,d4                       ;
+    ; TODO: the vertical line is not drawn/visible
+    lea     (_fb_start+LINE_WIDTH_B-16),a0
     bsr     vline
     rts
 
@@ -100,6 +105,8 @@ vline:
 .loop:
     or.l    d1,(a0)
     or.l    d2,4(a0)
+    or.l    d3,8(a0)
+    or.l    d4,12(a0)
     add.l   #LINE_WIDTH_B,a0
     dbra    d0,.loop
     rts
