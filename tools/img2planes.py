@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import os
+import sys
 import struct
 from PIL import Image
 
@@ -92,23 +93,35 @@ def convert_jpeg_to_interleaved_8bp(image_path, output_bin_path, output_pal_path
     print(f"  -> Total file size (with header): {len(img_header) + img_payload_len} bytes")
     print("Conversion complete!")
 
+
 if __name__ == "__main__":
-    # Configure input and output filenames
-    INPUT_JPEG = "input.jpg"
-    OUTPUT_BIN = "screen_320x240_8bpp.bin"
-    OUTPUT_PAL = "palette_256.bin"
+    # Ensure the user provided a filename argument
+    if len(sys.argv) < 2:
+        print("Usage: ./img2planes.py <input_image.jpg>")
+        sys.exit(1)
+
+    INPUT_IMAGE = sys.argv[1]
+
+    # Verify the file actually exists
+    if not os.path.exists(INPUT_IMAGE):
+        print(f"Error: '{INPUT_IMAGE}' not found.")
+        sys.exit(1)
+
+    # Extract the base filename (e.g., "kitten" from "folder/kitten.jpeg")
+    base_name = os.path.splitext(os.path.basename(INPUT_IMAGE))[0]
+
+    # Construct the dynamic output filenames
+    OUTPUT_BIN = f"{base_name}_320x240_8bpp.bin"
+    OUTPUT_PAL = f"{base_name}_palette.bin"
 
     # Set your custom 68000 target memory locations here if needed
     IMAGE_TARGET_ADDRESS = 0x00020000
     PALETTE_TARGET_ADDRESS = 0x00010000
 
-    if os.path.exists(INPUT_JPEG):
-        convert_jpeg_to_interleaved_8bp(
-            INPUT_JPEG,
-            OUTPUT_BIN,
-            OUTPUT_PAL,
-            img_load_addr=IMAGE_TARGET_ADDRESS,
-            pal_load_addr=PALETTE_TARGET_ADDRESS
-        )
-    else:
-        print(f"Error: '{INPUT_JPEG}' not found. Please place a JPEG file in the directory.")
+    convert_jpeg_to_interleaved_8bp(
+        INPUT_IMAGE,
+        OUTPUT_BIN,
+        OUTPUT_PAL,
+        img_load_addr=IMAGE_TARGET_ADDRESS,
+        pal_load_addr=PALETTE_TARGET_ADDRESS
+    )
