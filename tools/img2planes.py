@@ -3,6 +3,7 @@
 import os
 import sys
 import struct
+import argparse
 from PIL import Image
 
 def convert_jpeg_to_interleaved_8bp(image_path, output_bin_path, output_pal_path,
@@ -95,33 +96,27 @@ def convert_jpeg_to_interleaved_8bp(image_path, output_bin_path, output_pal_path
 
 
 if __name__ == "__main__":
-    # Ensure the user provided a filename argument
-    if len(sys.argv) < 2:
-        print("Usage: ./img2planes.py <input_image.jpg>")
-        sys.exit(1)
+    # Setup argument parser for cleaner CLI handling
+    parser = argparse.ArgumentParser(description="Convert a JPEG image to 68000 8bpp interleaved bitplanes.")
+    parser.add_argument("input_image", help="Path to the input JPEG image.")
+    parser.add_argument("-o", "--outdir", default=".",
+                        help="Destination folder for the generated .bin files. (Default: current directory)")
 
-    INPUT_IMAGE = sys.argv[1]
+    args = parser.parse_args()
+
+    INPUT_IMAGE = args.input_image
+    OUT_DIR = args.outdir
 
     # Verify the file actually exists
     if not os.path.exists(INPUT_IMAGE):
         print(f"Error: '{INPUT_IMAGE}' not found.")
         sys.exit(1)
 
+    # Ensure the destination directory exists
+    os.makedirs(OUT_DIR, exist_ok=True)
+
     # Extract the base filename (e.g., "kitten" from "folder/kitten.jpeg")
     base_name = os.path.splitext(os.path.basename(INPUT_IMAGE))[0]
 
-    # Construct the dynamic output filenames
-    OUTPUT_BIN = f"{base_name}_320x240_8bpp.bin"
-    OUTPUT_PAL = f"{base_name}_palette.bin"
-
-    # Set your custom 68000 target memory locations here if needed
-    IMAGE_TARGET_ADDRESS = 0x00020000
-    PALETTE_TARGET_ADDRESS = 0x00010000
-
-    convert_jpeg_to_interleaved_8bp(
-        INPUT_IMAGE,
-        OUTPUT_BIN,
-        OUTPUT_PAL,
-        img_load_addr=IMAGE_TARGET_ADDRESS,
-        pal_load_addr=PALETTE_TARGET_ADDRESS
-    )
+    # Construct the dynamic output filenames using the destination directory
+    OUTPUT_BIN = os.path.join(OUT_DIR, f"{base_name}_320x240_8bpp.bin")
