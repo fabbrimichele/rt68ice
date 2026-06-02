@@ -35,9 +35,9 @@ case class VgaDevice(vgaCd : ClockDomain) extends Component {
   palette.io.sel := io.palSel
 
   // Mode Register
-  // bit 0: screen mode (0 = 640x240 4bpp, 1 = 640x480 2bpp)
-  val ctrlReg = Reg(Bits(16 bits)) init 1
-  val resolution = ctrlReg(0)
+  // bit 0: screen mode (0 = 320x240 8bpp, 1 = 640x240 4bpp, 2 = 640x480 2bpp)
+  val ctrlReg = Reg(Bits(16 bits)) init 0
+  val resolution = ctrlReg(1 downto 0)
 
   // Read is handled below, after the banks, along with the other memory reads
   when(io.ctrlSel && io.bus.wr) {

@@ -4,7 +4,7 @@
 ; Program code
 ; ===========================
 start:
-    move.w  $1,VIDEO_CTRL               ; Set high-res (640*480px 2bpp)
+    move.w  #2,VIDEO_CTRL               ; Set high-res (640*480px 2bpp)
     bsr     clr_screen
     bsr     draw_bands
     bsr     draw_border

@@ -14,6 +14,7 @@
 ; ------------------------------
 start:
     jsr     init_vector_table
+    jsr     init_palette
     jsr     uart_init
     lea     msg_title,a0
     bsr     put_str
@@ -195,13 +196,14 @@ load_cmd:
                                 ; d1 content lenght
     cmp     #0,d1
     beq     loa_cmd_done        ; If d1 = 0, exit
-    subq.l  #1,d1               ; Decrement counter (required by dbra)
 
     ; Read content
 loa_cmd_loop:
     jsr     get_chr             ; Read byte from UART to d0
     move.b  d0,(a0)+            ; Copy read byte to memory
-    dbra    d1,loa_cmd_loop     ; Decrement d1, if != -1 exit
+    subq.l  #1,d1               ; Decrement the FULL 32-bit counter
+                                ; (dbra replaced to support long > 64KB)
+    bne     loa_cmd_loop        ; If the counter hasn't reached 0, branch back
 
 loa_cmd_done:
     lea     msg_load_done,a0
@@ -485,15 +487,37 @@ chk_trl_done:
 int_bs_handler:
     lea     msg_bus_err,a0
     bsr     put_str
+    move.l  #_stack_top,sp
+    bsr     clear_registers
     jmp     mon_entry
 
 trap_14_handler:
     move.l  #_stack_top,sp
+    bsr     clear_registers
     jmp     mon_entry
+
+clear_registers:
+    moveq   #0,d0
+    moveq   #0,d1
+    moveq   #0,d2
+    moveq   #0,d3
+    moveq   #0,d4
+    moveq   #0,d5
+    moveq   #0,d6
+    moveq   #0,d7
+    move.l  #0,a0
+    move.l  #0,a1
+    move.l  #0,a2
+    move.l  #0,a3
+    move.l  #0,a4
+    move.l  #0,a5
+    move.l  #0,a6
+    rts
 
 ; ------------------------------
 ; Libraries
 ; ------------------------------
+    include '../../lib/asm/mem_map_video.asm'
     include '../../lib/asm/console_io_uart.asm'
     include '../../lib/asm/conversions.asm'
     include '../../lib/asm/isr_vector.asm'
@@ -531,10 +555,37 @@ init_vector_table:
     move.l  #trap_14_handler,VT_TRAP_14
     rts
 
+init_palette:
+    lea     VIDEO_PLTE,a0       ; Point to start of palette memory ($10000)
+    lea     default_colors,a1   ; Point to our ROM data table
+    move.w  #15,d0              ; 16 colors to process (-1 for dbra)
+.loop:
+    move.l  (a1)+,(a0)+         ; Copy 32-bit color data to palette register
+    dbra    d0,.loop            ; Loop until all 16 are copied
+    rts
 
 ; ------------------------------
 ; ROM Data Section
 ; ------------------------------
+; Palette Data Table
+; Formatted as 32-bit Longwords: 0x00RRGGBB
+default_colors
+    dc.l    $00000000           ; 0: Black
+    dc.l    $000000AA           ; 1: Blue
+    dc.l    $0000AA00           ; 2: Green
+    dc.l    $0000AAAA           ; 3: Cyan
+    dc.l    $00AA0000           ; 4: Red
+    dc.l    $00AA00AA           ; 5: Magenta
+    dc.l    $00AA5500           ; 6: Brown
+    dc.l    $00AAAAAA           ; 7: Light Gray
+    dc.l    $00555555           ; 8: Dark Gray
+    dc.l    $005555FF           ; 9: Bright Blue
+    dc.l    $0055FF55           ; 10: Bright Green
+    dc.l    $0055FFFF           ; 11: Bright Cyan
+    dc.l    $00FF5555           ; 12: Bright Red
+    dc.l    $00FF55FF           ; 13: Bright Magenta
+    dc.l    $00FFFF55           ; 14: Yellow
+    dc.l    $00FFFFFF           ; 15: White
 
 ; Messages
 msg_title       dc.b    'RT68F Monitor v0.1',CR,LF,NUL

@@ -5,8 +5,8 @@ SCALA_PACKAGE = rt68ice
 VERILOG_SOURCES = hw/gen/$(TOP).v
 MERGED_VHDL = hw/gen/mergeRTL.vhd
 MERGED_VERILOG = hw/gen/mergeRTL.v
-#WAVE_FILE = simWorkspace/Blink/test/wave.fst
-WAVE_FILE = simWorkspace/VgaRasterEngine/test/wave.fst
+#WAVE_FILE = simWorkspace/VgaRasterEngine/test/wave.fst
+WAVE_FILE = simWorkspace/VgaDevice/test/wave.fst
 # ECP5 Specifics
 DEVICE  = --25k
 PACKAGE = --package CABGA256
@@ -27,9 +27,12 @@ TARGET_APP_DIR := target/app
 # Where the board is connected
 SERIAL_PORT = /dev/ttyACM0
 SERIAL_BAUD = 19200
+# Image conversion settings
+ASSETS_IMG_DIR = assets/images
+IMG_TOOL = tools/img2planes.py
 
 
-.PHONY: all clean rom prog prog-flash view-wave monitor
+.PHONY: all clean rom prog prog-flash view-wave monitor images
 
 all: $(TARGET).bit
 
@@ -155,3 +158,30 @@ $(TARGET_APP_DIR)/%.bin: $(ASM_APP_DIR)/%.asm
 	DETECTED_ADDR=$$(awk '/^[[:space:]]*[0-9a-fA-F]{8}[[:space:]]+\.text/ {print $$1; exit}' "$$SYM_FILE"); \
 	HEADER_HEX=$$DETECTED_ADDR$$HEX_SIZE; \
 	echo "$$HEADER_HEX" | xxd -r -p | cat - $$SHELL_RAW_FILE > $@
+
+
+# =========================================================================
+# SW PIPELINE 3: Asset Conversion (.jpg / .jpeg -> Interleaved .bin)
+# =========================================================================
+
+# Find all .jpg and .jpeg files
+JPG_SOURCES := $(wildcard $(ASSETS_IMG_DIR)/*.jpg)
+JPEG_SOURCES := $(wildcard $(ASSETS_IMG_DIR)/*.jpeg)
+
+# Map source files to their target _320x240_8bpp.bin names
+IMG_TARGETS := $(patsubst $(ASSETS_IMG_DIR)/%.jpg, $(TARGET_APP_DIR)/%_320x240_8bpp.bin, $(JPG_SOURCES)) \
+               $(patsubst $(ASSETS_IMG_DIR)/%.jpeg, $(TARGET_APP_DIR)/%_320x240_8bpp.bin, $(JPEG_SOURCES))
+
+# The main target to trigger all image conversions
+images: $(IMG_TARGETS)
+
+# Pattern rule for .jpg
+$(TARGET_APP_DIR)/%_320x240_8bpp.bin: $(ASSETS_IMG_DIR)/%.jpg
+	@mkdir -p $(TARGET_APP_DIR)
+	@echo "--- Converting Image: $< ---"
+	./$(IMG_TOOL) $< -o $(TARGET_APP_DIR)
+
+# Pattern rule for .jpeg
+$(TARGET_APP_DIR)/%_320x240_8bpp.bin: $(ASSETS_IMG_DIR)/%.jpeg
+	@mkdir -p $(TARGET_APP_DIR)
+	@echo "--- Converting Image: $< ---"
