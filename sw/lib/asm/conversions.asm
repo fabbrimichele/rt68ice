@@ -162,13 +162,13 @@ htb_calc:
     BLE     digit_calc
 
 alpha_calc:
-    CMP.B   #'A',D0
-    BLT     alpha_lower_calc
-    SUB.B   #'A'-10,D0
+    CMP.B   #'a',D0             ; Compare with lowercase 'a' (0x61)
+    BGE     alpha_lower_calc    ; If D0 >= 'a', branch to lowercase math
+    SUB.B   #'A'-10,D0          ; Otherwise, it's uppercase ('A'-'F')
     BRA     htp_shift
 
 alpha_lower_calc:
-    SUB.B   #'a'-10,D0
+    SUB.B   #'a'-10,D0          ; Convert lowercase 'a'-'f' to 10-15
     BRA     htp_shift
 
 digit_calc:
