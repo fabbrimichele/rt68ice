@@ -34,7 +34,7 @@ IMG_TOOL = tools/img2planes.py
 
 .PHONY: all clean rom prog prog-flash view-wave monitor images
 
-all: $(TARGET).bit
+all: images $(TARGET).bit
 
 # 1. Generate Verilog from SpinalHDL (The bridge)
 spinal: $(VERILOG_SOURCES) $(MERGED_VHDL)
