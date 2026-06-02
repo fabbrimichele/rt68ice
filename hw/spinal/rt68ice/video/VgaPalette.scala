@@ -84,4 +84,3 @@ case class VgaPalette(vgaCd : ClockDomain) extends Component {
     io.pixelColor := rOut ## gOut ## bOut
   }
 }
-
