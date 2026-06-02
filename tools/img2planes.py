@@ -120,3 +120,16 @@ if __name__ == "__main__":
 
     # Construct the dynamic output filenames using the destination directory
     OUTPUT_BIN = os.path.join(OUT_DIR, f"{base_name}_320x240_8bpp.bin")
+    OUTPUT_PAL = os.path.join(OUT_DIR, f"{base_name}_palette.bin")
+
+    # Set your custom 68000 target memory locations here if needed
+    IMAGE_TARGET_ADDRESS = 0x00020000
+    PALETTE_TARGET_ADDRESS = 0x00010000
+
+    convert_jpeg_to_interleaved_8bp(
+        INPUT_IMAGE,
+        OUTPUT_BIN,
+        OUTPUT_PAL,
+        img_load_addr=IMAGE_TARGET_ADDRESS,
+        pal_load_addr=PALETTE_TARGET_ADDRESS
+    )
