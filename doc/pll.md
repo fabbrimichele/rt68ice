@@ -26,19 +26,9 @@ ecppll --clkin 25 --clkin_name clkin25 \
 To generate with phase rotation:
 ```Bash
 ecppll --clkin 25 --clkin_name clkin25 \
-       --clkout0 96 --clkout0_name clk_96_sdram \
-       --clkout1 8 --clkout1_name clk_8_cpu \
+       --clkout0 8 --clkout0_name clk_8_cpu \
+       --clkout1 96 --clkout1_name clk_96_sdram --phase2 90 \
        --file pll1.v
-
-ecppll --clkin 25 --clkin_name clkin25 \
-       --clkout0 8 --clkout0_name clk_96_sdram \
-       --clkout1 8 --clkout1_name clk_8_cpu \
-       --file pll1.v
-
-ecppll --clkin 25 --clkin_name clkin25 \
-       --clkout0 125 --clkout0_name clk_125_hdmi \
-       --clkout1 25 --clkout1_name clk_25_vga \
-       --file pll2.v                    
 ```
 For more details:
 ```Bash

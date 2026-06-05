@@ -27,7 +27,7 @@ TARGET_APP_DIR := target/app
 # Where the board is connected
 SERIAL_PORT = /dev/ttyACM0
 #SERIAL_BAUD = 19200
-SERIAL_BAUD = 9600
+SERIAL_BAUD = 57600
 # Image conversion settings
 ASSETS_IMG_DIR = assets/images
 IMG_TOOL = tools/img2planes.py

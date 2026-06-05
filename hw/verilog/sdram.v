@@ -223,29 +223,13 @@ always @(posedge clk_96) begin
 	end
 end
 
-altddio_out
-#(
-	.extend_oe_disable("OFF"),
-	.intended_device_family("Cyclone V"),
-	.invert_output("OFF"),
-	.lpm_hint("UNUSED"),
-	.lpm_type("altddio_out"),
-	.oe_reg("UNREGISTERED"),
-	.power_up_high("OFF"),
-	.width(1)
-)
-sdramclk_ddr
-(
-	.datain_h(1'b0),
-	.datain_l(1'b1),
-	.outclock(clk_96),
-	.dataout(sd_clk),
-	.aclr(1'b0),
-	.aset(1'b0),
-	.oe(1'b1),
-	.outclocken(1'b1),
-	.sclr(1'b0),
-	.sset(1'b0)
+// Replaces the altddio_out block for ECP5 compatibility
+ODDRX1F sdramclk_ddr (
+    .D0(1'b0),          // Output 0 for the rising edge
+    .D1(1'b1),          // Output 1 for the falling edge
+    .SCLK(clk_96),      // The 96.77 MHz clock from your PLL
+    .RST(1'b0),         // No reset needed
+    .Q(sd_clk)          // The physical clock pin for your SDRAM
 );
 
 endmodule
