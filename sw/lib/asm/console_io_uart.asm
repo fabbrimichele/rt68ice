@@ -71,8 +71,8 @@ uart_init:
 	move.b  #$80,UART_LCR	; select DLAB = 1, to access the Divisor Latches of the Baud Generator
 	move.b  #$00,UART_IER	; set divisor MSB to 0
 	;move.b  #65,UART_RBR    ; set divisor LSB to 65: 20MHz/16/65 = 19231 (should be 19200)
-	;move.b  #27,UART_RBR    ; set divisor LSB to 26 (DLL): 8.333MHz/16/26 = 19290 (should be 19200, still in specs)
-	move.b  #9,UART_RBR     ; set divisor LSB to 9 (DLL): 8.333MHz/16/9 = 57870 (should be 57600, still in specs)
+	move.b  #27,UART_RBR    ; set divisor LSB to 26 (DLL): 8.333MHz/16/26 = 19290 (should be 19200, still in specs)
+	;move.b  #9,UART_RBR     ; set divisor LSB to 9 (DLL): 8.333MHz/16/9 = 57870 (should be 57600, still in specs)
 	move.b  #$03,UART_LCR	; set options to 8N1
 	move.b  #$00,UART_IER	; disable interrupt
 	rts
