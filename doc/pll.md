@@ -26,13 +26,13 @@ ecppll --clkin 25 --clkin_name clkin25 \
 To generate with phase rotation:
 ```Bash
 ecppll --clkin 25 --clkin_name clkin25 \
-       --clkout0 96 --clkout0_name clk_96 \
+       --clkout0 96 --clkout0_name clk_96_sdram \
        --clkout1 8 --clkout1_name clk_8_cpu \
        --file pll1.v
 
 ecppll --clkin 25 --clkin_name clkin25 \
-       --clkout0 20 --clkout0_name clk_96 \
-       --clkout1 20 --clkout1_name clk_8_cpu \
+       --clkout0 8 --clkout0_name clk_96_sdram \
+       --clkout1 8 --clkout1_name clk_8_cpu \
        --file pll1.v
 
 ecppll --clkin 25 --clkin_name clkin25 \
@@ -40,24 +40,15 @@ ecppll --clkin 25 --clkin_name clkin25 \
        --clkout1 25 --clkout1_name clk_25_vga \
        --file pll2.v                    
 ```
---phase2 90
-
-
-bus/cpu     8 MHz
-vga         25 MHz
-sdram       96 MHz
-hdmi        125 MHz
-
-
-
 For more details:
 ```Bash
 ecppll -h
 ```
 
-## Details
+### Details
 When generating multiple clocks from a single PLL primitive, they are mathematically "locked" together because they share 
 the same internal VCO (Voltage Controlled Oscillator).
 * **The Constraint:** Both frequencies must be achievable by dividing down the same VCO frequency.
 * **The Benefit:** The clocks will be phase-aligned, which is useful for high-speed interfaces like DDR memory or video signals.
+
 

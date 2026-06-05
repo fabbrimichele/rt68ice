@@ -70,9 +70,9 @@ get_chr:
 uart_init:
 	move.b  #$80,UART_LCR	; select DLAB = 1, to access the Divisor Latches of the Baud Generator
 	move.b  #$00,UART_IER	; set divisor MSB to 0
-	move.b  #65,UART_RBR    ; set divisor LSB to 65: 20MHz/16/65 = 19231 (should be 19200)
+	;move.b  #65,UART_RBR    ; set divisor LSB to 65: 20MHz/16/65 = 19231 (should be 19200)
 	;move.b  #25,UART_RBR    ; set divisor LSB to 25: 7.8125MHz/16/25 = 19531 (should be 19200, still in specs)
-	;move.b  #53,UART_RBR    ; set divisor LSB to 51 (DLL): 8.09859MHz/16/53 = 9550 baud (-0.27% error)
+	move.b  #26,UART_RBR    ; set divisor LSB to 26 (DLL): 8MHz/16/26 = 19230 baud (-0.27% error)
 	move.b  #$03,UART_LCR	; set options to 8N1
 	move.b  #$00,UART_IER	; disable interrupt
 	rts

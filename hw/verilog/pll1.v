@@ -5,13 +5,13 @@
 module pll1
 (
     input clkin25, // 25 MHz, 0 deg
-    output clk_96_sdram, // 20 MHz, 0 deg
-    output clk_8_cpu, // 20 MHz, 0 deg
+    output clk_96_sdram, // 8.33333 MHz, 0 deg
+    output clk_8_cpu, // 8 MHz, 0 deg   
     output locked
 );
 (* FREQUENCY_PIN_CLKI="25" *)
-(* FREQUENCY_PIN_CLKOP="20" *)
-(* FREQUENCY_PIN_CLKOS="20" *)
+(* FREQUENCY_PIN_CLKOP="8.33333" *)
+(* FREQUENCY_PIN_CLKOS="8" *)
 (* ICP_CURRENT="12" *) (* LPF_RESISTOR="8" *) (* MFG_ENABLE_FILTEROPAMP="1" *) (* MFG_GMCREF_SEL="2" *)
 EHXPLLL #(
         .PLLRST_ENA("DISABLED"),
@@ -22,24 +22,24 @@ EHXPLLL #(
         .OUTDIVIDER_MUXB("DIVB"),
         .OUTDIVIDER_MUXC("DIVC"),
         .OUTDIVIDER_MUXD("DIVD"),
-        .CLKI_DIV(5),
+        .CLKI_DIV(3),
         .CLKOP_ENABLE("ENABLED"),
-        .CLKOP_DIV(30),
-        .CLKOP_CPHASE(15),
+        .CLKOP_DIV(72),
+        .CLKOP_CPHASE(36),
         .CLKOP_FPHASE(0),
         .CLKOS_ENABLE("ENABLED"),
-        .CLKOS_DIV(30),
-        .CLKOS_CPHASE(15),
+        .CLKOS_DIV(75),
+        .CLKOS_CPHASE(36),
         .CLKOS_FPHASE(0),
         .FEEDBK_PATH("CLKOP"),
-        .CLKFB_DIV(4)
+        .CLKFB_DIV(1)
     ) pll_i (
         .RST(1'b0),
         .STDBY(1'b0),
         .CLKI(clkin25),
-        .CLKOP(clk_96),
+        .CLKOP(clk_96_sdram),
         .CLKOS(clk_8_cpu),
-        .CLKFB(clk_96),
+        .CLKFB(clk_96_sdram),
         .CLKINTFB(),
         .PHASESEL0(1'b0),
         .PHASESEL1(1'b0),
