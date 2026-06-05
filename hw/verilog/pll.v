@@ -5,9 +5,9 @@
 module pll
 (
     input clkin25, // 25 MHz, 0 deg
-    output clockout125, // 125 MHz, 0 deg
-    output clockout25, // 25 MHz, 0 deg
-    output clockout20, // 20.1613 MHz, 0 deg
+    output clk_125_hdmi, // 125 MHz, 0 deg
+    output clk_25_vga, // 25 MHz, 0 deg
+    output clk_20_cpu, // 20.1613 MHz, 0 deg
     output locked
 );
 (* FREQUENCY_PIN_CLKI="25" *)
@@ -43,10 +43,10 @@ EHXPLLL #(
         .RST(1'b0),
         .STDBY(1'b0),
         .CLKI(clkin25),
-        .CLKOP(clockout125),
-        .CLKOS(clockout25),
-        .CLKOS2(clockout20),
-        .CLKFB(clockout125),
+        .CLKOP(clk_125_hdmi),
+        .CLKOS(clk_25_vga),
+        .CLKOS2(clk_20_cpu),
+        .CLKFB(clk_125_hdmi),
         .CLKINTFB(),
         .PHASESEL0(1'b0),
         .PHASESEL1(1'b0),

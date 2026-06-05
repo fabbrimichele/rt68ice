@@ -31,6 +31,11 @@ ecppll --clkin 25 --clkin_name clkin25 \
        --file pll1.v
 
 ecppll --clkin 25 --clkin_name clkin25 \
+       --clkout0 20 --clkout0_name clk_96 \
+       --clkout1 20 --clkout1_name clk_8_cpu \
+       --file pll1.v
+
+ecppll --clkin 25 --clkin_name clkin25 \
        --clkout0 125 --clkout0_name clk_125_hdmi \
        --clkout1 25 --clkout1_name clk_25_vga \
        --file pll2.v                    

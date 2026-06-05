@@ -6,10 +6,10 @@ import spinal.core._
 //noinspection ScalaWeakerAccess
 class PllBB extends BlackBox {
   val io = new Bundle {
-    val clkin25   = in Bool()   // 25 MHz, 0 deg
-    val clockout125 = out Bool()  // 20 MHz, 0 deg
-    val clockout25 = out Bool()  // 20 MHz, 0 deg
-    val clockout20 = out Bool()  // 20 MHz, 0 deg
+    val clkin25   = in Bool()     // 25 MHz, input
+    val clk_125_hdmi = out Bool() // 125 MHz, 0 deg
+    val clk_25_vga = out Bool()   // 25 MHz, 0 deg
+    val clk_20_cpu = out Bool()   // 20 MHz, 0 deg
     val locked  = out Bool()
   }
 

@@ -8,31 +8,32 @@ import scala.language.postfixOps
 //noinspection TypeAnnotation
 //noinspection ScalaWeakerAccess
 case class ClockCtrl() extends Component {
-  val pll = new Pll2BB
+  val pll1 = new Pll1BB
+  val pll2 = new Pll2BB
   val reset = Reset(resetCycles = 25000) // 1 ms at 25 MHz
 
   val cpuCd = createClockDomain(
-    name = "clk7Mhz",
-    frequency = 7.8125 MHz,
-    pllClock = pll.io.clk_7_cpu,
+    name = "clk8Mhz",
+    frequency = 8.09859 MHz,
+    pllClock = pll1.io.clk_8_cpu,
   )
 
   val vgaCd = createClockDomain(
     name = "clk25Mhz",
     frequency = 25 MHz,
-    pllClock = pll.io.clk_25_vga,
+    pllClock = pll2.io.clk_25_vga,
   )
 
   val hdmiCd = createClockDomain(
     name = "clk125Mhz",
     frequency = 125 MHz,
-    pllClock = pll.io.clk_125_hdmi,
+    pllClock = pll2.io.clk_125_hdmi,
   )
 
   val sdRamCd = createClockDomain(
     name = "clk93Mhz",
-    frequency = 93.75 MHz,
-    pllClock = pll.io.clk_93_sdram,
+    frequency = 95.8333 MHz,
+    pllClock = pll1.io.clk_96_sdram,
   )
 
   private def createClockDomain(
@@ -48,7 +49,7 @@ case class ClockCtrl() extends Component {
 
     clkDomain.clock := pllClock
     clkDomain.reset := ResetCtrl.asyncAssertSyncDeassert(
-      input = reset.io.resetOut || !pll.io.locked,
+      input = reset.io.resetOut || !pll1.io.locked || !pll2.io.locked,
       clockDomain = clkDomain
     )
 
