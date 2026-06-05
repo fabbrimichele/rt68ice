@@ -22,7 +22,7 @@ case class Rt68IceTopLevel(romFile: String) extends Component {
 
   val clockCtrl = ClockCtrl()
 
-  clockCtrl.cd20MHz {
+  clockCtrl.cpuCd{
     // Bus Controller
     val bus = new BusController
 
@@ -57,14 +57,14 @@ case class Rt68IceTopLevel(romFile: String) extends Component {
     bus.io.uartBus <> uartDevice.io.bus
 
     // Video Device
-    val vgaDevice = VgaDevice(vgaCd = clockCtrl.cd25MHz)
+    val vgaDevice = VgaDevice(vgaCd = clockCtrl.vgaCd)
     vgaDevice.io.fbSel := bus.io.vidFbSel
     vgaDevice.io.palSel := bus.io.vidPalSel
     vgaDevice.io.ctrlSel := bus.io.vidCtrlSel
     vgaDevice.io.bus <> bus.io.videoBus
 
     // VGA-HDMI Bridge
-    val hdmiBridge = VgaToHdmiEcp5(vgaCd = clockCtrl.cd25MHz, hdmiCd = clockCtrl.cd125MHz)
+    val hdmiBridge = VgaToHdmiEcp5(vgaCd = clockCtrl.vgaCd, hdmiCd = clockCtrl.hdmiCd)
     hdmiBridge.TMDS_red.addTag(crossClockDomain)
     hdmiBridge.TMDS_green.addTag(crossClockDomain)
     hdmiBridge.TMDS_blue.addTag(crossClockDomain)
