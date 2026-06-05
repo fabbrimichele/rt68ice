@@ -6,7 +6,7 @@ module pll1
 (
     input clkin25, // 25 MHz, 0 deg
     output clk_8_cpu, // 8.33333 MHz, 0 deg
-    output clk_96_sdram, // 100 MHz, 0 deg
+    output clk_100_sdram, // 100 MHz, 0 deg
     output locked
 );
 (* FREQUENCY_PIN_CLKI="25" *)
@@ -38,7 +38,7 @@ EHXPLLL #(
         .STDBY(1'b0),
         .CLKI(clkin25),
         .CLKOP(clk_8_cpu),
-        .CLKOS(clk_96_sdram),
+        .CLKOS(clk_100_sdram),
         .CLKFB(clk_8_cpu),
         .CLKINTFB(),
         .PHASESEL0(1'b0),

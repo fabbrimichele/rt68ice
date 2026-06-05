@@ -8,7 +8,7 @@ class Pll1BB extends BlackBox {
   val io = new Bundle {
     val clkin25       = in Bool()   // 25 MHz input oscillator
     val clk_8_cpu     = out Bool()  // 8 MHz, 0 deg phase shift for M68K CPU
-    val clk_96_sdram  = out Bool()  // 96 MHz, 90 deg phase shift for SDRAM
+    val clk_100_sdram  = out Bool()  // 96 MHz, 90 deg phase shift for SDRAM
     val locked  = out Bool()
   }
 
