@@ -2,8 +2,8 @@ package rt68ice
 
 import rt68ice.core._
 import rt68ice.io.{LedDevice, T16450Device}
-import rt68ice.memory.Mem16Bit
-import rt68ice.video.{Gpdi, StreamedVgaDevice, VgaDevice}
+import rt68ice.memory.{Mem16Bit, SdRam, SdRamDevice}
+import rt68ice.video.{Gpdi, VgaDevice}
 import spinal.core._
 import spinal.lib.com.uart.Uart
 import spinal.lib.graphic.hdmi.VgaToHdmiEcp5
@@ -18,26 +18,35 @@ case class Rt68IceTopLevel(romFile: String) extends Component {
     val led = out Bits(3 bits)
     val uart = master(Uart()) // Expose UART pins (txd, rxd), must be defined in the constraints file
     val gpdi = master(Gpdi())
+    val sdram = master(SdRam())
   }
 
   val clockCtrl = ClockCtrl()
 
-  clockCtrl.cpuCd{
+  clockCtrl.systemCd {
     // Bus Controller
     val bus = new BusController
+    val cpuClockEn = clockCtrl.io.cpuClkEn && bus.io.clockEn
 
     // CPU
     val cpu = new M68K
     cpu.io.ipl := B"111"
-    cpu.io.clockEn := bus.io.clockEn
+    cpu.io.clockEn := cpuClockEn
     cpu.io.busErr := bus.io.busErr
     bus.io.busState := cpu.io.busState
     bus.io.cpuBus <> cpu.io.bus
 
+    // SDRAM
+    val sdRamDevice = SdRamDevice()
+    sdRamDevice.io.sdRam <> io.sdram
+    sdRamDevice.io.cpuClkEn := clockCtrl.io.cpuClkEn
+    sdRamDevice.io.sel := bus.io.sdRamSel
+    bus.io.sdRamBus <> sdRamDevice.io.bus
+
     // ROM
     val rom = Mem16Bit(sizeInWords = 4096, initFile = Some(romFile), readOnly = true)
     rom.io.sel := bus.io.romSel
-    bus.io.romBus  <> rom.io.bus
+    bus.io.romBus <> rom.io.bus
 
     // RAM
     val ram = Mem16Bit(sizeInWords = 8192)

@@ -55,12 +55,15 @@ module sdram (
 	output reg [15:0] rom_dout
 );
 
-localparam RASCAS_DELAY   = 3'd2;   // tRCD=20ns -> 2 cycles@96MHz
-localparam BURST_LENGTH   = 3'b010; // 000=1, 001=2, 010=4, 011=8
-localparam ACCESS_TYPE    = 1'b0;   // 0=sequential, 1=interleaved
-localparam CAS_LATENCY    = 3'd2;   // 2/3 allowed
-localparam OP_MODE        = 2'b00;  // only 00 (standard operation) allowed
-localparam NO_WRITE_BURST = 1'b1;   // 0= write burst enabled, 1=only single access write
+// ---------------------------------------------------------------------
+// ---------------------- 32 MHz Parameters ----------------------------
+// ---------------------------------------------------------------------
+localparam RASCAS_DELAY   = 3'd1;   // tRCD=20ns -> 1 cycle @ 32MHz (31.25ns)
+localparam BURST_LENGTH   = 3'b000; // UPDATED: 000=1 word (Single Access)
+localparam ACCESS_TYPE    = 1'b0;   // 0=sequential
+localparam CAS_LATENCY    = 3'd2;   // 2 cycles
+localparam OP_MODE        = 2'b00;  // standard operation
+localparam NO_WRITE_BURST = 1'b1;   // single access write
 
 localparam MODE = { 3'b000, NO_WRITE_BURST, OP_MODE, CAS_LATENCY, ACCESS_TYPE, BURST_LENGTH};
 
@@ -78,9 +81,9 @@ localparam STATE_READ      = STATE_CMD_CONT + CAS_LATENCY + 2'd2;
 localparam STATE_LAST      = 4'd11;  // last state in cycle
 
 reg [3:0] t;
+reg clk_8_enD;
 
 always @(posedge clk_96) begin
-	reg clk_8_enD;
 	clk_8_enD <= clk_8_en;
 	if (~clk_8_enD & clk_8_en) t <= 4'hA; else t <= t + 1'd1;
 	if (t == STATE_LAST) t <= STATE_FIRST;

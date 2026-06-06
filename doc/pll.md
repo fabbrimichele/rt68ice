@@ -16,9 +16,9 @@ ecppll -i 25 -o 50 --file pll.v
 To generate multiple output clocks with names (up to `--clkout3`):
 ```Bash
 ecppll --clkin 25 --clkin_name clkin25 \
-       --clkout0 125 --clkout0_name clockout125 \
-       --clkout1 25 --clkout1_name clockout25 \
-       --clkout2 20 --clkout2_name clockout20 \
+       --clkout0 125 --clkout0_name clk_125 \
+       --clkout1 25 --clkout1_name clk_25 \
+       --clkout2 32 --clkout2_name clk_32 \
        --file pll.v
 ```
 **Note:** Order matters. Put the highest frequency on `clkout0` to force the internal math solver to scale up the VCO.

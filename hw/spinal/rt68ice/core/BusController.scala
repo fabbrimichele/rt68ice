@@ -23,6 +23,7 @@ case class BusController() extends Component {
     val ledBus    = master(M68KBus())
     val uartBus   = master(M68KBus())
     val videoBus  = master(M68KBus())
+    val sdRamBus  = master(M68KBus())
 
     // Slave select signals (to peripherals)
     val romSel      = out Bool()
@@ -32,55 +33,44 @@ case class BusController() extends Component {
     val vidPalSel   = out Bool()
     val vidCtrlSel  = out Bool()
     val vidFbSel    = out Bool()
+    val sdRamSel    = out Bool()
   }
 
   // ---------------------------
   //     Bus Synchronization
   // ---------------------------
-
-  // The Wait-State Register
-  // This keeps track of whether we are currently in the middle of a pause
-  val isWaiting = RegInit(False)
-
-  // IMPORTANT: Gate the External Write signal
-  // Only allow 'io.wr' to be seen by the memory when isWaiting is True.
-  // This ensures write happens on the SECOND clock cycle, after the
-  // CPU has had time to stabilize the data and address.
-  val gatedWrite = io.cpuBus.wr  && isWaiting
+  // Handle pipelining (3 phases total)
+  val waitState = RegInit(U"00")
 
   // Handle memory sync access
   // Disable the CPU for one clock cycle when accessing memory
   // Detect if the CPU is trying to use the bus
   // We pause for Fetch (00), Data Read (10), and Data Write (11)
   val busActive = io.busState === B"00" ||
-    io.busState === B"10" ||
-    io.busState === B"11"
+                  io.busState === B"10" ||
+                  io.busState === B"11"
 
-  // The Handshake Logic
-  when(busActive && !isWaiting) {
-    // A bus cycle just started.
-    // Pull the brake (clkEnable = Low) and set the flag.
-    io.clockEn := False
-    isWaiting := True
+  val clkEnReg = RegInit(True)
+  io.clockEn := clkEnReg
+
+  when(busActive && waitState === 0) {
+    clkEnReg  := False
+    waitState := 1
+  } elsewhen(waitState === 1) {
+    clkEnReg  := False
+    waitState := 2
   } otherwise {
-    // Either the bus is idle (01), or we already finished our 1-cycle wait.
-    // Release the brake.
-    io.clockEn := True
-    isWaiting := False
+    clkEnReg  := True
+    waitState := 0
   }
+
+  /// Gate the write so it asserts cleanly while the address is stable in the pipeline
+  val gatedWrite = io.cpuBus.wr && (waitState =/= 0)
 
   // ------------------------
   //    Address Decoding
   // ------------------------
-  // Default assignments
-  io.ramSel     := False
-  io.romSel     := False
-  io.ledSel     := False
-  io.uartSel    := False
-  io.vidPalSel  := False
-  io.vidCtrlSel := False
-  io.vidFbSel   := False
-  io.busErr     := False
+  val address = io.cpuBus.address.asUInt
 
   // Address Bitmask Definitions
   // Boot vectors look at the absolute first 8 bytes via a 3-bit wildcard mask
@@ -92,6 +82,26 @@ case class BusController() extends Component {
   val vidPalMapping   = SizeMapping(0x00010000L, 16 KiB)   // $010000 - $013FFF
   val vidCtrlMapping  = SizeMapping(0x00014000L, 16 KiB)   // $014000 - $017FFF
   val vidFbMapping    = SizeMapping(0x00020000L, 128 KiB)  // $020000 - $03FFFF - only the first 75KB are available
+  val sdRamMapping    = SizeMapping(0x00040000L, 128 KiB)  // $040000 - $05FFFF TODO: extend it to 32 MB
+
+  // PIPELINE STAGE 1: Register the Hit Logic and Selects
+  val romSelReg    = RegNext(bootMapping.hit(address) || romMapping.hit(address), False)
+  val ramSelReg    = RegNext(ramMapping.hit(address), False)
+  val ledSelReg    = RegNext(ledMapping.hit(address), False)
+  val uartSelReg   = RegNext(uartMapping.hit(address), False)
+  val vidPalSelReg = RegNext(vidPalMapping.hit(address), False)
+  val vidCtrlSelReg= RegNext(vidCtrlMapping.hit(address), False)
+  val vidFbSelReg  = RegNext(vidFbMapping.hit(address), False)
+  val sdRamSelReg  = RegNext(sdRamMapping.hit(address), False)
+
+  io.romSel      := romSelReg
+  io.ramSel      := ramSelReg
+  io.ledSel      := ledSelReg
+  io.uartSel     := uartSelReg
+  io.vidPalSel   := vidPalSelReg
+  io.vidCtrlSel  := vidCtrlSelReg
+  io.vidFbSel    := vidFbSelReg
+  io.sdRamSel    := sdRamSelReg
 
   saveMemoryLayout(
     "doc/memory_layout.md",
@@ -105,50 +115,44 @@ case class BusController() extends Component {
     "VIDEO FB" -> vidFbMapping,
   )
 
-  // Decoder Execution Logic
-  val address = io.cpuBus.address.asUInt
-  when(bootMapping.hit(address)) {
-    io.romSel := True
-  } elsewhen ramMapping.hit(address) {
-    io.ramSel := True
-  } elsewhen romMapping.hit(address) {
-    io.romSel := True
-  } elsewhen ledMapping.hit(address) {
-    io.ledSel := True
-  } elsewhen uartMapping.hit(address) {
-    io.uartSel := True
-  } elsewhen vidPalMapping .hit(address) {
-    io.vidPalSel := True
-  } elsewhen vidCtrlMapping .hit(address) {
-    io.vidCtrlSel := True
-  } elsewhen vidFbMapping.hit(address) {
-    io.vidFbSel := True
-  } otherwise {
-    io.busErr := True // Out of bounds access! Trigger BERR
-  }
+  // Register the Bus Error check
+  io.busErr := RegNext(~(bootMapping.hit(address) || ramMapping.hit(address) ||
+    romMapping.hit(address) || ledMapping.hit(address) ||
+    uartMapping.hit(address) || vidPalMapping.hit(address) ||
+    vidCtrlMapping.hit(address) || vidFbMapping.hit(address) ||
+    sdRamMapping.hit(address)), False)
 
   // ----------------------
   //    Buses mapping
   // ----------------------
-  val buses = List(io.romBus, io.ramBus, io.ledBus, io.uartBus, io.videoBus)
+  // PIPELINE STAGE 1 (cont): Register the outgoing bus signals to break fanout routing delay
+  val buses = List(io.romBus, io.ramBus, io.ledBus, io.uartBus, io.videoBus, io.sdRamBus)
   for (bus <- buses) {
-    bus.address := io.cpuBus.address
-    bus.dataOut := io.cpuBus.dataOut
-    bus.lds := io.cpuBus.lds
-    bus.uds := io.cpuBus.uds
-    bus.wr := gatedWrite
+    bus.address := RegNext(io.cpuBus.address)
+    bus.dataOut := RegNext(io.cpuBus.dataOut)
+    bus.lds     := RegNext(io.cpuBus.lds)
+    bus.uds     := RegNext(io.cpuBus.uds)
+    bus.wr      := RegNext(gatedWrite, False)
   }
 
-  io.cpuBus.dataIn := 0
-  when(io.romSel) {
-    io.cpuBus.dataIn := io.romBus.dataIn
-  } elsewhen io.ramSel {
-    io.cpuBus.dataIn := io.ramBus.dataIn
-  } elsewhen io.ledSel {
-    io.cpuBus.dataIn := io.ledBus.dataIn
-  } elsewhen io.uartSel {
-    io.cpuBus.dataIn := io.uartBus.dataIn
-  } elsewhen (io.vidPalSel || io.vidCtrlSel || io.vidFbSel) {
-    io.cpuBus.dataIn := io.videoBus.dataIn
+  // PIPELINE STAGE 2: Register the incoming Data Mux
+  val readDataReg = Reg(Bits(16 bits))
+  readDataReg := 0
+
+  when(romSelReg) {
+    readDataReg := io.romBus.dataIn
+  } elsewhen ramSelReg {
+    readDataReg := io.ramBus.dataIn
+  } elsewhen ledSelReg {
+    readDataReg := io.ledBus.dataIn
+  } elsewhen uartSelReg {
+    readDataReg := io.uartBus.dataIn
+  } elsewhen (vidPalSelReg || vidCtrlSelReg || vidFbSelReg) {
+    readDataReg := io.videoBus.dataIn
+  } elsewhen (sdRamSelReg) {
+    readDataReg := io.sdRamBus.dataIn
   }
+
+  // Data is now securely pipelined and stable for the CPU to latch
+  io.cpuBus.dataIn := readDataReg
 }
