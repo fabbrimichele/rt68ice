@@ -55,11 +55,10 @@ $(TARGET).config: $(TARGET).json
 
 # 4. Bitstream
 $(TARGET).bit: $(TARGET).config
-	ecppack $< $@
+	ecppack --compress $< $@
 
 # 5. Load to FPGA
 prog: # $(TARGET).bit
-	#openFPGALoader -c cmsisdap --vid=0x1d50 --pid=0x602b $<
 	openFPGALoader -c cmsisdap --vid=0x1d50 --pid=0x602b $(TARGET).bit
 
 # 5. Load to FLASH (permanent)
