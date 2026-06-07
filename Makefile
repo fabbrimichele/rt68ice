@@ -56,7 +56,7 @@ $(TARGET).config: $(TARGET).json
 
 # 4. Bitstream
 $(TARGET).bit: $(TARGET).config
-	ecppack $< $@
+	ecppack --compress $< $@
 
 # 5. Load to FPGA
 prog: # $(TARGET).bit
