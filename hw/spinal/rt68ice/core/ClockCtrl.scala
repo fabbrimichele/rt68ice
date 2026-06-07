@@ -8,10 +8,6 @@ import scala.language.postfixOps
 //noinspection TypeAnnotation
 //noinspection ScalaWeakerAccess
 case class ClockCtrl() extends Component {
-  val io = new Bundle {
-    val cpuClkEn = out Bool()
-  }
-
   private val pll = new PllBB
   private val reset = Reset(resetCycles = 25000) // 1 ms at 25 MHz
 
@@ -28,17 +24,10 @@ case class ClockCtrl() extends Component {
   )
 
   val systemCd = createClockDomain(
-    name = "clk32Mhz",
-    frequency = 32 MHz,
+    name = "clk31Mhz",
+    frequency = 31 MHz,
     pllClock = pll.io.clk_31,
   )
-
-  // Generate the 8MHz strobe synchronously within the 32MHz domain
-  private val clockingArea = new ClockingArea(systemCd) {
-    val clockGenerator = new ClockGenerator()
-  }
-
-  io.cpuClkEn := clockingArea.clockGenerator.io.mhz8_en
 
   private def createClockDomain(
     name: String,

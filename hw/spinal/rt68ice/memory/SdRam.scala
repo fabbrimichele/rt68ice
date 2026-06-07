@@ -16,6 +16,7 @@ case class SdRam() extends Bundle with IMasterSlave {
   val we_n  = Bool()                 // write enable
   val ras_n = Bool()                 // row address select
   val cas_n = Bool()                 // columns address select
+  val cke   = Bool()
   val clock = Bool()
 
   override def asMaster(): Unit = {
@@ -27,6 +28,7 @@ case class SdRam() extends Bundle with IMasterSlave {
     out(we_n)
     out(ras_n)
     out(cas_n)
+    out(cke)
     out(clock)
   }
 }

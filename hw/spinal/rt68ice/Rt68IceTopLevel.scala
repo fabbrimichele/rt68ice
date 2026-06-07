@@ -26,9 +26,16 @@ case class Rt68IceTopLevel(romFile: String) extends Component {
   clockCtrl.systemCd {
     // Bus Controller
     val bus = new BusController
-    val cpuClockEn = clockCtrl.io.cpuClkEn && bus.io.clockEn
+
+    // SDRAM
+    val sdRamDevice = SdRamDevice()
+    sdRamDevice.io.sdRam <> io.sdram
+    sdRamDevice.io.sel := bus.io.sdRamSel
+    bus.io.sdRamBus <> sdRamDevice.io.bus
 
     // CPU
+    //val cpuClockEn = sdRamDevice.io.cpuClkEn && bus.io.clockEn
+    val cpuClockEn = bus.io.clockEn
     val cpu = new M68K
     cpu.io.ipl := B"111"
     cpu.io.clockEn := cpuClockEn
@@ -36,15 +43,8 @@ case class Rt68IceTopLevel(romFile: String) extends Component {
     bus.io.busState := cpu.io.busState
     bus.io.cpuBus <> cpu.io.bus
 
-    // SDRAM
-    val sdRamDevice = SdRamDevice()
-    sdRamDevice.io.sdRam <> io.sdram
-    sdRamDevice.io.cpuClkEn := clockCtrl.io.cpuClkEn
-    sdRamDevice.io.sel := bus.io.sdRamSel
-    bus.io.sdRamBus <> sdRamDevice.io.bus
-
     // ROM
-    val rom = Mem16Bit(sizeInWords = 4096, initFile = Some(romFile), readOnly = true)
+    val rom = Mem16Bit(sizeInWords = 1024, initFile = Some(romFile), readOnly = true)
     rom.io.sel := bus.io.romSel
     bus.io.romBus <> rom.io.bus
 
