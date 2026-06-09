@@ -34,8 +34,7 @@ case class Rt68IceTopLevel(romFile: String) extends Component {
     bus.io.sdRamBus <> sdRamDevice.io.bus
 
     // CPU
-    //val cpuClockEn = sdRamDevice.io.cpuClkEn && bus.io.clockEn
-    val cpuClockEn = bus.io.clockEn
+    val cpuClockEn = sdRamDevice.io.cpuClkEn && bus.io.clockEn
     val cpu = new M68K
     cpu.io.ipl := B"111"
     cpu.io.clockEn := cpuClockEn
