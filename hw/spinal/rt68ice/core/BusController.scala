@@ -88,14 +88,14 @@ case class BusController() extends Component {
   // Address Bitmask Definitions
   // Boot vectors look at the absolute first 8 bytes via a 3-bit wildcard mask
   val bootMapping     = MaskMapping(0x00000000L, 0xFFFFFFF8L)
-  val ramMapping      = SizeMapping(0x00000000L, 16 KiB)   // $000000 - $003FFF
-  val romMapping      = SizeMapping(0x00004000L, 16 KiB)   // $004000 - $007FFF
-  val ledMapping      = SizeMapping(0x00008000L, 16 KiB)   // $008000 - $00BFFF
-  val uartMapping     = SizeMapping(0x0000C000L, 16 KiB)   // $00C000 - $00FFFF
-  val vidPalMapping   = SizeMapping(0x00010000L, 16 KiB)   // $010000 - $013FFF
-  val vidCtrlMapping  = SizeMapping(0x00014000L, 16 KiB)   // $014000 - $017FFF
-  val vidFbMapping    = SizeMapping(0x00020000L, 128 KiB)  // $020000 - $03FFFF - only the first 75KB are available
-  val sdRamMapping    = SizeMapping(0x00040000L, 128 KiB)  // $040000 - $05FFFF TODO: extend it to 32 MB
+  val ramMapping      = SizeMapping(0x00000000L, 16 KiB)  // $000000 - $003FFF
+  val romMapping      = SizeMapping(0x00004000L, 16 KiB)  // $004000 - $007FFF
+  val ledMapping      = SizeMapping(0x00008000L, 16 KiB)  // $008000 - $00BFFF
+  val uartMapping     = SizeMapping(0x0000C000L, 16 KiB)  // $00C000 - $00FFFF
+  val vidPalMapping   = SizeMapping(0x00010000L, 16 KiB)  // $010000 - $013FFF
+  val vidCtrlMapping  = SizeMapping(0x00014000L, 16 KiB)  // $014000 - $017FFF
+  val vidFbMapping    = SizeMapping(0x00020000L, 128 KiB) // $020000 - $03FFFF - only the first 75KB are available
+  val sdRamMapping    = SizeMapping(0x00800000L, 8 MiB)   // $800000 - $FFFFFF - Map 8 MB out of 32 MB
 
   saveMemoryLayout(
     "doc/memory_layout.md",
@@ -107,6 +107,7 @@ case class BusController() extends Component {
     "VIDEO PALETTE" -> vidPalMapping,
     "VIDEO CONTROL" -> vidCtrlMapping,
     "VIDEO FB" -> vidFbMapping,
+    "SDRAM" -> sdRamMapping,
   )
 
   // Decoder Execution Logic
