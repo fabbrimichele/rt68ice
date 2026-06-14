@@ -16,7 +16,7 @@ menu:
     beq     addr_test
     cmp.b   #'3',d0
     beq     time_test
-    cmp.b   #'e',d0,
+    cmp.b   #'e',d0
     beq     .end
     bra     menu
 .end:
@@ -55,29 +55,26 @@ time_test:
 ; Walking Bits Test (Data Bus Integrity)
 ; Output: d0.b -> 0 OK, 1 Error
 ;         d1.w -> Failed bit
-;         a1   -> last address verified
+;         a2   -> last address verified
 ; ------------------------------------------------------
 run_data_test:
-    move.b  #1,LED
-
     move.w  #1,d1
 .bit_loop:
     ; Write loop
-    lea     RAM_START,a1
+    move.b  #1,LED
+    lea     RAM_START,a2
     move.l  #RAM_SIZE,d0
 .wr_loop:
-    move.w  d1,(a1)+
+    move.w  d1,(a2)+
     subq.l  #1,d0
     bne.s   .wr_loop
 
-    move.b  #2,LED
-
-
     ; Read loop
-    lea     RAM_START,a1
+    move.b  #2,LED
+    lea     RAM_START,a2
     move.l  #RAM_SIZE,d0
 .rd_loop:
-    move.w  (a1)+,d2
+    move.w  (a2)+,d2
     cmp.w   d1,d2
     bne.s   .error
     subq.l  #1,d0           ; Needs long, can't use dbra
@@ -86,7 +83,7 @@ run_data_test:
     ; Move to next bit
     lsl.w   #1,d1           ; Shift bit pattern (0001 -> 0002 -> 0004...)
     tst.w   d1              ; Did we shift all the way through?
-    bne.s     .bit_loop
+    bne.s   .bit_loop
 
     move.b  #0,d0           ; Success
     rts
@@ -105,8 +102,8 @@ run_time_test:
 ; ===========================
 ; Value Constants
 ; ===========================
-RAM_START   EQU 800000      ; SDRAM start address
-RAM_SIZE    EQU 4194304     ; In words
+RAM_START   equ $800000      ; SDRAM start address
+RAM_SIZE    equ 4194304-1    ; In words
 
 ; ===========================
 ; Include files
