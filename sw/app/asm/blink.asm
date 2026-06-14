@@ -34,7 +34,7 @@ DLY_VAL     equ     3125000     ; Delay iterations, 0.5 sec at 25 MHz
 ; Add here data costants, e.g. `msg_hello dc.b    "Type something:",CR,LF,NUL`
 
 ; ===========================
-; RAM Data Section (bootloader mem)
+; RAM Data Section
 ; ===========================
     section .bss
 ; Add here variables and buffers, e.g. `buffer ds.b 80`

@@ -487,6 +487,7 @@ chk_trl_done:
 int_bs_handler:
     lea     msg_bus_err,a0
     bsr     put_str
+    bsr     print_regs
     move.l  #_stack_top,sp
     bsr     clear_registers
     jmp     mon_entry
@@ -512,6 +513,90 @@ clear_registers:
     move.l  #0,a4
     move.l  #0,a5
     move.l  #0,a6
+    rts
+
+; ------------------------------
+; Print registers
+; ------------------------------
+print_regs:
+    movem.l d0/a0/a1,-(sp)    ; Save d0, a0, AND a1 to the stack
+
+    lea     msg_d0,a0
+    bsr     print_reg         ; Print D0 content
+
+    lea     msg_d1,a0
+    move.l  d1,d0
+    bsr     print_reg
+
+    lea     msg_d2,a0
+    move.l  d2,d0
+    bsr     print_reg
+
+    lea     msg_d3,a0
+    move.l  d3,d0
+    bsr     print_reg
+
+    lea     msg_d4,a0
+    move.l  d4,d0
+    bsr     print_reg
+
+    lea     msg_d5,a0
+    move.l  d5,d0
+    bsr     print_reg
+
+    lea     msg_d6,a0
+    move.l  d6,d0
+    bsr     print_reg
+
+    lea     msg_d7,a0
+    move.l  d7,d0
+    bsr     print_reg
+
+    lea     msg_a0,a0         ; Load A0 label
+    move.l  8(sp),d0          ; Peek at A0 from the saved block on stack
+    bsr     print_reg
+
+    lea     msg_a1,a0
+    move.l  a1,d0
+    bsr     print_reg
+
+    lea     msg_a2,a0
+    move.l  a2,d0
+    bsr     print_reg
+
+    lea     msg_a3,a0
+    move.l  a3,d0
+    bsr     print_reg
+
+    lea     msg_a4,a0
+    move.l  a4,d0
+    bsr     print_reg
+
+    lea     msg_a5,a0
+    move.l  a5,d0
+    bsr     print_reg
+
+    lea     msg_a6,a0
+    move.l  a6,d0
+    bsr     print_reg
+
+    lea     msg_a7,a0
+    move.l  a7,d0
+    bsr     print_reg
+
+    move.b  #CR,d0
+    bsr     put_chr
+    move.b  #LF,d0
+    bsr     put_chr
+
+    movem.l (sp)+,d0/a0/a1    ; Restore all three registers
+    rts
+
+; Call this by putting the message address in A0
+; and the value to print in D0
+print_reg:
+    bsr     put_str           ; Print the label
+    bsr     bin_to_hex        ; Call your established hex converter
     rts
 
 ; ------------------------------
@@ -600,6 +685,24 @@ msg_help        dc.b    'dump  <ADDR>       - Dump from ADDR (HEX)',CR,LF
 msg_loading     dc.b    'Loading...',CR,LF,NUL
 msg_load_done   dc.b    'Done.',CR,LF,NUL
 msg_bus_err     dc.b    'Bus Error!',CR,LF,NUL
+
+; Registers names
+msg_d0          dc.b    'd0: ',NUL
+msg_d1          dc.b    '  d1: ',NUL
+msg_d2          dc.b    '  d2: ',NUL
+msg_d3          dc.b    '  d3: ',NUL
+msg_d4          dc.b    CR,LF,'d4: ',NUL
+msg_d5          dc.b    '  d5: ',NUL
+msg_d6          dc.b    '  d6: ',NUL
+msg_d7          dc.b    '  d7: ',NUL
+msg_a0          dc.b    CR,LF,'a0: ',NUL
+msg_a1          dc.b    '  a1: ',NUL
+msg_a2          dc.b    '  a2: ',NUL
+msg_a3          dc.b    '  a3: ',NUL
+msg_a4          dc.b    CR,LF,'a4: ',NUL
+msg_a5          dc.b    '  a5: ',NUL
+msg_a6          dc.b    '  a6: ',NUL
+msg_a7          dc.b    '  a7: ',NUL
 
 ; Commands
 ; They must be null terminated

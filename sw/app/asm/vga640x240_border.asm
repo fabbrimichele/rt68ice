@@ -108,7 +108,7 @@ LINE_WIDTH_B    equ     40*8
 ; Add here data costants, e.g. `msg_hello dc.b    "Type something:",CR,LF,NUL`
 
 ; ===========================
-; RAM Data Section (bootloader mem)
+; RAM Data Section
 ; ===========================
     section .bss
 ;   buffer  ds.w 1
