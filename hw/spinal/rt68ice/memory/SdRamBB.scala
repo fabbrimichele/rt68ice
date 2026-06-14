@@ -18,7 +18,7 @@ class SdRamBB extends BlackBox {
     val p0_addr       = in Bits(25 bits)
     val p0_data       = in Bits(16 bits)
     val p0_byte_en    = in Bits(2 bits)   // Byte enable for writes
-    val output        = out Bits(16 bits)
+    val p0_q          = out Bits(16 bits)
     val p0_wr_req     = in Bool()
     val p0_rd_req     = in Bool()
     val p0_available  = out Bool()        // The port is ready to be used
@@ -39,7 +39,7 @@ class SdRamBB extends BlackBox {
 
   // Map the clock domain
   // Mapped in the wrapper
-  mapClockDomain(clock = io.clk, reset = io.reset_n, resetActiveLevel = LOW)
+  mapClockDomain(clock = io.clk, reset = io.reset, resetActiveLevel = HIGH)
 
   setDefinitionName("sdram") // This tells SpinalHDL which Verilog module to instantiate
   addRTLPath("hw/verilog/sdram.v") // Merge the file to the generated 'mergeRTL.v' file
