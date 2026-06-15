@@ -26,23 +26,28 @@ data_test:
     lea     msg_tst_data,a0
     bsr     put_str
     bsr     run_data_test
-    lea     msg_pass,a0
-    bsr     put_str
-    bra     menu
+    bra     handle_test_result
 
 addr_test:
     lea     msg_tst_addr,a0
     bsr     put_str
     bsr     run_addr_test
-    lea     msg_pass,a0
-    bsr     put_str
-    bra     menu
+    bra     handle_test_result
 
 time_test:
     lea     msg_tst_time,a0
     bsr     put_str
     bsr     run_time_test
+    ; Fall through to handle_test_result since it's next
+
+handle_test_result:
+    tst.b   d0
+    bne.s   .err
     lea     msg_pass,a0
+    bsr     put_str
+    bra     menu
+.err:
+    lea     msg_err,a0
     bsr     put_str
     bra     menu
 
@@ -53,6 +58,10 @@ time_test:
 
 ; ------------------------------------------------------
 ; Walking Bits Test (Data Bus Integrity)
+; This test ensures that every single data line can
+; independently hold a 0 or 1 without affecting its
+; neighbor.
+;
 ; Output: d0.b -> 0 OK, 1 Error
 ;         d1.w -> Failed bit
 ;         a2   -> last address verified
@@ -61,7 +70,6 @@ run_data_test:
     move.w  #1,d1
 .bit_loop:
     ; Write loop
-    move.b  #1,LED
     lea     RAM_START,a2
     move.l  #RAM_SIZE,d0
 .wr_loop:
@@ -70,7 +78,6 @@ run_data_test:
     bne.s   .wr_loop
 
     ; Read loop
-    move.b  #2,LED
     lea     RAM_START,a2
     move.l  #RAM_SIZE,d0
 .rd_loop:
@@ -85,19 +92,90 @@ run_data_test:
     tst.w   d1              ; Did we shift all the way through?
     bne.s   .bit_loop
 
-    move.b  #0,d0           ; Success
+    moveq   #0,d0                  ; Success
     rts
 
 .error:
-    move.b  #1,d0           ; Error
+    moveq   #1,d0                  ; Error
     rts
 
 
+; ------------------------------------------------------
+; The "Address Alias" Test (Row/Bank Conflict)
+; Ensures that writing to one address doesn't accidentally
+; overwrite another due to ignored or floating address lines.
+;
+; Output: d0.b -> 0 OK, 1 Error
+; ------------------------------------------------------
 run_addr_test:
+    move.l  #RAM_START,a0           ; Base address (0x800000)
+    move.l  #RAM_START+$10000,a1    ; Distant row/bank address (0x810000)
+
+    ; 1. Write unique patterns
+    move.w  #$AAAA,(a0)             ; Write to 0x800000
+    move.w  #$5555,2(a0)            ; Write to 0x800002
+    move.w  #$1234,(a1)             ; Write to 0x810000
+
+    ; 2. Read back and verify the first two
+    cmp.w   #$AAAA,(a0)             ; Did 0x800000 change?
+    bne.s   .error
+    cmp.w   #$5555,2(a0)            ; Did 0x800002 change?
+    bne.s   .error
+
+    ; 3. Verify the distant address
+    cmp.w   #$1234,(a1)             ; Did 0x810000 change?
+    bne.s   .error
+
+    moveq   #0,d0                   ; Success
     rts
 
-run_time_test:
+.error:
+    moveq   #1,d0                   ; Error
     rts
+
+
+; ------------------------------------------------------
+; 3. The "Pseudo-Random Soak" Test (Timing Stress)
+; Floods the memory controller with back-to-back READ
+; commands to catch race conditions and buffer clear failures.
+;
+; Output: d0.b -> 0 OK, 1 Error
+; ------------------------------------------------------
+run_time_test:
+    ; 1 & 2. Allocate and fill a 1KB block (256 Longwords)
+    move.l  #RAM_START,a0
+    move.l  #$DEADBEEF,d1           ; Test pattern
+    move.w  #255,d0                 ; 256 iterations (0 to 255)
+
+.fill_loop:
+    move.l  d1,(a0)+                ; Write 32 bits and auto-increment
+    dbra    d0,.fill_loop
+
+    ; 3 & 4. Tight loop to read back and verify 1,000,000 times
+    move.l  #1000000,d2             ; Outer loop counter (~6-7 mins at 8MHz)
+
+.soak_loop:
+    move.l  #RAM_START,a0           ; Reset pointer to start of 1KB block
+    move.w  #255,d0                 ; Reset inner counter to 256 longwords
+
+.rd_loop:
+    ; Using cmp.l (a0)+, d1 is the fastest way to read and verify on M68K.
+    ; It forces a 32-bit read cycle (two back-to-back 16-bit fetches)
+    ; directly against our register.
+    cmp.l   (a0)+,d1
+    bne.s   .error                  ; Jump out immediately if mismatch
+    dbra    d0,.rd_loop             ; Inner loop (1KB)
+
+    subq.l  #1,d2                   ; Decrement outer loop counter
+    bne.s   .soak_loop              ; Outer loop (1,000,000 times)
+
+    moveq   #0,d0                   ; Success
+    rts
+
+.error:
+    moveq   #1,d0                   ; Error
+    rts
+
 
 ; ===========================
 ; Value Constants
