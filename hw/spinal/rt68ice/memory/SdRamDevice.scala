@@ -41,19 +41,45 @@ case class SdRamDevice() extends Component {
   val isRead = !io.bus.wr
   val validDataPhase = io.bus.uds || io.bus.lds
 
-  // Reads trigger immediately on address select.
-  // Writes wait for UDS/LDS to ensure stable data.
-  val rdTrigger = io.sel.rise(False) && isRead
-  val wrTrigger = (io.sel && isWrite && validDataPhase).rise(False)
+  // An active cycle is when the chip is selected AND the CPU has asserted strobes.
+  // In a 32-bit move.l, io.sel stays High continuously, but validDataPhase will toggle.
+  val activeCycle = io.sel && validDataPhase
+
+  // Detect if the CPU seamlessly moves to the second half of a 32-bit transfer.
+  // The TG68K does not negate UDS/LDS between the two 16-bit halves;
+  // instead, it increments the address bus.
+  val lastAddress = RegNext(io.bus.address)
+  val addressChanged = io.bus.address =/= lastAddress
+  val newPhase = activeCycle && addressChanged
+
+  // Trigger SDRAM operations on the initial strobe, OR when the address increments
+  val phaseTrigger = activeCycle.rise(False) || newPhase
+
+  val rdTrigger = phaseTrigger && isRead
+  val wrTrigger = phaseTrigger && isWrite
 
   sdRam.io.p0_wr_req  := wrTrigger
   sdRam.io.p0_rd_req  := rdTrigger
 
   // 2. CPU Clock Enable / Wait States
-  // Stall the CPU (drop cpuClkEn) whenever the memory is selected,
-  // and resume the CPU clock exactly when the SDRAM signals it is ready.
-  io.cpuClkEn := !io.sel || sdRam.io.p0_ready
+  // We need to know if we are currently in the middle of a longword transfer.
+  // A longword is two back-to-back phases.
+  val isLongword = RegInit(False)
+  when(activeCycle.rise(False)) {
+    isLongword := True
+  } elsewhen(!activeCycle) {
+    isLongword := False
+  }
 
-  // 3. Prevent unused signal warnings
-  sdRam.io.p0_available // Read but unused in this specific clock-gating strategy
+  // The operation is only "Done" when the second phase finishes.
+  val fullCycleDone = RegInit(False)
+  when(!activeCycle) {
+    fullCycleDone := False
+  } elsewhen(isLongword && sdRam.io.p0_ready) {
+    fullCycleDone := True
+  }
+
+  // Stall the CPU until the full 32-bit transaction is complete.
+  // We allow the CPU to run if the cycle is finished OR if the CPU is currently idle.
+  io.cpuClkEn := !activeCycle || fullCycleDone
 }

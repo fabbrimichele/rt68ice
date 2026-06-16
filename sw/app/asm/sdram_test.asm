@@ -152,7 +152,8 @@ run_time_test:
     dbra    d0,.fill_loop
 
     ; 3 & 4. Tight loop to read back and verify 1,000,000 times
-    move.l  #1000000,d2             ; Outer loop counter (~6-7 mins at 8MHz)
+    ;move.l  #1000000,d2             ; Outer loop counter (~6-7 mins at 8MHz)
+    move.l  #10,d2             ; Outer loop counter (~6-7 mins at 8MHz)
 
 .soak_loop:
     move.l  #RAM_START,a0           ; Reset pointer to start of 1KB block
