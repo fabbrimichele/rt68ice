@@ -134,7 +134,7 @@ module sdram (
 	endfunction
 	reg dq_output = 0;
 	reg [15:0] sdram_data = 0;
-reg [127:0] temp;
+    reg [127:0] temp;
 	assign SDRAM_DQ = (dq_output ? sdram_data : 16'hzzzz);
 	assign init_complete = state != 3'd0;
 	assign p0_available = (state == 3'd1) && ~port_req;
