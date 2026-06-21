@@ -10,3 +10,12 @@ To test the serial
   ```
 * program the FPGA with the program `serial_test`.
 
+### How calculate the baud divisor
+```
+divisor = UART Clock / 16 / baud
+```
+e.g. 
+```
+divisor = 31.250 MHz / 16 / 19200 = 101
+31.250 MHz / 16 / 101 = 19337 
+```

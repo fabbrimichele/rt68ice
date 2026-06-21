@@ -6,7 +6,8 @@ VERILOG_SOURCES = hw/gen/$(TOP).v
 MERGED_VHDL = hw/gen/mergeRTL.vhd
 MERGED_VERILOG = hw/gen/mergeRTL.v
 #WAVE_FILE = simWorkspace/VgaRasterEngine/test/wave.fst
-WAVE_FILE = simWorkspace/VgaDevice/test/wave.fst
+#WAVE_FILE = simWorkspace/VgaDevice/test/wave.fst
+WAVE_FILE = simWorkspace/SdRamDevice/test/wave.vcd
 # ECP5 Specifics
 DEVICE  = --25k
 PACKAGE = --package CABGA256
@@ -27,6 +28,7 @@ TARGET_APP_DIR := target/app
 # Where the board is connected
 SERIAL_PORT = /dev/ttyACM0
 SERIAL_BAUD = 19200
+#SERIAL_BAUD = 57600
 # Image conversion settings
 ASSETS_IMG_DIR = assets/images
 IMG_TOOL = tools/img2planes.py

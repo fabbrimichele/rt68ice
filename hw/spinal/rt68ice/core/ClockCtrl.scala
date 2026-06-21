@@ -8,25 +8,25 @@ import scala.language.postfixOps
 //noinspection TypeAnnotation
 //noinspection ScalaWeakerAccess
 case class ClockCtrl() extends Component {
-  val pll = new PllBB
-  val reset = Reset(resetCycles = 25000) // 1 ms at 25 MHz
+  private val pll = new PllBB
+  private val reset = Reset(resetCycles = 25000) // 1 ms at 25 MHz
 
-  val cd20MHz = createClockDomain(
-    name = "clk20Mhz",
-    frequency = 20 MHz,
-    pllClock = pll.io.clockout20,
-  )
-
-  val cd25MHz = createClockDomain(
+  val vgaCd = createClockDomain(
     name = "clk25Mhz",
     frequency = 25 MHz,
-    pllClock = pll.io.clockout25,
+    pllClock = pll.io.clk_25,
   )
 
-  val cd125MHz = createClockDomain(
+  val hdmiCd = createClockDomain(
     name = "clk125Mhz",
     frequency = 125 MHz,
-    pllClock = pll.io.clockout125,
+    pllClock = pll.io.clk_125,
+  )
+
+  val systemCd = createClockDomain(
+    name = "clk31Mhz",
+    frequency = 31 MHz,
+    pllClock = pll.io.clk_31,
   )
 
   private def createClockDomain(

@@ -5,15 +5,15 @@
 module pll
 (
     input clkin25, // 25 MHz, 0 deg
-    output clockout125, // 125 MHz, 0 deg
-    output clockout25, // 25 MHz, 0 deg
-    output clockout20, // 20.1613 MHz, 0 deg
+    output clk_125, // 125 MHz, 0 deg
+    output clk_25, // 25 MHz, 0 deg
+    output clk_31, // 28.4091 MHz, 0 deg
     output locked
 );
 (* FREQUENCY_PIN_CLKI="25" *)
 (* FREQUENCY_PIN_CLKOP="125" *)
 (* FREQUENCY_PIN_CLKOS="25" *)
-(* FREQUENCY_PIN_CLKOS2="20.1613" *)
+(* FREQUENCY_PIN_CLKOS2="28.4091" *)
 (* ICP_CURRENT="12" *) (* LPF_RESISTOR="8" *) (* MFG_ENABLE_FILTEROPAMP="1" *) (* MFG_GMCREF_SEL="2" *)
 EHXPLLL #(
         .PLLRST_ENA("DISABLED"),
@@ -34,7 +34,7 @@ EHXPLLL #(
         .CLKOS_CPHASE(2),
         .CLKOS_FPHASE(0),
         .CLKOS2_ENABLE("ENABLED"),
-        .CLKOS2_DIV(31),
+        .CLKOS2_DIV(22),
         .CLKOS2_CPHASE(2),
         .CLKOS2_FPHASE(0),
         .FEEDBK_PATH("CLKOP"),
@@ -43,10 +43,10 @@ EHXPLLL #(
         .RST(1'b0),
         .STDBY(1'b0),
         .CLKI(clkin25),
-        .CLKOP(clockout125),
-        .CLKOS(clockout25),
-        .CLKOS2(clockout20),
-        .CLKFB(clockout125),
+        .CLKOP(clk_125),
+        .CLKOS(clk_25),
+        .CLKOS2(clk_31),
+        .CLKFB(clk_125),
         .CLKINTFB(),
         .PHASESEL0(1'b0),
         .PHASESEL1(1'b0),

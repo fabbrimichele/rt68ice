@@ -10,7 +10,7 @@ import scala.language.postfixOps
 
 //noinspection TypeAnnotation
 //noinspection ScalaWeakerAccess
-case class VgaDevice(vgaCd : ClockDomain) extends Component {
+case class VgaDevice(vgaCd: ClockDomain) extends Component {
   val io = new Bundle {
     val bus     = slave(M68KBus())
     val fbSel   = in Bool()
