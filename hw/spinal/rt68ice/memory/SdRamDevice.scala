@@ -73,7 +73,7 @@ case class SdRamDevice() extends Component {
 
   // The operation is only "Done" when the second phase finishes.
   val fullCycleDone = RegInit(False)
-  when(!activeCycle) {
+  when(!activeCycle || newPhase) {
     fullCycleDone := False
   } elsewhen(isLongword && sdRam.io.p0_ready) {
     fullCycleDone := True
@@ -81,5 +81,5 @@ case class SdRamDevice() extends Component {
 
   // Stall the CPU until the full 32-bit transaction is complete.
   // We allow the CPU to run if the cycle is finished OR if the CPU is currently idle.
-  io.cpuClkEn := !activeCycle || fullCycleDone
+  io.cpuClkEn := !activeCycle || (fullCycleDone && !newPhase)
 }
