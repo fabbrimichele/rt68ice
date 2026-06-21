@@ -82,6 +82,15 @@ module sdram (
 	localparam CYCLES_UNTIL_INIT_PRECHARGE_END = (10 + CYCLES_UNTIL_CLEAR_INHIBIT) + (rtoi(SETTING_T_RP_MIN_PRECHARGE_CMD_PERIOD_NANO_SEC / CLOCK_PERIOD_NANO_SEC) > (SETTING_T_RP_MIN_PRECHARGE_CMD_PERIOD_NANO_SEC / CLOCK_PERIOD_NANO_SEC) ? rtoi(SETTING_T_RP_MIN_PRECHARGE_CMD_PERIOD_NANO_SEC / CLOCK_PERIOD_NANO_SEC) : rtoi(SETTING_T_RP_MIN_PRECHARGE_CMD_PERIOD_NANO_SEC / CLOCK_PERIOD_NANO_SEC) + 1);
 	localparam CYCLES_UNTIL_REFRESH1_END = CYCLES_UNTIL_INIT_PRECHARGE_END + CYCLES_FOR_AUTOREFRESH;
 	localparam CYCLES_UNTIL_REFRESH2_END = CYCLES_UNTIL_REFRESH1_END + CYCLES_FOR_AUTOREFRESH;
+
+	/* State machine labels */
+	localparam STATE_INIT      = 3'd0;
+    localparam STATE_IDLE      = 3'd1;
+    localparam STATE_DELAY     = 3'd2;
+    localparam STATE_WRITE     = 3'd3;
+    localparam STATE_READ      = 3'd4;
+    localparam STATE_READ_DATA = 3'd5;
+
 	/* verilator lint_on REALCVT */
 	wire [2:0] concrete_burst_length = (BURST_LENGTH == 1 ? 3'h0 : (BURST_LENGTH == 2 ? 3'h1 : (BURST_LENGTH == 4 ? 3'h2 : 3'h3)));
 	wire [12:0] configured_mode = {3'b000, ~WRITE_BURST[0], 2'b00, CAS_LATENCY[2:0], BURST_TYPE[0], concrete_burst_length};
@@ -166,7 +175,7 @@ module sdram (
 			if (state != 3'd0)
 				refresh_counter <= refresh_counter + 16'h0001;
 			case (state)
-				3'd0: begin
+				STATE_INIT: begin
 					delay_counter <= delay_counter + 32'h00000001;
 					if (delay_counter == CYCLES_UNTIL_START_INHIBIT)
 						SDRAM_CKE <= 1;
@@ -186,7 +195,7 @@ module sdram (
 					else if (delay_counter == (CYCLES_UNTIL_REFRESH2_END + SETTING_T_MRD_MIN_LOAD_MODE_CLOCK_CYCLES))
 						state <= 3'd1;
 				end
-				3'd1: begin
+				STATE_IDLE: begin
 					dq_output <= 0;
 					p0_ready <= 0;
 					current_io_operation <= 2'd0;
@@ -211,7 +220,7 @@ module sdram (
 						set_active_command(0, p0_addr_current);
 					end
 				end
-				3'd2:
+				STATE_DELAY:
 					if (delay_counter > 0)
 						delay_counter <= delay_counter - 32'h00000001;
 					else begin
@@ -222,7 +231,7 @@ module sdram (
 								0: p0_ready <= 1;
 							endcase
 					end
-				3'd3: begin : sv2v_autoblock_1
+				STATE_WRITE: begin : sv2v_autoblock_1
 					reg [27:0] active_port_entries;
 					state <= 3'd2;
 
@@ -238,7 +247,7 @@ module sdram (
 					sdram_data <= active_port_entries[17-:16];
 					SDRAM_DQM <= ~active_port_entries[1-:2];
 				end
-				3'd4: begin : sv2v_autoblock_2
+				STATE_READ: begin : sv2v_autoblock_2
 					reg [27:0] active_port_entries;
 					if ((CAS_LATENCY == 1) && ~SETTING_USE_FAST_INPUT_REGISTER)
 						state <= 3'd5;
@@ -254,7 +263,7 @@ module sdram (
 					SDRAM_A <= {3'b001, active_port_entries[27-:10]};
 					SDRAM_DQM <= 2'b00;
 				end
-				3'd5: begin : sv2v_autoblock_3
+				STATE_READ_DATA: begin : sv2v_autoblock_3
 					//reg [127:0] temp;
 					reg [3:0] expected_count;
 					case (active_port)
