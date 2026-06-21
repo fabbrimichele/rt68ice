@@ -1,7 +1,6 @@
 package rt68ice.io
 
 import rt68ice.core.M68KBus
-import rt68ice.core.M68KBus.DATA_WIDTH
 import spinal.core._
 import spinal.lib._
 

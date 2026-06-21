@@ -3,6 +3,7 @@ package rt68ice
 import rt68ice.core._
 import rt68ice.io.{LedDevice, T16450Device}
 import rt68ice.memory.{Mem16Bit, SdRam, SdRamDevice}
+import rt68ice.timer.Counter
 import rt68ice.video.{Gpdi, VgaDevice}
 import spinal.core._
 import spinal.lib.com.uart.Uart
@@ -51,6 +52,11 @@ case class Rt68IceTopLevel(romFile: String) extends Component {
     val ram = Mem16Bit(sizeInWords = 8192)
     ram.io.sel := bus.io.ramSel
     bus.io.ramBus <> ram.io.bus
+
+    // Counter
+    val counter = Counter()
+    counter.io.sel := bus.io.counterSel
+    bus.io.counterBus <> counter.io.bus
 
     // LED Device
     val ledDevice = LedDevice()

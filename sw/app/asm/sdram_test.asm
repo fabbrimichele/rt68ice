@@ -16,6 +16,8 @@ menu:
     beq     addr_test
     cmp.b   #'3',d0
     beq     time_test
+    cmp.b   #'4',d0
+    beq     bench_test
     cmp.b   #'e',d0
     beq     .end
     bra     menu
@@ -38,7 +40,18 @@ time_test:
     lea     msg_tst_time,a0
     bsr     put_str
     bsr     run_time_test
-    ; Fall through to handle_test_result since it's next
+    bra     handle_test_result
+
+bench_test:
+    lea     msg_tst_bench,a0
+    bsr     put_str
+    bsr     run_bench_test
+    ; Skip shared result (Passed/Error) and shows cycles
+    move.l  d1,d0
+    bsr     bin_to_hex
+    lea     msg_newline,a0
+    bsr     put_str
+    bra     menu
 
 handle_test_result:
     tst.b   d0
@@ -178,6 +191,36 @@ run_time_test:
     rts
 
 
+; ------------------------------------------------------
+; 4. The "SDRAM Performance Benchmark" Test
+; Performs a block memory move between SDRAM addresses
+; to measure cycles taken for read/write operations via
+; the ProfilerDevice.
+;
+; Output: d1.l -> Total clock cycles taken for 256 words
+run_bench_test:
+    ; --- Setup ---
+    movea.l #COUNTER,a0         ; Load counter base into A0
+
+    ; --- Benchmark Start ---
+    move.l  (a0),d0             ; Snapshot Start Time (High word first, then latched low)
+
+    ; --- SDRAM Copy Loop ---
+    movea.l #RAM_START,a1       ; Source
+    movea.l #RAM_START+200,a2   ; Destination
+    move.w  #1024,d1            ; Set loop counter (iterations)
+
+.copy_loop:
+    move.w  (a1)+,(a2)+         ; Load word from SDRAM, store to SDRAM
+    dbra    d1,.copy_loop       ; Decrement and loop until D1 < 0
+
+    ; --- Benchmark End ---
+    move.l  (a0),d1             ; Snapshot End Time
+
+    ; Result calculation
+    sub.l   d0,d1               ; D1 = Total cycles taken for 256 words
+    rts
+
 ; ===========================
 ; Value Constants
 ; ===========================
@@ -189,6 +232,8 @@ RAM_SIZE    equ 4194304-1    ; In words
 ; ===========================
     include '../../lib/asm/console_io_uart.asm'
     include '../../lib/asm/mem_map_led.asm'
+    include '../../lib/asm/mem_map_counter.asm'
+    include '../../lib/asm/conversions.asm'
 
 ; ===========================
 ; Data Constants
@@ -204,6 +249,7 @@ msg_menu:
     dc.b    "1. Data Bus Integrity",CR,LF
     dc.b    "2. Row/Bank Conflict",CR,LF
     dc.b    "3. Timing Stress",CR,LF
+    dc.b    "4. Benchmark",CR,LF
     dc.b    "e. Exit",CR,LF,NUL
 
 msg_tst_data:
@@ -215,11 +261,17 @@ msg_tst_addr:
 msg_tst_time:
     dc.b    CR,LF,"Timing Stress...",CR,LF,NUL
 
+msg_tst_bench:
+    dc.b    CR,LF,"Benchmark...",CR,LF,NUL
+
 msg_pass:
     dc.b    "Passed!",CR,LF,NUL
 
 msg_err:
     dc.b    "Error!",CR,LF,NUL
+
+msg_newline:
+    dc.b    CR,LF,NUL
 
 ; ===========================
 ; RAM Data Section
