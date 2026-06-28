@@ -1,37 +1,58 @@
 ; ----------------------------------------------------------
-; bin_to_dec: D0.L is converted to decimal ASCII and printed
+; bin_to_dec
+; Reentrant unsigned 32-bit decimal printer
+;
+; Input:
+;   D0.L = value
+;
+; Requires:
+;   put_chr(char in D0.B)
+;
+; Notes:
+;   - Fully reentrant (no stack digit usage)
+;   - Uses RAM buffer (define `bin_to_dec_buf DS.B 11`)
+;   - Safe for ROM-resident code
 ; ----------------------------------------------------------
 bin_to_dec:
-    MOVEM.L D1/D2,-(SP)     ; Save working registers
-    MOVEQ   #0,D2           ; D2 will be our digit counter
+        MOVEM.L D1-D2/A0-A1,-(SP)
 
-.div_loop:
-    CLR.L   D1              ; Ensure upper 16 bits are clear for DIVU
-    DIVU    #10,D0          ; D0 = Quotient (lower), Remainder (upper)
+        LEA     bin_to_dec_buf(PC),A1     ; A1 = end of buffer
+        ADD.L   #10,A1             ; point to last byte
 
-    ; --- 1. Isolate the remainder (the digit) ---
-    MOVE.L  D0,D1           ; Copy result
-    SWAP    D1              ; Put Remainder into lower 16 bits
-    ANDI.L  #$F,D1          ; Mask just in case (though remainder is <10)
+        MOVEQ   #0,D2              ; digit count
 
-    ; --- 2. Convert to ASCII ---
-    ADDI.B  #'0',D1         ; Add ASCII offset '0'
+        TST.L   D0
+        BNE     .convert
 
-    ; --- 3. Push to Stack to reverse order later ---
-    MOVE.W  D1,-(SP)        ; Push ASCII char to stack
-    ADDQ.W  #1,D2           ; Increment digit counter
+        MOVE.B  #'0',(A1)
+        MOVEQ   #1,D2
+        BRA     .print
 
-    ; --- 4. Prepare for next iteration ---
-    CLR.W   D0              ; Clear high word (old remainder)
-    SWAP    D0              ; Restore Quotient to lower word
-    TST.W   D0              ; Is quotient 0?
-    BNE.S   .div_loop       ; If not, continue
+.convert:
+.loop:
+        MOVE.L  D0,D1
+        DIVU    #10,D1            ; quotient in low word, remainder in high
 
-    ; --- 5. Print loop ---
+        MOVE.W  D1,D0             ; quotient
+        SWAP    D1
+        MOVE.W  D1,D2             ; remainder
+
+        ADDI.B  #'0',D2
+        MOVE.B  D2,(A1)
+
+        SUBQ.L  #1,A1
+        ADDQ.W  #1,D2
+
+        TST.W   D0
+        BNE     .loop
+
+        ADDQ.L  #1,A1             ; adjust to first digit
+
+.print:
 .print_loop:
-    MOVE.W  (SP)+,D0        ; Pop digit off stack (this reverses the order!)
-    BSR     put_chr         ; Display the character
-    DBRA    D2,.print_loop  ; Loop until all digits printed
+        MOVE.B  (A1)+,D0
+        BSR     put_chr
+        DBRA    D2,.print_loop
 
-    MOVEM.L (SP)+,D1/D2     ; Restore registers
-    RTS
+        MOVEM.L (SP)+,D1-D2/A0-A1
+        RTS
