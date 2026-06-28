@@ -7,7 +7,7 @@ import argparse
 from PIL import Image
 
 def convert_jpeg_to_interleaved_8bp(image_path, output_bin_path, output_pal_path,
-                                    img_load_addr=0x20000, pal_load_addr=0x10000):
+                                    img_load_addr=0x100000, pal_load_addr=0x10000):
     """
     Converts a JPEG image to a 320x240 8-bitplane word-interleaved binary file
     and a 32-bit xxRRGGBB palette file. Both files are prefixed with a
@@ -123,7 +123,7 @@ if __name__ == "__main__":
     OUTPUT_PAL = os.path.join(OUT_DIR, f"{base_name}_palette.bin")
 
     # Set your custom 68000 target memory locations here if needed
-    IMAGE_TARGET_ADDRESS = 0x00020000
+    IMAGE_TARGET_ADDRESS = 0x00100000
     PALETTE_TARGET_ADDRESS = 0x00010000
 
     convert_jpeg_to_interleaved_8bp(

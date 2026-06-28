@@ -1,7 +1,7 @@
 package rt68ice
 
 import rt68ice.core._
-import rt68ice.io.{LedDevice, T16450Device}
+import rt68ice.io.{LedArrayDevice, LedDevice, T16450Device}
 import rt68ice.memory.{Mem16Bit, SdRam, SdRamDevice}
 import rt68ice.timer.Counter
 import rt68ice.video.{Gpdi, VgaDevice}
@@ -17,6 +17,7 @@ import scala.language.postfixOps
 case class Rt68IceTopLevel(romFile: String) extends Component {
   val io = new Bundle {
     val led = out Bits(3 bits)
+    val leds = out Bits(16 bits)
     val uart = master(Uart()) // Expose UART pins (txd, rxd), must be defined in the constraints file
     val gpdi = master(Gpdi())
     val sdram = master(SdRam())
@@ -63,6 +64,12 @@ case class Rt68IceTopLevel(romFile: String) extends Component {
     ledDevice.io.sel := bus.io.ledSel
     io.led := ledDevice.io.led
     bus.io.ledBus <> ledDevice.io.bus
+
+    // LED Array Device
+    val ledsDevice = LedArrayDevice()
+    ledsDevice.io.sel := bus.io.ledsSel
+    io.leds := ledsDevice.io.leds
+    bus.io.ledsBus <> ledsDevice.io.bus
 
     // UART Device
     val uartDevice = T16450Device()

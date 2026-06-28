@@ -604,7 +604,7 @@ print_reg:
 ; ------------------------------
     include '../../lib/asm/mem_map_video.asm'
     include '../../lib/asm/console_io_uart.asm'
-    include '../../lib/asm/conversions.asm'
+    include '../../lib/asm/conv_hex.asm'
     include '../../lib/asm/isr_vector.asm'
 
 
