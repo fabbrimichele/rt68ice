@@ -198,6 +198,7 @@ run_time_test:
 ; the ProfilerDevice.
 ;
 ; Output: d1.l -> Total clock cycles taken for 256 words
+; ------------------------------------------------------
 run_bench_test:
     ; --- Setup ---
     movea.l #COUNTER,a0         ; Load counter base into A0
@@ -233,7 +234,7 @@ RAM_SIZE    equ 4194304-1    ; In words
     include '../../lib/asm/console_io_uart.asm'
     include '../../lib/asm/mem_map_led.asm'
     include '../../lib/asm/mem_map_counter.asm'
-    include '../../lib/asm/conversions.asm'
+    include '../../lib/asm/conv_hex.asm'
 
 ; ===========================
 ; Data Constants
