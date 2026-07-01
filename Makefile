@@ -28,6 +28,7 @@ TARGET_APP_DIR := target/app
 # Where the board is connected
 SERIAL_PORT = /dev/ttyACM0
 SERIAL_BAUD = 19200
+RUN ?= 1
 #SERIAL_BAUD = 57600
 # Image conversion settings
 ASSETS_IMG_DIR = assets/images
@@ -89,17 +90,7 @@ serial-load: apps
 	fi
 	# Test file existence
 	test -f $(TARGET_APP_DIR)/$(BIN)
-	# Send `load` command to prepare the device
-	@echo "--- Loading $(BIN) to $(SERIAL_PORT) ---"
-	printf "load\r" > $(SERIAL_PORT)
-	sleep 0.5
-	# Transfer the contents of the chosen binary file
-	cat $(TARGET_APP_DIR)/$(BIN) > $(SERIAL_PORT)
-	sleep 0.5
-	# Send RUN command
-	@PROGRAM_ADDRESS=$$(hexdump -vn 4 -e '4/1 "%02X"' $(TARGET_APP_DIR)/$(BIN)); \
-	echo "--- Running application at 0x$$PROGRAM_ADDRESS ---"; \
-	printf "run $$PROGRAM_ADDRESS\r" > $(SERIAL_PORT)
+	python3 tools/serial_load.py --port $(SERIAL_PORT) --baud $(SERIAL_BAUD) $(if $(filter 0 false no,$(RUN)),--no-run,) $(TARGET_APP_DIR)/$(BIN)
 
 clean:
 	rm -rf *.json *.config *.bit target hw/spinal/rt68ice/memory/*.hex
@@ -186,3 +177,4 @@ $(TARGET_APP_DIR)/%_320x240_8bpp.bin: $(ASSETS_IMG_DIR)/%.jpg
 $(TARGET_APP_DIR)/%_320x240_8bpp.bin: $(ASSETS_IMG_DIR)/%.jpeg
 	@mkdir -p $(TARGET_APP_DIR)
 	@echo "--- Converting Image: $< ---"
+	./$(IMG_TOOL) $< -o $(TARGET_APP_DIR)
