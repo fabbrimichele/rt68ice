@@ -14,6 +14,11 @@ case class SdRamCtrlConfig(
   p0BurstLength: Int = 1,
 )
 
+/*
+  Porting to SpinalHDL of https://github.com/agg23/sdram-controller
+ */
+//noinspection TypeAnnotation
+//noinspection ScalaWeakerAccess
 case class SdRamCtrl(config: SdRamCtrlConfig = SdRamCtrlConfig()) extends Component {
   require(Set(1, 2, 4, 8).contains(config.burstLength), "burstLength must be 1, 2, 4, or 8")
   require(Set(1, 2, 4, 8).contains(config.p0BurstLength), "p0BurstLength must be 1, 2, 4, or 8")
@@ -161,7 +166,7 @@ case class SdRamCtrl(config: SdRamCtrlConfig = SdRamCtrlConfig()) extends Compon
   io.sdRam.cke := clockEnable
   io.sdRam.clock := !ClockDomain.current.readClockWire
 
-  private def setActiveCommand(port: Int, addr: Bits): Unit = {
+  private def setActiveCommand(addr: Bits, port: Int = 0): Unit = {
     command := Command.active
     bank := addr(24 downto 23)
     address := addr(22 downto 10)
@@ -185,6 +190,7 @@ case class SdRamCtrl(config: SdRamCtrlConfig = SdRamCtrlConfig()) extends Compon
     refreshCounter := refreshCounter + 1
   }
 
+  // Do not use SpinalHDL State Machine, it could break the timing.
   switch(state) {
     is(State.init) {
       delayCounter := delayCounter + 1
@@ -225,12 +231,12 @@ case class SdRamCtrl(config: SdRamCtrlConfig = SdRamCtrlConfig()) extends Compon
         delayState := State.write
         currentIoOperation := IoOperation.write
         p0WrQueue := False
-        setActiveCommand(0, p0AddrCurrent)
+        setActiveCommand(p0AddrCurrent)
       } elsewhen(io.p0RdReq || p0RdQueue) {
         state := State.delay
         delayState := State.read
         currentIoOperation := IoOperation.read
-        setActiveCommand(0, p0AddrCurrent)
+        setActiveCommand(p0AddrCurrent)
       }
     }
 
@@ -307,8 +313,4 @@ case class SdRamCtrl(config: SdRamCtrlConfig = SdRamCtrlConfig()) extends Compon
       }
     }
   }
-}
-
-object SdRamCtrlVerilog extends App {
-  rt68ice.Config.spinal.generateVerilog(SdRamCtrl())
 }
