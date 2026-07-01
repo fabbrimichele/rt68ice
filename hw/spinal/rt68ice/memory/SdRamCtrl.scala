@@ -14,26 +14,6 @@ case class SdRamCtrlConfig(
   p0BurstLength: Int = 1,
 )
 
-case class SdRamCtrlPins() extends Bundle with IMasterSlave {
-  val dqIn    = Bits(16 bits)
-  val dqOut   = Bits(16 bits)
-  val dqWrite = Bool()
-  val a       = Bits(13 bits)
-  val dm      = Bits(2 bits)
-  val ba      = Bits(2 bits)
-  val cs_n    = Bool()
-  val we_n    = Bool()
-  val ras_n   = Bool()
-  val cas_n   = Bool()
-  val cke     = Bool()
-  val clock   = Bool()
-
-  override def asMaster(): Unit = {
-    in(dqIn)
-    out(dqOut, dqWrite, a, dm, ba, cs_n, we_n, ras_n, cas_n, cke, clock)
-  }
-}
-
 case class SdRamCtrl(config: SdRamCtrlConfig = SdRamCtrlConfig()) extends Component {
   require(Set(1, 2, 4, 8).contains(config.burstLength), "burstLength must be 1, 2, 4, or 8")
   require(Set(1, 2, 4, 8).contains(config.p0BurstLength), "p0BurstLength must be 1, 2, 4, or 8")
@@ -52,7 +32,7 @@ case class SdRamCtrl(config: SdRamCtrlConfig = SdRamCtrlConfig()) extends Compon
     val p0Available = out Bool()
     val p0Ready     = out Bool()
 
-    val sdRam = master(SdRamCtrlPins())
+    val sdRam = master(SdRam())
   }
 
   private def ceilCycles(ns: Double): Int =
@@ -167,8 +147,10 @@ case class SdRamCtrl(config: SdRamCtrlConfig = SdRamCtrlConfig()) extends Compon
   io.p0Ready := p0ReadyReg
   io.p0Q := p0QReg
 
-  io.sdRam.dqOut := dqData
-  io.sdRam.dqWrite := dqOutput
+  when(dqOutput) {
+    io.sdRam.dq := dqData
+  }
+
   io.sdRam.a := address
   io.sdRam.dm := dataMask
   io.sdRam.ba := bank
@@ -309,14 +291,14 @@ case class SdRamCtrl(config: SdRamCtrlConfig = SdRamCtrlConfig()) extends Compon
       }
 
       switch(readCounter) {
-        is(0) { readBuffer(15 downto 0) := io.sdRam.dqIn }
-        is(1) { readBuffer(31 downto 16) := io.sdRam.dqIn }
-        is(2) { readBuffer(47 downto 32) := io.sdRam.dqIn }
-        is(3) { readBuffer(63 downto 48) := io.sdRam.dqIn }
-        is(4) { readBuffer(79 downto 64) := io.sdRam.dqIn }
-        is(5) { readBuffer(95 downto 80) := io.sdRam.dqIn }
-        is(6) { readBuffer(111 downto 96) := io.sdRam.dqIn }
-        is(7) { readBuffer(127 downto 112) := io.sdRam.dqIn }
+        is(0) { readBuffer(15 downto 0) := io.sdRam.dq }
+        is(1) { readBuffer(31 downto 16) := io.sdRam.dq }
+        is(2) { readBuffer(47 downto 32) := io.sdRam.dq }
+        is(3) { readBuffer(63 downto 48) := io.sdRam.dq }
+        is(4) { readBuffer(79 downto 64) := io.sdRam.dq }
+        is(5) { readBuffer(95 downto 80) := io.sdRam.dq }
+        is(6) { readBuffer(111 downto 96) := io.sdRam.dq }
+        is(7) { readBuffer(127 downto 112) := io.sdRam.dq }
       }
 
       p0QReg := readBuffer(config.p0BurstLength * 16 - 1 downto 0)

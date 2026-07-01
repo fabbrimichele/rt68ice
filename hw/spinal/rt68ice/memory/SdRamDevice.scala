@@ -18,20 +18,16 @@ case class SdRamDevice() extends Component {
 
   val sdRam = SdRamCtrl()
 
-  io.sdRam.clock  := sdRam.io.sdRam.clock
-  io.sdRam.cke    := sdRam.io.sdRam.cke
-  io.sdRam.a      := sdRam.io.sdRam.a
-  io.sdRam.dm     := sdRam.io.sdRam.dm
-  io.sdRam.we_n   := sdRam.io.sdRam.we_n
-  io.sdRam.ras_n  := sdRam.io.sdRam.ras_n
-  io.sdRam.cas_n  := sdRam.io.sdRam.cas_n
-  io.sdRam.ba     := sdRam.io.sdRam.ba
-  io.sdRam.cs_n   := sdRam.io.sdRam.cs_n
-
-  sdRam.io.sdRam.dqIn := io.sdRam.dq
-  when(sdRam.io.sdRam.dqWrite) {
-    io.sdRam.dq := sdRam.io.sdRam.dqOut
-  }
+  io.sdRam.clock    := sdRam.io.sdRam.clock
+  io.sdRam.cke      := sdRam.io.sdRam.cke
+  io.sdRam.a        := sdRam.io.sdRam.a
+  io.sdRam.dm       := sdRam.io.sdRam.dm
+  io.sdRam.we_n     := sdRam.io.sdRam.we_n
+  io.sdRam.ras_n    := sdRam.io.sdRam.ras_n
+  io.sdRam.cas_n    := sdRam.io.sdRam.cas_n
+  io.sdRam.ba       := sdRam.io.sdRam.ba
+  io.sdRam.cs_n     := sdRam.io.sdRam.cs_n
+  sdRam.io.sdRam.dq := io.sdRam.dq
 
   // --- CPU/Chipset interface ---
 
