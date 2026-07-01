@@ -16,25 +16,25 @@ case class SdRamDevice() extends Component {
     val sdRam     = master(SdRam())
   }
 
-  val sdRam = new SdRamBB()
+  val sdRam = SdRamCtrl()
 
-  io.sdRam.clock  := sdRam.io.SDRAM_CLK
-  io.sdRam.cke    := sdRam.io.SDRAM_CKE
-  io.sdRam.dq     := sdRam.io.SDRAM_DQ
-  io.sdRam.a      := sdRam.io.SDRAM_A
-  io.sdRam.dm     := sdRam.io.SDRAM_DQM
-  io.sdRam.we_n   := sdRam.io.SDRAM_nWE
-  io.sdRam.ras_n  := sdRam.io.SDRAM_nRAS
-  io.sdRam.cas_n  := sdRam.io.SDRAM_nCAS
-  io.sdRam.ba     := sdRam.io.SDRAM_BA
-  io.sdRam.cs_n   := sdRam.io.SDRAM_nCS
+  io.sdRam.clock    := sdRam.io.sdRam.clock
+  io.sdRam.cke      := sdRam.io.sdRam.cke
+  io.sdRam.a        := sdRam.io.sdRam.a
+  io.sdRam.dm       := sdRam.io.sdRam.dm
+  io.sdRam.we_n     := sdRam.io.sdRam.we_n
+  io.sdRam.ras_n    := sdRam.io.sdRam.ras_n
+  io.sdRam.cas_n    := sdRam.io.sdRam.cas_n
+  io.sdRam.ba       := sdRam.io.sdRam.ba
+  io.sdRam.cs_n     := sdRam.io.sdRam.cs_n
+  sdRam.io.sdRam.dq := io.sdRam.dq
 
   // --- CPU/Chipset interface ---
 
-  sdRam.io.p0_data    := io.bus.dataOut
-  io.bus.dataIn       := sdRam.io.p0_q
-  sdRam.io.p0_addr    := io.bus.address(23 downto 1).resized // access by words
-  sdRam.io.p0_byte_en := io.bus.uds ## io.bus.lds
+  sdRam.io.p0Data   := io.bus.dataOut
+  io.bus.dataIn     := sdRam.io.p0Q
+  sdRam.io.p0Addr   := io.bus.address(23 downto 1).resized // access by words
+  sdRam.io.p0ByteEn := io.bus.uds ## io.bus.lds
 
   // 1. Request Generation
   val isWrite = io.bus.wr
@@ -58,8 +58,8 @@ case class SdRamDevice() extends Component {
   val rdTrigger = phaseTrigger && isRead
   val wrTrigger = phaseTrigger && isWrite
 
-  sdRam.io.p0_wr_req  := wrTrigger
-  sdRam.io.p0_rd_req  := rdTrigger
+  sdRam.io.p0WrReq := wrTrigger
+  sdRam.io.p0RdReq := rdTrigger
 
   // 2. CPU Clock Enable / Wait States
   // We need to know if we are currently in the middle of a longword transfer.
@@ -75,7 +75,7 @@ case class SdRamDevice() extends Component {
   val fullCycleDone = RegInit(False)
   when(!activeCycle || newPhase) {
     fullCycleDone := False
-  } elsewhen(isLongword && sdRam.io.p0_ready) {
+  } elsewhen(isLongword && sdRam.io.p0Ready) {
     fullCycleDone := True
   }
 
