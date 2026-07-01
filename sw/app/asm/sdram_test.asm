@@ -48,7 +48,7 @@ bench_test:
     bsr     run_bench_test
     ; Skip shared result (Passed/Error) and shows cycles
     move.l  d1,d0
-    bsr     bin_to_hex
+    bsr     bin_to_dec
     lea     msg_newline,a0
     bsr     put_str
     bra     menu
@@ -235,6 +235,7 @@ RAM_SIZE    equ 4194304-1    ; In words
     include '../../lib/asm/mem_map_led.asm'
     include '../../lib/asm/mem_map_counter.asm'
     include '../../lib/asm/conv_hex.asm'
+    include '../../lib/asm/conv_dec.asm'
 
 ; ===========================
 ; Data Constants
@@ -278,4 +279,5 @@ msg_newline:
 ; RAM Data Section
 ; ===========================
     section .bss
-buffer  ds.w 1
+buffer         ds.w 1
+bin_to_dec_buf ds.b 12
