@@ -9,50 +9,58 @@
 ;   put_chr(char in D0.B)
 ;
 ; Notes:
-;   - Fully reentrant (no stack digit usage)
-;   - Uses RAM buffer (define `bin_to_dec_buf DS.B 11`)
-;   - Safe for ROM-resident code
+;   - Prints without a RAM digit buffer.
+;   - Uses repeated subtraction of decimal powers, so it supports
+;     the full unsigned 32-bit range on plain 68000.
 ; ----------------------------------------------------------
 bin_to_dec:
-        MOVEM.L D1-D2/A0-A1,-(SP)
+        MOVEM.L D1-D4/A0,-(SP)
 
-        LEA     bin_to_dec_buf(PC),A1     ; A1 = end of buffer
-        ADD.L   #10,A1             ; point to last byte
+        MOVE.L  D0,D1             ; D1 = remaining value
+        LEA     .powers(PC),A0
+        MOVEQ   #9,D4             ; 10 decimal powers, DBRA count
+        MOVEQ   #0,D3             ; nonzero digit printed flag
 
-        MOVEQ   #0,D2              ; digit count
+.power_loop:
+        MOVE.L  (A0)+,D2          ; D2 = current decimal power
+        MOVEQ   #0,D0             ; D0 = digit for this power
 
-        TST.L   D0
-        BNE     .convert
+.digit_loop:
+        CMP.L   D2,D1
+        BLO.S   .emit_digit       ; remaining value < current power
+        SUB.L   D2,D1
+        ADDQ.B  #1,D0
+        BRA.S   .digit_loop
 
-        MOVE.B  #'0',(A1)
-        MOVEQ   #1,D2
-        BRA     .print
+.emit_digit:
+        TST.B   D3
+        BNE.S   .print_digit
+        TST.B   D0
+        BNE.S   .start_printing
+        TST.W   D4
+        BNE.S   .next_power       ; Skip leading zeroes before final digit
 
-.convert:
-.loop:
-        MOVE.L  D0,D1
-        DIVU    #10,D1            ; quotient in low word, remainder in high
+.start_printing:
+        MOVEQ   #1,D3
 
-        MOVE.W  D1,D0             ; quotient
-        SWAP    D1
-        MOVE.W  D1,D2             ; remainder
-
-        ADDI.B  #'0',D2
-        MOVE.B  D2,(A1)
-
-        SUBQ.L  #1,A1
-        ADDQ.W  #1,D2
-
-        TST.W   D0
-        BNE     .loop
-
-        ADDQ.L  #1,A1             ; adjust to first digit
-
-.print:
-.print_loop:
-        MOVE.B  (A1)+,D0
+.print_digit:
+        ADDI.B  #'0',D0
         BSR     put_chr
-        DBRA    D2,.print_loop
 
-        MOVEM.L (SP)+,D1-D2/A0-A1
+.next_power:
+        DBRA    D4,.power_loop
+
+        MOVEM.L (SP)+,D1-D4/A0
         RTS
+
+.powers:
+        DC.L    1000000000
+        DC.L    100000000
+        DC.L    10000000
+        DC.L    1000000
+        DC.L    100000
+        DC.L    10000
+        DC.L    1000
+        DC.L    100
+        DC.L    10
+        DC.L    1

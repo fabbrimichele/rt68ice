@@ -46,7 +46,8 @@ bench_test:
     lea     msg_tst_bench,a0
     bsr     put_str
     bsr     run_bench_test
-    ; Skip shared result (Passed/Error) and shows cycles
+    lea     msg_cycles,a0
+    bsr     put_str
     move.l  d1,d0
     bsr     bin_to_dec
     lea     msg_newline,a0
@@ -194,32 +195,31 @@ run_time_test:
 ; ------------------------------------------------------
 ; 4. The "SDRAM Performance Benchmark" Test
 ; Performs a block memory move between SDRAM addresses
-; to measure cycles taken for read/write operations via
-; the ProfilerDevice.
+; to measure elapsed hardware counter ticks for SDRAM
+; read/write operations.
 ;
-; Output: d1.l -> Total clock cycles taken for 256 words
+; Output: d1.l -> Total counter ticks taken for BENCH_WORDS words
 ; ------------------------------------------------------
 run_bench_test:
     ; --- Setup ---
-    movea.l #COUNTER,a0         ; Load counter base into A0
+    movea.l #COUNTER,a0             ; Counter base
+    movea.l #RAM_START,a1           ; Source
+    movea.l #RAM_START+$1000,a2     ; Destination
+    move.w  #(BENCH_WORDS-1),d1     ; DBRA loop count
 
     ; --- Benchmark Start ---
-    move.l  (a0),d0             ; Snapshot Start Time (High word first, then latched low)
+    move.l  (a0),d0                 ; Start counter snapshot
 
     ; --- SDRAM Copy Loop ---
-    movea.l #RAM_START,a1       ; Source
-    movea.l #RAM_START+200,a2   ; Destination
-    move.w  #1024,d1            ; Set loop counter (iterations)
-
 .copy_loop:
-    move.w  (a1)+,(a2)+         ; Load word from SDRAM, store to SDRAM
-    dbra    d1,.copy_loop       ; Decrement and loop until D1 < 0
+    move.w  (a1)+,(a2)+             ; Load word from SDRAM, store to SDRAM
+    dbra    d1,.copy_loop           ; Decrement and loop until D1 < 0
 
     ; --- Benchmark End ---
-    move.l  (a0),d1             ; Snapshot End Time
+    move.l  (a0),d1                 ; End counter snapshot
 
     ; Result calculation
-    sub.l   d0,d1               ; D1 = Total cycles taken for 256 words
+    sub.l   d0,d1                   ; D1 = elapsed counter ticks
     rts
 
 ; ===========================
@@ -227,6 +227,7 @@ run_bench_test:
 ; ===========================
 RAM_START   equ $800000      ; SDRAM start address
 RAM_SIZE    equ 4194304-1    ; In words
+BENCH_WORDS equ 256          ; Number of words copied by benchmark
 
 ; ===========================
 ; Include files
@@ -266,6 +267,9 @@ msg_tst_time:
 msg_tst_bench:
     dc.b    CR,LF,"Benchmark...",CR,LF,NUL
 
+msg_cycles:
+    dc.b    "Clock cycles: ",NUL
+
 msg_pass:
     dc.b    "Passed!",CR,LF,NUL
 
@@ -280,4 +284,3 @@ msg_newline:
 ; ===========================
     section .bss
 buffer         ds.w 1
-bin_to_dec_buf ds.b 12
