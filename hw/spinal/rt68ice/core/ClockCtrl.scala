@@ -12,25 +12,25 @@ case class ClockCtrl() extends Component {
   private val reset = Reset(resetCycles = 25000) // 1 ms at 25 MHz
 
   val vgaCd = createClockDomain(
-    name = "clk25Mhz",
+    name = "clkVga",
     frequency = 25 MHz,
     pllClock = pll.io.clk_vga,
   )
 
   val hdmiCd = createClockDomain(
-    name = "clk125Mhz",
+    name = "clkHdmi",
     frequency = 125 MHz,
     pllClock = pll.io.clk_hdmi,
   )
 
   val systemCd = createClockDomain(
-    name = "clk31Mhz",
+    name = "clkSystem",
     frequency = 28.4091 MHz,
     pllClock = pll.io.clk_cpu,
   )
 
   val sdRamCd = createClockDomain(
-    name = "clk31Mhz",
+    name = "clkSdRam",
     frequency = 28.4091 MHz,
     pllClock = pll.io.clk_cpu,
   )
