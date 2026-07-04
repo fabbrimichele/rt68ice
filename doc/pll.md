@@ -15,11 +15,13 @@ ecppll -i 25 -o 50 --file pll.v
 
 To generate multiple output clocks with names (up to `--clkout3`):
 ```Bash
-ecppll --clkin 25 --clkin_name clkin25 \
-       --clkout0 125 --clkout0_name clk_125 \
-       --clkout1 25 --clkout1_name clk_25 \
-       --clkout2 28 --clkout2_name clk_32 \
-       --file pll.v
+ecppll -i 25 \
+  --clkin_name clkin_25 \
+  -o 125 --clkout0_name clk_hdmi \
+  --clkout1 25 --clkout1_name clk_vga \
+  --clkout2 28 --clkout2_name clk_cpu \
+  --clkout3 56 --clkout3_name clk_sdram --phase3 180 \
+  -f hw/verilog/pll.v
 ```
 **Note:** Order matters. Put the highest frequency on `clkout0` to force the internal math solver to scale up the VCO.
 

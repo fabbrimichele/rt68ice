@@ -14,19 +14,25 @@ case class ClockCtrl() extends Component {
   val vgaCd = createClockDomain(
     name = "clk25Mhz",
     frequency = 25 MHz,
-    pllClock = pll.io.clk_25,
+    pllClock = pll.io.clk_vga,
   )
 
   val hdmiCd = createClockDomain(
     name = "clk125Mhz",
     frequency = 125 MHz,
-    pllClock = pll.io.clk_125,
+    pllClock = pll.io.clk_hdmi,
   )
 
   val systemCd = createClockDomain(
     name = "clk31Mhz",
-    frequency = 31 MHz,
-    pllClock = pll.io.clk_31,
+    frequency = 28.4091 MHz,
+    pllClock = pll.io.clk_cpu,
+  )
+
+  val sdRamCd = createClockDomain(
+    name = "clk31Mhz",
+    frequency = 28.4091 MHz,
+    pllClock = pll.io.clk_cpu,
   )
 
   private def createClockDomain(

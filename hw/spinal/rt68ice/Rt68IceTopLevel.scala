@@ -30,7 +30,7 @@ case class Rt68IceTopLevel(romFile: String) extends Component {
     val bus = new BusController
 
     // SDRAM
-    val sdRamDevice = SdRamDevice()
+    val sdRamDevice = SdRamDevice(clockCtrl.sdRamCd)
     sdRamDevice.io.sdRam <> io.sdram
     sdRamDevice.io.sel := bus.io.sdRamSel
     bus.io.sdRamBus <> sdRamDevice.io.bus

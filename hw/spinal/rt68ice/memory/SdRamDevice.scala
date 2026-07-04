@@ -8,7 +8,7 @@ import scala.language.postfixOps
 
 //noinspection TypeAnnotation
 //noinspection ScalaWeakerAccess
-case class SdRamDevice() extends Component {
+case class SdRamDevice(sdRamCd: ClockDomain) extends Component {
   val io = new Bundle {
     val bus       = slave(M68KBus())
     val sel       = in Bool()
@@ -17,6 +17,8 @@ case class SdRamDevice() extends Component {
   }
 
   val sdRam = SdRamCtrl()
+
+  // TODO: define a new clock area for sdRamCd
 
   io.sdRam.clock    := sdRam.io.sdRam.clock
   io.sdRam.cke      := sdRam.io.sdRam.cke
