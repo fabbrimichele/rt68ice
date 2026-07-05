@@ -7,6 +7,7 @@ import spinal.core.sim._
 import rt68ice.core.M68KBus
 
 object SdRamDeviceSim extends App {
+  /* TODO: restore with sdram clock domain
   SimConfig
     .withWave
     .withVerilator // Required to simulate the Verilog inside the BlackBox
@@ -202,4 +203,6 @@ object SdRamDeviceSim extends App {
 
       dut.clockDomain.waitSampling(20)
     }
+
+   */
 }

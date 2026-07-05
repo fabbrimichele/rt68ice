@@ -12,21 +12,27 @@ case class ClockCtrl() extends Component {
   private val reset = Reset(resetCycles = 25000) // 1 ms at 25 MHz
 
   val vgaCd = createClockDomain(
-    name = "clk25Mhz",
+    name = "clkVga",
     frequency = 25 MHz,
-    pllClock = pll.io.clk_25,
+    pllClock = pll.io.clk_vga,
   )
 
   val hdmiCd = createClockDomain(
-    name = "clk125Mhz",
+    name = "clkHdmi",
     frequency = 125 MHz,
-    pllClock = pll.io.clk_125,
+    pllClock = pll.io.clk_hdmi,
   )
 
   val systemCd = createClockDomain(
-    name = "clk31Mhz",
-    frequency = 31 MHz,
-    pllClock = pll.io.clk_31,
+    name = "clkSystem",
+    frequency = 28.4091 MHz,
+    pllClock = pll.io.clk_cpu,
+  )
+
+  val sdRamCd = createClockDomain(
+    name = "clkSdRam",
+    frequency = 56.8182 MHz, // It's used to calculate the SDRAM timing
+    pllClock = pll.io.clk_sdram,
   )
 
   private def createClockDomain(
