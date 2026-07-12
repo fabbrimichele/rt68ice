@@ -11,6 +11,7 @@ class PllBB extends BlackBox {
     val clk_vga = out Bool()
     val clk_cpu = out Bool()
     val clk_sdram = out Bool()
+    val clk_usb = out Bool()
     val locked  = out Bool()
   }
 

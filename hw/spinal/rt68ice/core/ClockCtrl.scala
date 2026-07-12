@@ -35,6 +35,12 @@ case class ClockCtrl() extends Component {
     pllClock = pll.io.clk_sdram,
   )
 
+  val usbCd = createClockDomain(
+    name = "clkUsb",
+    frequency = 11.9048 MHz,
+    pllClock = pll.io.clk_usb,
+  )
+
   private def createClockDomain(
     name: String,
     frequency: HertzNumber,
