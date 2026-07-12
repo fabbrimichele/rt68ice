@@ -86,7 +86,7 @@ EHXPLLL #(
         .CLKOP_DIV(44),
         .CLKOP_CPHASE(22),
         .CLKOP_FPHASE(0),
-        .FEEDBK_PATH("INTOP"),
+        .FEEDBK_PATH("CLKOP"),      // Reverted to CLKOP so ecppack can map it
         .CLKFB_DIV(2)
     ) pll_1 (
         .RST(~locked0),
@@ -103,5 +103,5 @@ EHXPLLL #(
         .PLLWAKESYNC(1'b0),
         .ENCLKOP(1'b0),
         .LOCK(locked)
-	);
+    );
 endmodule
