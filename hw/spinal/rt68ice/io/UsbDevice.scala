@@ -6,6 +6,13 @@ import spinal.lib._
 
 import scala.language.postfixOps
 
+/*
+  TODO: the USB gamepad for some reason it's not always recognized,
+        it's not the FPGA, it's the gamepad itself, I also tried
+        to move it to the 2nd port and I get the same issues.
+        The USB mouse on the other hand works fine.
+        I tried the mechanical keyboard and it doesn't work at all.
+ */
 //noinspection TypeAnnotation
 //noinspection ScalaWeakerAccess
 case class UsbDevice(usbCd: ClockDomain) extends Component {
@@ -37,17 +44,17 @@ case class UsbDevice(usbCd: ClockDomain) extends Component {
 
 
   // --- 68000 bus interface ---
-  val usb1Typ28MHz = BufferCC(usb1Typ12MHz, init = B"00")
-  val usb2Typ28MHz = BufferCC(usb2Typ12MHz, init = B"00")
+  val usb1Typ = BufferCC(usb1Typ12MHz, init = B"00")
+  val usb2Typ = BufferCC(usb2Typ12MHz, init = B"00")
 
   // TODO: I'm unsure this intermediate register is really necessary
   // USB1 Control register
   // USB1[10] device type. 0: no device, 1: keyboard, 2: mouse, 3: gamepad
   val usb1TypeReg = Reg(Bits(2 bits)) init 0
-  usb1TypeReg := usb1Typ28MHz
+  usb1TypeReg := usb1Typ
 
   val usb2TypeReg = Reg(Bits(2 bits)) init 0
-  usb2TypeReg := usb2Typ28MHz
+  usb2TypeReg := usb2Typ
 
   io.bus.dataIn := 0
   when(io.sel) {
