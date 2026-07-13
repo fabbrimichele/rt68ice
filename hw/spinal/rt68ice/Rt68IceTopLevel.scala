@@ -1,7 +1,7 @@
 package rt68ice
 
 import rt68ice.core._
-import rt68ice.io.{LedArrayDevice, LedDevice, T16450Device}
+import rt68ice.io.{LedArrayDevice, LedDevice, T16450Device, Usb, UsbDevice}
 import rt68ice.memory.{Mem16Bit, SdRam, SdRamDevice}
 import rt68ice.timer.Counter
 import rt68ice.video.{Gpdi, VgaDevice}
@@ -21,6 +21,7 @@ case class Rt68IceTopLevel(romFile: String) extends Component {
     val uart = master(Uart()) // Expose UART pins (txd, rxd), must be defined in the constraints file
     val gpdi = master(Gpdi())
     val sdram = master(SdRam())
+    val usb1 = master(Usb())
   }
 
   val clockCtrl = ClockCtrl()
@@ -93,6 +94,12 @@ case class Rt68IceTopLevel(romFile: String) extends Component {
     hdmiBridge.io.vga <> vgaDevice.io.vga
     io.gpdi.dp := hdmiBridge.io.gpdi_dp
     io.gpdi.dn := hdmiBridge.io.gpdi_dn
+
+    // USB HID Host
+    val usbDevice = UsbDevice(usbCd = clockCtrl.usbCd)
+    usbDevice.io.usb <> io.usb1
+    usbDevice.io.sel := bus.io.usbSel
+    bus.io.usbBus <> usbDevice.io.bus
   }
 
   // Remove io_ prefix

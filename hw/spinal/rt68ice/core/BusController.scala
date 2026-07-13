@@ -25,7 +25,8 @@ case class BusController() extends Component {
     val videoBus    = master(M68KBus())
     val sdRamBus    = master(M68KBus())
     val counterBus  = master(M68KBus())
-    val ledsBus  = master(M68KBus())
+    val ledsBus     = master(M68KBus())
+    val usbBus      = master(M68KBus())
 
     // Slave select signals (to peripherals)
     val romSel      = out Bool()
@@ -38,6 +39,7 @@ case class BusController() extends Component {
     val sdRamSel    = out Bool()
     val counterSel  = out Bool()
     val ledsSel     = out Bool()
+    val usbSel      = out Bool()
   }
 
   // ---------------------------
@@ -87,6 +89,7 @@ case class BusController() extends Component {
   io.vidCtrlSel := False
   io.counterSel := False
   io.ledsSel    := False
+  io.usbSel     := False
   io.vidFbSel   := False
   io.sdRamSel   := False
   io.busErr     := False
@@ -102,6 +105,7 @@ case class BusController() extends Component {
   val vidCtrlMapping  = SizeMapping(0x00014000L, 16 KiB)  // $014000 - $017FFF
   val counterMapping  = SizeMapping(0x00018000L, 16 KiB)  // $018000 - $01BFFF
   val ledsMapping     = SizeMapping(0x00020000L, 16 KiB)  // $020000 - $023FFF
+  val usbMapping      = SizeMapping(0x00024000L, 16 KiB)  // $024000 - $027FFF
   val vidFbMapping    = SizeMapping(0x00100000L, 128 KiB) // $100000 - $11FFFF - only the first 75KB are available
   val sdRamMapping    = SizeMapping(0x00800000L, 8 MiB)   // $800000 - $FFFFFF - Map 8 MB out of 32 MB
 
@@ -116,6 +120,7 @@ case class BusController() extends Component {
     "VIDEO CONTROL" -> vidCtrlMapping,
     "COUNTER" -> counterMapping,
     "LED_ARRAY" -> ledsMapping,
+    "USB HID HOST" -> usbMapping,
     "VIDEO FB" -> vidFbMapping,
     "SDRAM" -> sdRamMapping,
   )
@@ -144,6 +149,8 @@ case class BusController() extends Component {
     io.counterSel := True
   } elsewhen ledsMapping.hit(address) {
     io.ledsSel := True
+  } elsewhen usbMapping.hit(address) {
+    io.usbSel := True
   } otherwise {
     io.busErr := True // Out of bounds access! Trigger BERR
   }
@@ -152,7 +159,11 @@ case class BusController() extends Component {
   //    Buses mapping
   // ----------------------
   // Separate standard peripherals from the smart SDRAM controller
-  val buses = List(io.romBus, io.ramBus, io.ledBus, io.uartBus, io.videoBus, io.counterBus, io.ledsBus)
+  val buses = List(
+    io.romBus, io.ramBus, io.ledBus, io.uartBus,
+    io.videoBus, io.counterBus, io.ledsBus, io.usbBus
+  )
+
   for (bus <- buses) {
     bus.address := io.cpuBus.address
     bus.dataOut := io.cpuBus.dataOut
@@ -186,5 +197,7 @@ case class BusController() extends Component {
     io.cpuBus.dataIn := io.counterBus.dataIn
   } elsewhen io.ledsSel {
     io.cpuBus.dataIn := io.ledsBus.dataIn
+  } elsewhen io.usbSel {
+    io.cpuBus.dataIn := io.usbBus.dataIn
   }
 }
