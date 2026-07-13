@@ -22,6 +22,7 @@ case class Rt68IceTopLevel(romFile: String) extends Component {
     val gpdi = master(Gpdi())
     val sdram = master(SdRam())
     val usb1 = master(Usb())
+    val usb2 = master(Usb())
   }
 
   val clockCtrl = ClockCtrl()
@@ -98,6 +99,7 @@ case class Rt68IceTopLevel(romFile: String) extends Component {
     // USB HID Host
     val usbDevice = UsbDevice(usbCd = clockCtrl.usbCd)
     usbDevice.io.usb1 <> io.usb1
+    usbDevice.io.usb2 <> io.usb2
     usbDevice.io.sel := bus.io.usbSel
     bus.io.usbBus <> usbDevice.io.bus
   }

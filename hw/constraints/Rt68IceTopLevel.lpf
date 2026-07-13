@@ -21,9 +21,9 @@ LOCATE      COMP "usb1_dm"        SITE "C13";
 IOBUF       PORT "usb1_dm"        IO_TYPE=LVCMOS33;
 
 // USB 2
-LOCATE      COMP "usb2_dp"        SITE "E14";
+LOCATE      COMP "usb2_dp"        SITE "D8";
 IOBUF       PORT "usb2_dp"        IO_TYPE=LVCMOS33;
-LOCATE      COMP "usb2_dm"        SITE "E13";
+LOCATE      COMP "usb2_dm"        SITE "C7";
 IOBUF       PORT "usb2_dm"        IO_TYPE=LVCMOS33;
 
 // LED Array
