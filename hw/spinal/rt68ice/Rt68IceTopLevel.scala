@@ -97,7 +97,7 @@ case class Rt68IceTopLevel(romFile: String) extends Component {
 
     // USB HID Host
     val usbDevice = UsbDevice(usbCd = clockCtrl.usbCd)
-    usbDevice.io.usb <> io.usb1
+    usbDevice.io.usb1 <> io.usb1
     usbDevice.io.sel := bus.io.usbSel
     bus.io.usbBus <> usbDevice.io.bus
   }

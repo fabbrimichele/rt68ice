@@ -7,8 +7,8 @@ module pll
     input clkin_25, // 25 MHz, 0 deg
     output clk_hdmi, // 125 MHz, 0 deg
     output clk_vga, // 25 MHz, 0 deg
-    output clk_cpu, // 28.4091 MHz, 0 deg
-    output clk_sdram, // 56.8182 MHz, 180 deg
+    output clk_cpu, // 26.0417 MHz, 0 deg
+    output clk_sdram, // 52.0833 MHz, 180 deg
     output clk_usb, // 11.9048 MHz, 0 deg
     output locked
 );
@@ -18,8 +18,8 @@ wire locked0;
 (* FREQUENCY_PIN_CLKI="25" *)
 (* FREQUENCY_PIN_CLKOP="125" *)
 (* FREQUENCY_PIN_CLKOS="25" *)
-(* FREQUENCY_PIN_CLKOS2="28.4091" *)
-(* FREQUENCY_PIN_CLKOS3="56.8182" *)
+(* FREQUENCY_PIN_CLKOS2="26.0417" *)
+(* FREQUENCY_PIN_CLKOS3="52.0833" *)
 (* ICP_CURRENT="12" *) (* LPF_RESISTOR="8" *) (* MFG_ENABLE_FILTEROPAMP="1" *) (* MFG_GMCREF_SEL="2" *)
 EHXPLLL #(
         .PLLRST_ENA("DISABLED"),
@@ -40,13 +40,13 @@ EHXPLLL #(
         .CLKOS_CPHASE(2),
         .CLKOS_FPHASE(0),
         .CLKOS2_ENABLE("ENABLED"),
-        .CLKOS2_DIV(22),
+        .CLKOS2_DIV(24),
         .CLKOS2_CPHASE(2),
         .CLKOS2_FPHASE(0),
         .CLKOS3_ENABLE("ENABLED"),
-        .CLKOS3_DIV(11),
-        .CLKOS3_CPHASE(7),
-        .CLKOS3_FPHASE(4),
+        .CLKOS3_DIV(12),
+        .CLKOS3_CPHASE(8),
+        .CLKOS3_FPHASE(0),
         .FEEDBK_PATH("CLKOP"),
         .CLKFB_DIV(5)
     ) pll_0 (
