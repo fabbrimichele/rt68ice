@@ -27,6 +27,8 @@ case class UsbDevice(usbCd: ClockDomain) extends Component {
   class UsbHostSync(usbHost: UsbHidHostBB) extends Area {
     val typ      = BufferCC(usbHost.io.typ, init = B"00")
     val conErr   = BufferCC(usbHost.io.conerr, init = False)
+
+    // --- Mouse ---
     val mouseBtn = BufferCC(usbHost.io.mouse_btn, init = B"00000000")
 
     // Accumulate dx/dy inside the USB clock domain
@@ -42,7 +44,18 @@ case class UsbDevice(usbCd: ClockDomain) extends Component {
     val mouseDxAcc = BufferCC(accDx.asBits, init = B"00000000")
     val mouseDyAcc = BufferCC(accDy.asBits, init = B"00000000")
 
-    // TODO: map remain registers
+    // --- Gamepad ---
+    val gamepad = BufferCC(
+      usbHost.io.game_l ## usbHost.io.game_r ##
+      usbHost.io.game_u ## usbHost.io.game_d ##
+      usbHost.io.game_a ## usbHost.io.game_b ##
+      usbHost.io.game_x ## usbHost.io.game_y ##
+      usbHost.io.game_sel ## usbHost.io.game_sta,
+      init = B"0000000000"
+    )
+
+    // --- Keyboard ---
+    // TODO
   }
 
   // ------ USB interface ------
@@ -70,7 +83,7 @@ case class UsbDevice(usbCd: ClockDomain) extends Component {
         2  -> host1.mouseBtn.resize(16),
         3  -> host1.mouseDxAcc.resize(16),
         4  -> host1.mouseDyAcc.resize(16),
-        5  -> B"x0000",
+        5  -> host1.gamepad.resize(16),
         6  -> B"x0000",
         7  -> B"x0000",
         8  -> host2.typ.resize(16),
@@ -78,7 +91,7 @@ case class UsbDevice(usbCd: ClockDomain) extends Component {
         10 -> host2.mouseBtn.resize(16),
         11 -> host2.mouseDxAcc.resize(16),
         12 -> host2.mouseDyAcc.resize(16),
-        13 -> B"x0000",
+        13 -> host2.gamepad.resize(16),
         14 -> B"x0000",
         15 -> B"x0000",
       )
