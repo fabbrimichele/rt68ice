@@ -25,8 +25,14 @@ case class UsbDevice(usbCd: ClockDomain) extends Component {
   }
 
   class UsbHostSync(usbHost: UsbHidHostBB) extends Area {
-    val typ      = BufferCC(usbHost.io.typ, init = B"00")
-    val conErr   = BufferCC(usbHost.io.conerr, init = False)
+    // -- Port status ---
+    // Bit 7: conErr
+    // Bits 1-0: typ
+    // Bits 6-2: Reserved (0)
+    val status = BufferCC(
+      usbHost.io.conerr ## B"00000" ## usbHost.io.typ,
+      init = B"00000000"
+    )
 
     // --- Mouse ---
     val mouseBtn = BufferCC(usbHost.io.mouse_btn, init = B"00000000")
@@ -78,20 +84,20 @@ case class UsbDevice(usbCd: ClockDomain) extends Component {
     when(!io.bus.wr) {
       // Read
       io.bus.dataIn := io.bus.address(4 downto 1).mux(
-        0  -> host1.typ.resize(16),
-        1  -> host1.conErr.asBits.resize(16),
-        2  -> host1.mouseBtn.resize(16),
-        3  -> host1.mouseDxAcc.resize(16),
-        4  -> host1.mouseDyAcc.resize(16),
-        5  -> host1.gamepad.resize(16),
+        0  -> host1.status.resize(16),
+        1  -> host1.mouseBtn.resize(16),
+        2  -> host1.mouseDxAcc.resize(16),
+        3  -> host1.mouseDyAcc.resize(16),
+        4  -> host1.gamepad.resize(16),
+        5  -> B"x0000",
         6  -> B"x0000",
         7  -> B"x0000",
-        8  -> host2.typ.resize(16),
-        9  -> host2.conErr.asBits.resize(16),
-        10 -> host2.mouseBtn.resize(16),
-        11 -> host2.mouseDxAcc.resize(16),
-        12 -> host2.mouseDyAcc.resize(16),
-        13 -> host2.gamepad.resize(16),
+        8  -> host2.status.resize(16),
+        9  -> host2.mouseBtn.resize(16),
+        10 -> host2.mouseDxAcc.resize(16),
+        11 -> host2.mouseDyAcc.resize(16),
+        12 -> host2.gamepad.resize(16),
+        13 -> B"x0000",
         14 -> B"x0000",
         15 -> B"x0000",
       )
