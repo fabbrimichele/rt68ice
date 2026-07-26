@@ -25,65 +25,51 @@ case class UsbDevice(usbCd: ClockDomain) extends Component {
   }
 
   // ------ USB interface ------
-  // TODO: this variable are probably unnecessary,
-  //       you can access directly the usbHost1 inside the domain clock and assign it to the BufferCC
-  val usb1Typ12MHz      = Bits(2 bits)
-  val usb1ConErr12MHz   = Bits(1 bits)
-  val usb1MouseBtn12MHz = Bits(8 bits)
-  val usb1MouseDx12MHz  = Bits(8 bits)
-  val usb1MouseDy12MHz  = Bits(8 bits)
-
-  val usb2Typ12MHz      = Bits(2 bits)
-  val usb2ConErr12MHz   = Bits(1 bits)
-  val usb2MouseBtn12MHz = Bits(8 bits)
-  val usb2MouseDx12MHz  = Bits(8 bits)
-  val usb2MouseDy12MHz  = Bits(8 bits)
-
-  usbCd {
+  val usbDomain = new ClockingArea(usbCd) {
     val usbHost1 = new UsbHidHostBB
     usbHost1.io.usb_dp := io.usb1.dp
     usbHost1.io.usb_dm := io.usb1.dm
-    usb1Typ12MHz       := usbHost1.io.typ
-    usb1ConErr12MHz(0) := usbHost1.io.conerr
-    usb1MouseBtn12MHz  := usbHost1.io.mouse_btn
-    usb1MouseDx12MHz   := usbHost1.io.mouse_dx
-    usb1MouseDy12MHz   := usbHost1.io.mouse_dy
 
     val usbHost2 = new UsbHidHostBB
     usbHost2.io.usb_dp := io.usb2.dp
     usbHost2.io.usb_dm := io.usb2.dm
-    usb2Typ12MHz       := usbHost2.io.typ
-    usb2ConErr12MHz(0) := usbHost2.io.conerr
-    usb2MouseBtn12MHz  := usbHost2.io.mouse_btn
-    usb2MouseDx12MHz   := usbHost2.io.mouse_dx
-    usb2MouseDy12MHz   := usbHost2.io.mouse_dy
-
-    // TODO: map remain registers
   }
 
-
   // --- 68000 bus interface ---
-  val usb1Typ       = BufferCC(usb1Typ12MHz, init = B"00")
-  val usb1ConErr    = BufferCC(usb1ConErr12MHz, init = B"0")
-  val usb1MouseBtn  = BufferCC(usb1MouseBtn12MHz, init = B"00000000")
+  // TODO: map remain registers
+  val usb1Typ       = BufferCC(usbDomain.usbHost1.io.typ, init = B"00")
+  val usb1ConErr    = BufferCC(usbDomain.usbHost1.io.conerr, init = False)
+  val usb1MouseBtn  = BufferCC(usbDomain.usbHost1.io.mouse_btn, init = B"00000000")
+  val usb1MouseDx  = BufferCC(usbDomain.usbHost1.io.mouse_dx, init = B"00000000")
+  val usb1MouseDy  = BufferCC(usbDomain.usbHost1.io.mouse_dy, init = B"00000000")
 
-  val usb2Typ       = BufferCC(usb2Typ12MHz, init = B"00")
-  val usb2ConErr    = BufferCC(usb2ConErr12MHz, init = B"0")
-  val usb2MouseBtn  = BufferCC(usb2MouseBtn12MHz, init = B"00000000")
+  val usb2Typ       = BufferCC(usbDomain.usbHost2.io.typ, init = B"00")
+  val usb2ConErr    = BufferCC(usbDomain.usbHost2.io.conerr, init = False)
+  val usb2MouseBtn  = BufferCC(usbDomain.usbHost2.io.mouse_btn, init = B"00000000")
+  val usb2MouseDx  = BufferCC(usbDomain.usbHost2.io.mouse_dx, init = B"00000000")
+  val usb2MouseDy  = BufferCC(usbDomain.usbHost2.io.mouse_dy, init = B"00000000")
 
   io.bus.dataIn := 0
   when(io.sel) {
     when(!io.bus.wr) {
       // Read
-      io.bus.dataIn := io.bus.address(3 downto 1).mux(
-        0 -> usb1Typ.resize(16),
-        1 -> usb1ConErr.resize(16),
-        2 -> usb1MouseBtn.resize(16),
-        3 -> usb1MouseBtn.resize(16),
-        4 -> usb2Typ.resize(16),
-        5 -> usb2ConErr.resize(16),
-        6 -> usb2MouseBtn.resize(16),
-        7 -> usb2MouseBtn.resize(16),
+      io.bus.dataIn := io.bus.address(4 downto 1).mux(
+        0  -> usb1Typ.resize(16),
+        1  -> usb1ConErr.asBits.resize(16),
+        2  -> usb1MouseBtn.resize(16),
+        3  -> usb1MouseDx.resize(16),
+        4  -> usb1MouseDy.resize(16),
+        5  -> B"x0000",
+        6  -> B"x0000",
+        7  -> B"x0000",
+        8  -> usb2Typ.resize(16),
+        9  -> usb2ConErr.asBits.resize(16),
+        10 -> usb2MouseBtn.resize(16),
+        11 -> usb2MouseDx.resize(16),
+        12 -> usb2MouseDy.resize(16),
+        13 -> B"x0000",
+        14 -> B"x0000",
+        15 -> B"x0000",
       )
     }
   }
