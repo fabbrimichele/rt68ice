@@ -28,8 +28,20 @@ case class UsbDevice(usbCd: ClockDomain) extends Component {
     val typ      = BufferCC(usbHost.io.typ, init = B"00")
     val conErr   = BufferCC(usbHost.io.conerr, init = False)
     val mouseBtn = BufferCC(usbHost.io.mouse_btn, init = B"00000000")
-    val mouseDx  = BufferCC(usbHost.io.mouse_dx, init = B"00000000")
-    val mouseDy  = BufferCC(usbHost.io.mouse_dy, init = B"00000000")
+
+    // Accumulate dx/dy inside the USB clock domain
+    val accDx = Reg(SInt(8 bits)) init 0
+    val accDy = Reg(SInt(8 bits)) init 0
+
+    when(usbHost.io.report && usbHost.io.typ === 2) {
+      accDx := accDx + usbHost.io.mouse_dx.asSInt
+      accDy := accDy + usbHost.io.mouse_dy.asSInt
+    }
+
+    // Safely transfer the accumulating position counters across CDC
+    val mouseDxAcc = BufferCC(accDx.asBits, init = B"00000000")
+    val mouseDyAcc = BufferCC(accDy.asBits, init = B"00000000")
+
     // TODO: map remain registers
   }
 
@@ -56,16 +68,16 @@ case class UsbDevice(usbCd: ClockDomain) extends Component {
         0  -> host1.typ.resize(16),
         1  -> host1.conErr.asBits.resize(16),
         2  -> host1.mouseBtn.resize(16),
-        3  -> host1.mouseDx.resize(16),
-        4  -> host1.mouseDy.resize(16),
+        3  -> host1.mouseDxAcc.resize(16),
+        4  -> host1.mouseDyAcc.resize(16),
         5  -> B"x0000",
         6  -> B"x0000",
         7  -> B"x0000",
         8  -> host2.typ.resize(16),
         9  -> host2.conErr.asBits.resize(16),
         10 -> host2.mouseBtn.resize(16),
-        11 -> host2.mouseDx.resize(16),
-        12 -> host2.mouseDy.resize(16),
+        11 -> host2.mouseDxAcc.resize(16),
+        12 -> host2.mouseDyAcc.resize(16),
         13 -> B"x0000",
         14 -> B"x0000",
         15 -> B"x0000",
