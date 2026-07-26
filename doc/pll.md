@@ -17,7 +17,7 @@ To generate multiple output clocks with names (up to `--clkout3`):
 ```Bash
 ecppll -i 25 \
   --clkin_name clkin_25 \
-  -o 125 --clkout0_name clk_hdmi \
+  --clkout0 125 --clkout0_name clk_hdmi \
   --clkout1 25 --clkout1_name clk_vga \
   --clkout2 28 --clkout2_name clk_cpu \
   --clkout3 56 --clkout3_name clk_sdram --phase3 180 \
