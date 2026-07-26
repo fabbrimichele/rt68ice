@@ -24,6 +24,15 @@ case class UsbDevice(usbCd: ClockDomain) extends Component {
     val usb2     = master(Usb())
   }
 
+  class UsbHostSync(usbHost: UsbHidHostBB) extends Area {
+    val typ      = BufferCC(usbHost.io.typ, init = B"00")
+    val conErr   = BufferCC(usbHost.io.conerr, init = False)
+    val mouseBtn = BufferCC(usbHost.io.mouse_btn, init = B"00000000")
+    val mouseDx  = BufferCC(usbHost.io.mouse_dx, init = B"00000000")
+    val mouseDy  = BufferCC(usbHost.io.mouse_dy, init = B"00000000")
+    // TODO: map remain registers
+  }
+
   // ------ USB interface ------
   val usbDomain = new ClockingArea(usbCd) {
     val usbHost1 = new UsbHidHostBB
@@ -36,37 +45,27 @@ case class UsbDevice(usbCd: ClockDomain) extends Component {
   }
 
   // --- 68000 bus interface ---
-  // TODO: map remain registers
-  val usb1Typ       = BufferCC(usbDomain.usbHost1.io.typ, init = B"00")
-  val usb1ConErr    = BufferCC(usbDomain.usbHost1.io.conerr, init = False)
-  val usb1MouseBtn  = BufferCC(usbDomain.usbHost1.io.mouse_btn, init = B"00000000")
-  val usb1MouseDx  = BufferCC(usbDomain.usbHost1.io.mouse_dx, init = B"00000000")
-  val usb1MouseDy  = BufferCC(usbDomain.usbHost1.io.mouse_dy, init = B"00000000")
-
-  val usb2Typ       = BufferCC(usbDomain.usbHost2.io.typ, init = B"00")
-  val usb2ConErr    = BufferCC(usbDomain.usbHost2.io.conerr, init = False)
-  val usb2MouseBtn  = BufferCC(usbDomain.usbHost2.io.mouse_btn, init = B"00000000")
-  val usb2MouseDx  = BufferCC(usbDomain.usbHost2.io.mouse_dx, init = B"00000000")
-  val usb2MouseDy  = BufferCC(usbDomain.usbHost2.io.mouse_dy, init = B"00000000")
+  val host1 = new UsbHostSync(usbDomain.usbHost1)
+  val host2 = new UsbHostSync(usbDomain.usbHost2)
 
   io.bus.dataIn := 0
   when(io.sel) {
     when(!io.bus.wr) {
       // Read
       io.bus.dataIn := io.bus.address(4 downto 1).mux(
-        0  -> usb1Typ.resize(16),
-        1  -> usb1ConErr.asBits.resize(16),
-        2  -> usb1MouseBtn.resize(16),
-        3  -> usb1MouseDx.resize(16),
-        4  -> usb1MouseDy.resize(16),
+        0  -> host1.typ.resize(16),
+        1  -> host1.conErr.asBits.resize(16),
+        2  -> host1.mouseBtn.resize(16),
+        3  -> host1.mouseDx.resize(16),
+        4  -> host1.mouseDy.resize(16),
         5  -> B"x0000",
         6  -> B"x0000",
         7  -> B"x0000",
-        8  -> usb2Typ.resize(16),
-        9  -> usb2ConErr.asBits.resize(16),
-        10 -> usb2MouseBtn.resize(16),
-        11 -> usb2MouseDx.resize(16),
-        12 -> usb2MouseDy.resize(16),
+        8  -> host2.typ.resize(16),
+        9  -> host2.conErr.asBits.resize(16),
+        10 -> host2.mouseBtn.resize(16),
+        11 -> host2.mouseDx.resize(16),
+        12 -> host2.mouseDy.resize(16),
         13 -> B"x0000",
         14 -> B"x0000",
         15 -> B"x0000",
