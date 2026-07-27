@@ -4,16 +4,31 @@
 ; Program code
 ; ===========================
 start:
-    lea     LEDS,a0             ;
-    lea     USB2_MOUSE_BTN,a1   ;
+    lea     msg_title,a0
+    bsr     put_str
 
 .loop:
-    move.w  (a1),d0         ; Read mouse button
-    move.w  d0,(a0)         ; Show button on LEDs
-    btst    #2,d0           ; Test middle button
-    bne     end             ; Exit program if button pressed
-    jsr     delay           ; Else continue
-    jmp     .loop           ; Infinite loop
+    clr.l   d0
+    move.w  USB2_MOUSE_DX,d0    ; Read mouse dx accumulator
+    bsr     bin_to_hex
+    move.b  #' ',d0
+    bsr     put_chr
+
+    clr.l   d0
+    move.w  USB2_MOUSE_DY,d0    ; Read mouse dy accumulator
+    bsr     bin_to_hex
+    move.b  #' ',d0
+    bsr     put_chr
+
+    move.w  USB2_MOUSE_BTN,d0   ; Read mouse button
+    btst    #2,d0               ; Test middle button
+    bne     end                 ; Exit program if button pressed
+    bsr     bin_to_hex
+    lea     msg_newline,a0
+    bsr     put_str
+
+    jsr     delay               ; Else continue
+    jmp     .loop               ; Infinite loop
 
 end:
     trap    #14
@@ -35,12 +50,19 @@ DLY_VAL     equ     312500   ;
 ; ===========================
     include '../../lib/asm/mem_map_leds.asm'
     include '../../lib/asm/mem_map_usb.asm'
+    include '../../lib/asm/console_io_uart.asm'
+    include '../../lib/asm/conv_hex.asm'
+    include '../../lib/asm/conv_dec.asm'
 
 ; ===========================
 ; Data Constants
 ; Must be after code to avoid alignment issues
 ; ===========================
-; Add here data costants, e.g. `msg_hello dc.b    "Type something:",CR,LF,NUL`
+msg_title:
+    dc.b    CR,LF,"DX       DY       BTN",CR,LF,NUL
+
+msg_newline:
+    dc.b    ' ',' ',CR,NUL  ; it also cleans the previous string left over
 
 ; ===========================
 ; RAM Data Section
