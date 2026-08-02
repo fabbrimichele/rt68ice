@@ -40,7 +40,7 @@ case class Rt68IceTopLevel(romFile: String) extends Component {
     // CPU
     val cpuClockEn = sdRamDevice.io.cpuClkEn && bus.io.clockEn
     val cpu = new M68K
-    cpu.io.ipl := B"111"
+    cpu.io.ipl := bus.io.ipl
     cpu.io.clockEn := cpuClockEn
     cpu.io.busErr := bus.io.busErr
     bus.io.busState := cpu.io.busState
@@ -78,6 +78,7 @@ case class Rt68IceTopLevel(romFile: String) extends Component {
     uartDevice.io.uart <> io.uart
     uartDevice.io.sel := bus.io.uartSel
     bus.io.uartBus <> uartDevice.io.bus
+    bus.io.uartInt := uartDevice.io.int
 
     // Video Device
     val vgaDevice = VgaDevice(vgaCd = clockCtrl.vgaCd)
@@ -102,6 +103,7 @@ case class Rt68IceTopLevel(romFile: String) extends Component {
     usbDevice.io.usb2 <> io.usb2
     usbDevice.io.sel := bus.io.usbSel
     bus.io.usbBus <> usbDevice.io.bus
+    bus.io.usbInt := usbDevice.io.int
   }
 
   // Remove io_ prefix

@@ -194,7 +194,7 @@ load_cmd:
     ; Read content length
     jsr     read_32bit_word     ; Result in d1.L
                                 ; d1 content lenght
-    cmp     #0,d1
+    cmp.l   #0,d1
     beq     loa_cmd_done        ; If d1 = 0, exit
 
     ; Read content
@@ -553,7 +553,7 @@ print_regs:
     bsr     print_reg
 
     lea     msg_a0,a0         ; Load A0 label
-    move.l  8(sp),d0          ; Peek at A0 from the saved block on stack
+    move.l  4(sp),d0          ; Peek at A0 from the saved block on stack
     bsr     print_reg
 
     lea     msg_a1,a0

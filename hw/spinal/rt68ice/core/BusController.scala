@@ -16,6 +16,7 @@ case class BusController() extends Component {
     val busState	= in Bits(2 bits)  // 00-> fetch code 10->read data 11->write data 01->no memaccess
     val clockEn   = out Bool()
     val busErr    = out Bool()
+    val ipl       = out Bits(3 bits)
 
     // Slave buses
     val romBus      = master(M68KBus())
@@ -40,6 +41,10 @@ case class BusController() extends Component {
     val counterSel  = out Bool()
     val ledsSel     = out Bool()
     val usbSel      = out Bool()
+
+    // Interrupts
+    val uartInt     = in Bool()
+    val usbInt      = in Bool()
   }
 
   // ---------------------------
@@ -76,6 +81,20 @@ case class BusController() extends Component {
     io.clockEn := True
     isWaiting := False
   }
+
+  // ------------------------
+  //    Interrupts
+  // ------------------------
+  // Only autovectors are used for interrupts
+  // IPL is active low
+  when(io.usbInt) {
+    io.ipl := B"001" // bitwise not 6
+  } elsewhen(io.uartInt) {
+    io.ipl := B"011" // bitwise not 4
+  } otherwise {
+    io.ipl := B"111" // bitwise not 0
+  }
+
 
   // ------------------------
   //    Address Decoding

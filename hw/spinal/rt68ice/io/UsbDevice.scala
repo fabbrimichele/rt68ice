@@ -7,21 +7,21 @@ import spinal.lib._
 import scala.language.postfixOps
 
 /*
-  TODO: the USB gamepad for some reason it's not always recognized,
-        it's not the FPGA, it's the gamepad itself, I also tried
-        to move it to the 2nd port and I get the same issues.
-        The USB mouse on the other hand works fine.
-        I tried the mechanical keyboard and it doesn't work at all.
+  TODO:
+   - use 12 MHz clock (DONE)
+   - check if gamepad is recognized with 12 MHz clock
+   - find a keyboard that works
+   - interrupt
  */
 //noinspection TypeAnnotation
 //noinspection ScalaWeakerAccess
 case class UsbDevice(usbCd: ClockDomain) extends Component {
   val io = new Bundle {
-    val bus       = slave(M68KBus())
-    val sel       = in Bool()
-    // TODO: if possible define an interrupt
-    val usb1     = master(Usb())
-    val usb2     = master(Usb())
+    val bus   = slave(M68KBus())
+    val sel   = in Bool()
+    val int   = out Bool()
+    val usb1  = master(Usb())
+    val usb2  = master(Usb())
   }
 
   class UsbHostSync(usbHost: UsbHidHostBB) extends Area {
@@ -33,6 +33,9 @@ case class UsbDevice(usbCd: ClockDomain) extends Component {
       usbHost.io.conerr ## B"00000" ## usbHost.io.typ,
       init = B"00000000"
     )
+
+    // --- Interrupt ---
+    val int = BufferCC(usbHost.io.report, init = False)
 
     // --- Mouse ---
     val mouseBtn = BufferCC(usbHost.io.mouse_btn, init = B"00000000")
@@ -78,6 +81,11 @@ case class UsbDevice(usbCd: ClockDomain) extends Component {
   // --- 68000 bus interface ---
   val host1 = new UsbHostSync(usbDomain.usbHost1)
   val host2 = new UsbHostSync(usbDomain.usbHost2)
+
+  // TODO: add interrupt for host2 (e.g. host1.int || host2.int)
+  //       and add to the status register which usb host triggered the interrupt
+  //       note that the interrupt status should be reset after read
+  io.int := host1.int
 
   io.bus.dataIn := 0
   when(io.sel) {

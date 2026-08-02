@@ -4,17 +4,13 @@
 ; Program code
 ; ===========================
 start:
-    lea     LEDS,a0         ;
-    lea     USB1_GAMEPAD,a1 ;
+    move.l  #usb_isr,VT_INT_6   ; Set USB interrupt handler
+    and.w   #$F8FF,SR           ; Enable all interrupts on 68000 (Clear mask bits)
+    trap    #14
 
-.loop:
-    move.w  (a1),(a0)       ; Write d1 into LED register
-    move.l  #DLY_VAL,d0     ;
-.dly_loop:
-    subq.l  #1,d0           ; 4 cycles
-    bne     .dly_loop       ; 10 cycles when taken
-    jmp     .loop           ; Infinite loop
-
+usb_isr:
+    move.w  USB1_GAMEPAD,LEDS   ; Write gamepad status to LEDs
+    rte
 
 ; ===========================
 ; Value Constants
@@ -26,6 +22,7 @@ DLY_VAL     equ     312500   ;
 ; ===========================
     include '../../lib/asm/mem_map_leds.asm'
     include '../../lib/asm/mem_map_usb.asm'
+    include '../../lib/asm/isr_vector.asm'
 
 ; ===========================
 ; Data Constants
