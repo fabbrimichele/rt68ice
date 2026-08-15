@@ -114,6 +114,11 @@ case class BusController() extends Component {
   io.busErr     := False
 
   // Address Bitmask Definitions
+  // TG68K emits a CPU-space interrupt-acknowledge read at $FFFFFFF2-$FFFFFFFE.
+  // Autovector mode generates the vector internally, so this cycle only needs
+  // to complete without raising BERR; the default bus input value of zero is
+  // ignored by the CPU.
+  val interruptAckMapping = MaskMapping(0xFFFFFFF0L, 0xFFFFFFF0L)
   // Boot vectors look at the absolute first 8 bytes via a 3-bit wildcard mask
   val bootMapping     = MaskMapping(0x00000000L, 0xFFFFFFF8L)
   val ramMapping      = SizeMapping(0x00000000L, 16 KiB)  // $000000 - $003FFF
@@ -146,7 +151,9 @@ case class BusController() extends Component {
 
   // Decoder Execution Logic
   val address = io.cpuBus.address.asUInt
-  when(bootMapping.hit(address)) {
+  when(interruptAckMapping.hit(address)) {
+    io.busErr := False
+  } elsewhen bootMapping.hit(address) {
     io.romSel := True
   } elsewhen ramMapping.hit(address) {
     io.ramSel := True
