@@ -62,13 +62,39 @@ start:
     ext.w   d0
     move.w  d0,d5                  ; D5.W = signed Y delta
 
-    moveq   #0,d2                  ; Erase old cursor with palette color 0
-    bsr     draw_cursor
+    ; Mice normally send periodic reports even when they have not moved.
+    ; Do not erase and redraw the cursor for a zero-delta report: updating the
+    ; live framebuffer unnecessarily makes the cursor flicker on the display.
+    tst.w   d4
+    bne     .move_cursor
+    tst.w   d5
+    beq     .wait
+
+.move_cursor:
+    move.w  cursor_x,d6             ; Preserve the old position
+    move.w  cursor_y,d7
 
     add.w   d4,cursor_x
     add.w   d5,cursor_y
     bsr     clamp_cursor
 
+    ; Clamping can also turn a non-zero report into no movement at an edge.
+    cmp.w   cursor_x,d6
+    bne     .redraw_cursor
+    cmp.w   cursor_y,d7
+    beq     .wait
+
+.redraw_cursor:
+    move.w  cursor_x,d4             ; Preserve the new position
+    move.w  cursor_y,d5
+    move.w  d6,cursor_x
+    move.w  d7,cursor_y
+
+    moveq   #0,d2                   ; Erase the cursor at its old position
+    bsr     draw_cursor
+
+    move.w  d4,cursor_x
+    move.w  d5,cursor_y
     moveq   #CURSOR_COLOR,d2
     bsr     draw_cursor
     bra     .wait
