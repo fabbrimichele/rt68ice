@@ -33,8 +33,8 @@ case class UsbDevice(usbCd: ClockDomain) extends Component {
 
       val status = Reg(Bits(8 bits)) init 0
       val mouseBtn = Reg(Bits(8 bits)) init 0
-      val mouseDx = Reg(Bits(8 bits)) init 0
-      val mouseDy = Reg(Bits(8 bits)) init 0
+      val mouseDx = Reg(Bits(12 bits)) init 0
+      val mouseDy = Reg(Bits(12 bits)) init 0
       val gamepad = Reg(Bits(10 bits)) init 0
       val hasReport = RegInit(False)
       val toggle = RegInit(False)
@@ -64,8 +64,8 @@ case class UsbDevice(usbCd: ClockDomain) extends Component {
     // all independently synchronized bits have settled to the same snapshot.
     val sysStatus = BufferCC(usbSnapshot.status, init = B"00000000")
     val sysMouseBtn = BufferCC(usbSnapshot.mouseBtn, init = B"00000000")
-    val sysMouseDx = BufferCC(usbSnapshot.mouseDx, init = B"00000000")
-    val sysMouseDy = BufferCC(usbSnapshot.mouseDy, init = B"00000000")
+    val sysMouseDx = BufferCC(usbSnapshot.mouseDx, init = B"000000000000")
+    val sysMouseDy = BufferCC(usbSnapshot.mouseDy, init = B"000000000000")
     val sysGamepad = BufferCC(usbSnapshot.gamepad, init = B"0000000000")
     val sysHasReport = BufferCC(usbSnapshot.hasReport, init = False)
     val sysToggle = BufferCC(usbSnapshot.toggle, init = False)
@@ -76,8 +76,8 @@ case class UsbDevice(usbCd: ClockDomain) extends Component {
     // Status: bit 7 conErr, bits 1-0 device type, bits 6-2 reserved.
     val status = Reg(Bits(8 bits)) init 0
     val mouseBtn = Reg(Bits(8 bits)) init 0
-    val mouseDxAcc = Reg(SInt(8 bits)) init 0
-    val mouseDyAcc = Reg(SInt(8 bits)) init 0
+    val mouseDxAcc = Reg(SInt(16 bits)) init 0
+    val mouseDyAcc = Reg(SInt(16 bits)) init 0
     val gamepad = Reg(Bits(10 bits)) init 0
 
     val int = RegInit(False)
