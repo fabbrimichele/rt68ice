@@ -44,6 +44,7 @@ case class Rt68IceTopLevel(romFile: String) extends Component {
     cpu.io.clockEn := cpuClockEn
     cpu.io.busErr := bus.io.busErr
     bus.io.busState := cpu.io.busState
+    bus.io.fc := cpu.io.fc
     bus.io.cpuBus <> cpu.io.bus
 
     // ROM
@@ -114,4 +115,3 @@ object Rt68IceTopLevelVerilog extends App {
   private val report = Config.spinal.generateVerilog(Rt68IceTopLevel(romFile = "monitor.hex"))
   report.mergeRTLSource("mergeRTL") // Merge all rtl sources into mergeRTL.vhd and mergeRTL.v files
 }
-

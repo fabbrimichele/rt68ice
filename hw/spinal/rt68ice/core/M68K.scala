@@ -25,6 +25,7 @@ case class M68K(
     val bus       = master(M68KBus())
     val ipl		    = in Bits(3 bits)
     val busState  = out Bits(2 bits)
+    val fc        = out Bits(3 bits)
     val busErr    = in Bool()
     val clockEn   = in Bool()
   }
@@ -52,4 +53,5 @@ case class M68K(
   io.bus.lds := !tg68kernel.io.nLDS
   io.bus.wr := !tg68kernel.io.nWr
   io.busState := tg68kernel.io.busstate
+  io.fc := tg68kernel.io.FC
 }
