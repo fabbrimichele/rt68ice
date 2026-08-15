@@ -76,8 +76,6 @@ case class UsbDevice(usbCd: ClockDomain) extends Component {
     // Status: bit 7 conErr, bits 1-0 device type, bits 6-2 reserved.
     val status = Reg(Bits(8 bits)) init 0
     val mouseBtn = Reg(Bits(8 bits)) init 0
-    val mouseDxLast = Reg(Bits(8 bits)) init 0
-    val mouseDyLast = Reg(Bits(8 bits)) init 0
     val mouseDxAcc = Reg(SInt(8 bits)) init 0
     val mouseDyAcc = Reg(SInt(8 bits)) init 0
     val gamepad = Reg(Bits(10 bits)) init 0
@@ -94,8 +92,6 @@ case class UsbDevice(usbCd: ClockDomain) extends Component {
 
       when(sysHasReport) {
         when(sysStatus(1 downto 0) === 2) {
-          mouseDxLast := sysMouseDx
-          mouseDyLast := sysMouseDy
           mouseDxAcc := mouseDxAcc + sysMouseDx.asSInt
           mouseDyAcc := mouseDyAcc + sysMouseDy.asSInt
         }
@@ -147,15 +143,15 @@ case class UsbDevice(usbCd: ClockDomain) extends Component {
         3  -> host1.mouseDyAcc.asBits.resize(16),
         4  -> host1.gamepad.resize(16),
         5  -> interruptStatus,
-        6  -> host1.mouseDxLast.resize(16),
-        7  -> host1.mouseDyLast.resize(16),
+        6  -> B"x0000",
+        7  -> B"x0000",
         8  -> host2.status.resize(16),
         9  -> host2.mouseBtn.resize(16),
         10 -> host2.mouseDxAcc.asBits.resize(16),
         11 -> host2.mouseDyAcc.asBits.resize(16),
         12 -> host2.gamepad.resize(16),
-        13 -> host2.mouseDxLast.resize(16),
-        14 -> host2.mouseDyLast.resize(16),
+        13 -> B"x0000",
+        14 -> B"x0000",
         15 -> B"x0000",
       )
     }

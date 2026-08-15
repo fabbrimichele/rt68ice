@@ -1,5 +1,9 @@
     section .text, code
 
+; Compatibility note: the USB host assumes byte-aligned signed 8-bit X/Y
+; values. Mice that use packed 12-bit axes in report protocol will produce
+; incorrect movement unless their HID reports are decoded differently.
+
 ; ===========================
 ; Program code
 ; ===========================
@@ -33,9 +37,9 @@ start:
     ; pending and will be processed after interrupts are enabled again.
     or.w    #$0700,SR
     moveq   #0,d2
-    move.b  mouse_raw_x,d2
+    move.b  mouse_acc_x,d2
     moveq   #0,d3
-    move.b  mouse_raw_y,d3
+    move.b  mouse_acc_y,d3
     moveq   #0,d1
     move.b  mouse_raw_buttons,d1
     clr.b   mouse_updated
@@ -49,23 +53,23 @@ start:
 
     ; The hardware registers are wrapping accumulators. Use the first report
     ; only as the reference point so the cursor does not jump at startup.
-    move.b  d2,last_raw_x
-    move.b  d3,last_raw_y
+    move.b  d2,last_acc_x
+    move.b  d3,last_acc_y
     move.b  #1,have_sample
     bra     .apply_buttons
 
 .calculate_delta:
     moveq   #0,d0
     move.b  d2,d0
-    sub.b   last_raw_x,d0
-    move.b  d2,last_raw_x
+    sub.b   last_acc_x,d0
+    move.b  d2,last_acc_x
     ext.w   d0
     move.w  d0,d4                  ; D4.W = signed X delta
 
     moveq   #0,d0
     move.b  d3,d0
-    sub.b   last_raw_y,d0
-    move.b  d3,last_raw_y
+    sub.b   last_acc_y,d0
+    move.b  d3,last_acc_y
     ext.w   d0
     move.w  d0,d5                  ; D5.W = signed Y delta
 
@@ -154,9 +158,9 @@ usb_isr:
     move.w  USB2_MOUSE_BTN,d0
     move.b  d0,mouse_raw_buttons
     move.w  USB2_MOUSE_DX,d0
-    move.b  d0,mouse_raw_x
+    move.b  d0,mouse_acc_x
     move.w  USB2_MOUSE_DY,d0
-    move.b  d0,mouse_raw_y
+    move.b  d0,mouse_acc_y
     move.b  #1,mouse_updated        ; Publish complete snapshot last
 
 .done:
@@ -303,9 +307,9 @@ CURSOR_PLANE_MASK equ   2
 ; RAM data
 ; ===========================
     section .bss
-mouse_raw_x:
+mouse_acc_x:
     ds.b    1
-mouse_raw_y:
+mouse_acc_y:
     ds.b    1
 mouse_raw_buttons:
     ds.b    1
@@ -313,9 +317,9 @@ mouse_updated:
     ds.b    1
 have_sample:
     ds.b    1
-last_raw_x:
+last_acc_x:
     ds.b    1
-last_raw_y:
+last_acc_y:
     ds.b    1
     even
 cursor_x:

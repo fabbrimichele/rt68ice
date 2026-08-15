@@ -20,12 +20,12 @@ start:
     ; masked and will be handled after they are enabled again.
     or.w    #$0700,SR
 
-    move.b  mouse_raw_x,d0
+    move.b  mouse_acc_x,d0
     ext.w   d0
     ext.l   d0
     move.l  d0,d2
 
-    move.b  mouse_raw_y,d0
+    move.b  mouse_acc_y,d0
     ext.w   d0
     ext.l   d0
     move.l  d0,d3
@@ -33,38 +33,18 @@ start:
     moveq   #0,d4
     move.b  mouse_buttons,d4
 
-    move.b  mouse_acc_x,d0
-    ext.w   d0
-    ext.l   d0
-    move.l  d0,d5
-
-    move.b  mouse_acc_y,d0
-    ext.w   d0
-    ext.l   d0
-    move.l  d0,d6
-
     clr.b   mouse_updated
 
     and.w   #$F8FF,SR
 
-    lea     msg_dx,a0
+    lea     msg_acc_x,a0
     bsr     put_str
     move.l  d2,d0
     bsr     bin_to_dec_signed
 
-    lea     msg_dy,a0
-    bsr     put_str
-    move.l  d3,d0
-    bsr     bin_to_dec_signed
-
-    lea     msg_acc_x,a0
-    bsr     put_str
-    move.l  d5,d0
-    bsr     bin_to_dec_signed
-
     lea     msg_acc_y,a0
     bsr     put_str
-    move.l  d6,d0
+    move.l  d3,d0
     bsr     bin_to_dec_signed
 
     lea     msg_buttons,a0
@@ -91,10 +71,6 @@ usb_isr:
     beq     .done
     move.w  USB2_STATUS,d0      ; Acknowledge Host 2
 
-    move.w  USB2_MOUSE_RAW_DX,d0
-    move.b  d0,mouse_raw_x
-    move.w  USB2_MOUSE_RAW_DY,d0
-    move.b  d0,mouse_raw_y
     move.w  USB2_MOUSE_DX,d0
     move.b  d0,mouse_acc_x
     move.w  USB2_MOUSE_DY,d0
@@ -122,14 +98,8 @@ usb_isr:
 msg_title:
     dc.b    CR,LF,"USB Host 2 mouse",CR,LF,NUL
 
-msg_dx:
-    dc.b    "DX=",NUL
-
-msg_dy:
-    dc.b    " DY=",NUL
-
 msg_acc_x:
-    dc.b    " ACCX=",NUL
+    dc.b    "ACCX=",NUL
 
 msg_acc_y:
     dc.b    " ACCY=",NUL
@@ -144,10 +114,6 @@ msg_newline:
 ; RAM Data Section
 ; ===========================
     section .bss
-mouse_raw_x:
-    ds.b    1
-mouse_raw_y:
-    ds.b    1
 mouse_acc_x:
     ds.b    1
 mouse_acc_y:
