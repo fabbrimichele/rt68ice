@@ -101,18 +101,22 @@ case class UsbDevice(usbCd: ClockDomain) extends Component {
   }
 
   // --- 68000 bus interface ---
-  // Reading USB1_STATUS acknowledges the level-triggered interrupt. Keep a
-  // new report pending if it arrives during the acknowledgement read.
-  val host1StatusRead = io.sel &&
+  val registerRead = io.sel &&
     !io.bus.wr &&
-    (io.bus.uds || io.bus.lds) &&
-    (io.bus.address(4 downto 1) === 0)
+    (io.bus.uds || io.bus.lds)
+
+  // Reading a host's status register acknowledges only that host. Keep a new
+  // report pending if it arrives during the acknowledgement read.
+  val host1StatusRead = registerRead && (io.bus.address(4 downto 1) === 0)
+  val host2StatusRead = registerRead && (io.bus.address(4 downto 1) === 8)
 
   val host1 = new UsbHostSync(usbDomain.usbHost1, host1StatusRead)
-  val host2 = new UsbHostSync(usbDomain.usbHost2, False)
+  val host2 = new UsbHostSync(usbDomain.usbHost2, host2StatusRead)
 
-  // TODO: add interrupt acknowledgement and routing for host2.
-  io.int := host1.int
+  // Both hosts share the same interrupt level. USB_IRQ_STATUS lets software
+  // identify all pending sources without acknowledging either one.
+  io.int := host1.int || host2.int
+  val interruptStatus = (host2.int ## host1.int).resize(16)
 
   io.bus.dataIn := 0
   when(io.sel) {
@@ -124,7 +128,7 @@ case class UsbDevice(usbCd: ClockDomain) extends Component {
         2  -> host1.mouseDxAcc.resize(16),
         3  -> host1.mouseDyAcc.resize(16),
         4  -> host1.gamepad.resize(16),
-        5  -> B"x0000",
+        5  -> interruptStatus,
         6  -> B"x0000",
         7  -> B"x0000",
         8  -> host2.status.resize(16),

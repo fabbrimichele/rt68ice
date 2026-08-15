@@ -14,7 +14,6 @@ case class BusController() extends Component {
     // Master Interface (from CPU)
     val cpuBus    = slave(M68KBus())
     val busState	= in Bits(2 bits)  // 00-> fetch code 10->read data 11->write data 01->no memaccess
-    val fc        = in Bits(3 bits)
     val clockEn   = out Bool()
     val busErr    = out Bool()
     val ipl       = out Bits(3 bits)
@@ -152,11 +151,7 @@ case class BusController() extends Component {
 
   // Decoder Execution Logic
   val address = io.cpuBus.address.asUInt
-  val interruptAck = (io.fc === B"111") &&
-    (io.busState === B"10") &&
-    interruptAckMapping.hit(address)
-
-  when(interruptAck) {
+  when(interruptAckMapping.hit(address)) {
     io.busErr := False
   } elsewhen bootMapping.hit(address) {
     io.romSel := True

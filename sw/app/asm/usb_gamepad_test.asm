@@ -13,11 +13,24 @@ start:
     bra     .wait
 
 usb_isr:
-    move.l  d0,-(sp)
-    move.w  USB1_STATUS,d0      ; Acknowledge the pending USB interrupt
-    move.w  USB1_GAMEPAD,d0     ; Read packed gamepad status
-    move.w  d0,LEDS             ; Display packed gamepad status
-    move.l  (sp)+,d0
+    movem.l d0-d1,-(sp)
+    move.w  USB_IRQ_STATUS,d1   ; Snapshot pending hosts without clearing them
+
+    btst    #0,d1
+    beq     .host2
+    move.w  USB1_STATUS,d0      ; Acknowledge USB host 1
+    move.w  USB1_GAMEPAD,d0
+    move.w  d0,LEDS
+
+.host2:
+    btst    #1,d1
+    beq     .done
+    move.w  USB2_STATUS,d0      ; Acknowledge USB host 2
+    move.w  USB2_GAMEPAD,d0
+    move.w  d0,LEDS
+
+.done:
+    movem.l (sp)+,d0-d1
     rte
 
 ; ===========================
