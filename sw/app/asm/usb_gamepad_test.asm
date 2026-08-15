@@ -19,6 +19,9 @@ usb_isr:
     btst    #0,d1
     beq     .host2
     move.w  USB1_STATUS,d0      ; Acknowledge USB host 1
+    andi.w  #$0003,d0           ; Update LEDs only for a gamepad
+    cmpi.w  #3,d0
+    bne     .host2
     move.w  USB1_GAMEPAD,d0
     move.w  d0,LEDS
 
@@ -26,6 +29,9 @@ usb_isr:
     btst    #1,d1
     beq     .done
     move.w  USB2_STATUS,d0      ; Acknowledge USB host 2
+    andi.w  #$0003,d0           ; A mouse report must not blank the LEDs
+    cmpi.w  #3,d0
+    bne     .done
     move.w  USB2_GAMEPAD,d0
     move.w  d0,LEDS
 
