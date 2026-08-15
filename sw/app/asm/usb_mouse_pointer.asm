@@ -15,7 +15,9 @@ start:
     move.w  #2,VIDEO_CTRL           ; 640x480, two bitplanes
     lea     VIDEO_PLTE,a0
     move.l  #$00000000,(a0)         ; Palette 0: black
-    move.l  #$00FFFFFF,12(a0)       ; Palette 3: white
+    move.l  #$00FFFFFF,4(a0)        ; Palette 1: drawing
+    move.l  #$00FFFFFF,8(a0)        ; Palette 2: cursor
+    move.l  #$00FFFFFF,12(a0)       ; Palette 3: drawing + cursor
     bsr     clear_screen
 
     moveq   #CURSOR_COLOR,d2
@@ -34,8 +36,13 @@ start:
     move.b  mouse_raw_x,d2
     moveq   #0,d3
     move.b  mouse_raw_y,d3
+    moveq   #0,d1
+    move.b  mouse_raw_buttons,d1
     clr.b   mouse_updated
     and.w   #$F8FF,SR
+
+    btst    #2,d1                   ; Middle button exits the program
+    bne     .exit
 
     tst.b   have_sample
     bne     .calculate_delta
@@ -45,7 +52,7 @@ start:
     move.b  d2,last_raw_x
     move.b  d3,last_raw_y
     move.b  #1,have_sample
-    bra     .wait
+    bra     .apply_buttons
 
 .calculate_delta:
     moveq   #0,d0
@@ -68,7 +75,7 @@ start:
     tst.w   d4
     bne     .move_cursor
     tst.w   d5
-    beq     .wait
+    beq     .apply_buttons
 
 .move_cursor:
     move.w  cursor_x,d6             ; Preserve the old position
@@ -82,7 +89,7 @@ start:
     cmp.w   cursor_x,d6
     bne     .redraw_cursor
     cmp.w   cursor_y,d7
-    beq     .wait
+    beq     .apply_buttons
 
 .redraw_cursor:
     move.w  cursor_x,d4             ; Preserve the new position
@@ -97,7 +104,31 @@ start:
     move.w  d5,cursor_y
     moveq   #CURSOR_COLOR,d2
     bsr     draw_cursor
+    bra     .apply_buttons
+
+.apply_buttons:
+    btst    #0,d1                   ; Left button draws a persistent pixel
+    bne     .draw_at_cursor
+    btst    #1,d1                   ; Right button clears a persistent pixel
+    bne     .clear_at_cursor
     bra     .wait
+
+.draw_at_cursor:
+    moveq   #DRAW_COLOR,d2
+    bra     .update_pixel
+
+.clear_at_cursor:
+    moveq   #0,d2
+
+.update_pixel:
+    move.w  cursor_x,d0
+    move.w  cursor_y,d1
+    moveq   #DRAW_PLANE_MASK,d4
+    bsr     draw_pixel
+    bra     .wait
+
+.exit:
+    trap    #14
 
 ; ===========================
 ; USB interrupt handler
@@ -120,6 +151,8 @@ usb_isr:
     cmpi.w  #2,d0                   ; Device type 2 is a mouse
     bne     .done
 
+    move.w  USB2_MOUSE_BTN,d0
+    move.b  d0,mouse_raw_buttons
     move.w  USB2_MOUSE_DX,d0
     move.b  d0,mouse_raw_x
     move.w  USB2_MOUSE_DY,d0
@@ -155,7 +188,8 @@ clamp_cursor:
 ; Draw a cross centered at cursor_x/cursor_y.
 ; Input: D2.B = palette color
 draw_cursor:
-    movem.l d0-d3,-(sp)
+    movem.l d0-d4,-(sp)
+    moveq   #CURSOR_PLANE_MASK,d4
 
     move.w  #(-CURSOR_RADIUS),d3
 .horizontal:
@@ -177,13 +211,15 @@ draw_cursor:
     cmpi.w  #(CURSOR_RADIUS+1),d3
     blt     .vertical
 
-    movem.l (sp)+,d0-d3
+    movem.l (sp)+,d0-d4
     rts
 
 ; Draw one pixel in the 640x480 two-bitplane framebuffer.
 ; Input: D0.W = X, D1.W = Y, D2.B = palette color (0-3)
+;        D4.B = bitplane update mask (bit 0: drawing, bit 1: cursor)
 draw_pixel:
     movem.l d0-d7/a0,-(sp)
+    move.b  d4,d7
 
     ; Address = framebuffer + Y*160 + (X/16)*4.
     moveq   #0,d3
@@ -211,6 +247,8 @@ draw_pixel:
     move.w  d4,d6
     not.w   d6
 
+    btst    #0,d7
+    beq     .plane1
     btst    #0,d2
     beq     .clear_plane0
     or.w    d4,(a0)
@@ -219,6 +257,8 @@ draw_pixel:
     and.w   d6,(a0)
 
 .plane1:
+    btst    #1,d7
+    beq     .done
     btst    #1,d2
     beq     .clear_plane1
     or.w    d4,2(a0)
@@ -247,7 +287,10 @@ LINE_WIDTH_B    equ     160
 CURSOR_RADIUS   equ     5
 CURSOR_MAX_X    equ     SCREEN_WIDTH-CURSOR_RADIUS-1
 CURSOR_MAX_Y    equ     SCREEN_HEIGHT-CURSOR_RADIUS-1
-CURSOR_COLOR    equ     3
+DRAW_COLOR      equ     1
+DRAW_PLANE_MASK equ     1
+CURSOR_COLOR    equ     2
+CURSOR_PLANE_MASK equ   2
 
 ; ===========================
 ; Include files
@@ -263,6 +306,8 @@ CURSOR_COLOR    equ     3
 mouse_raw_x:
     ds.b    1
 mouse_raw_y:
+    ds.b    1
+mouse_raw_buttons:
     ds.b    1
 mouse_updated:
     ds.b    1
