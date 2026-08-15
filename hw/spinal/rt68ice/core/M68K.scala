@@ -15,6 +15,9 @@ object M68KType extends Enumeration {
 //noinspection ScalaWeakerAccess
 case class M68K(
   cpuType: M68KType = M68000,
+  // IPL_autovector is active-high in TG68KdotC_Kernel.  The external 68000
+  // VPA signal is active-low, but the original TG68K wrapper inverts it
+  // before passing it to this input.
   autovector: Boolean = true
 ) extends Component {
 

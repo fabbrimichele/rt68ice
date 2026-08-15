@@ -25,14 +25,20 @@ case class ClockCtrl() extends Component {
 
   val systemCd = createClockDomain(
     name = "clkSystem",
-    frequency = 28.4091 MHz,
+    frequency = 26.0417 MHz,
     pllClock = pll.io.clk_cpu,
   )
 
   val sdRamCd = createClockDomain(
     name = "clkSdRam",
-    frequency = 56.8182 MHz, // It's used to calculate the SDRAM timing
+    frequency = 52.0833 MHz, // It's used to calculate the SDRAM timing
     pllClock = pll.io.clk_sdram,
+  )
+
+  val usbCd = createClockDomain(
+    name = "clkUsb",
+    frequency = 11.9048 MHz,
+    pllClock = pll.io.clk_usb,
   )
 
   private def createClockDomain(

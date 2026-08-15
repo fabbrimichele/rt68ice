@@ -73,8 +73,8 @@ uart_init:
 	;move.b  #65,UART_RBR    ; set divisor LSB to 65: 20MHz/16/65 = 19231 (should be 19200)
 	;move.b  #27,UART_RBR    ; set divisor LSB to 26 (DLL): 8.333MHz/16/26 = 19290 (should be 19200, still in specs)
 	;move.b  #9,UART_RBR     ; set divisor LSB to 9 (DLL): 8.333MHz/16/9 = 57870 (should be 57600, still in specs)
-	;move.b  #101,UART_RBR    ; set divisor LSB to 101 (DLL): 31.250MHz/16/101 = 19337 (error = 0.7%)
-	move.b  #92,UART_RBR    ; set divisor LSB to 101 (DLL): 28.4091MHz/16/92 = 19299 (error = 0.52%)
+	;move.b  #101,UART_RBR   ; set divisor LSB to 101 (DLL): 31.250MHz/16/101 = 19337 (error = 0.7%)
+	move.b  #85,UART_RBR    ; set divisor LSB to 92 (DLL): 26.0417MHz/16/85 = 19148 (error = 0.27%)
 
 
 	move.b  #$03,UART_LCR	; set options to 8N1

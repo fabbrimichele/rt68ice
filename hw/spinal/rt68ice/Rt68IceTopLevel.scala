@@ -1,7 +1,7 @@
 package rt68ice
 
 import rt68ice.core._
-import rt68ice.io.{LedArrayDevice, LedDevice, T16450Device}
+import rt68ice.io.{LedArrayDevice, LedDevice, T16450Device, Usb, UsbDevice}
 import rt68ice.memory.{Mem16Bit, SdRam, SdRamDevice}
 import rt68ice.timer.Counter
 import rt68ice.video.{Gpdi, VgaDevice}
@@ -21,6 +21,8 @@ case class Rt68IceTopLevel(romFile: String) extends Component {
     val uart = master(Uart()) // Expose UART pins (txd, rxd), must be defined in the constraints file
     val gpdi = master(Gpdi())
     val sdram = master(SdRam())
+    val usb1 = master(Usb())
+    val usb2 = master(Usb())
   }
 
   val clockCtrl = ClockCtrl()
@@ -38,7 +40,7 @@ case class Rt68IceTopLevel(romFile: String) extends Component {
     // CPU
     val cpuClockEn = sdRamDevice.io.cpuClkEn && bus.io.clockEn
     val cpu = new M68K
-    cpu.io.ipl := B"111"
+    cpu.io.ipl := bus.io.ipl
     cpu.io.clockEn := cpuClockEn
     cpu.io.busErr := bus.io.busErr
     bus.io.busState := cpu.io.busState
@@ -76,6 +78,7 @@ case class Rt68IceTopLevel(romFile: String) extends Component {
     uartDevice.io.uart <> io.uart
     uartDevice.io.sel := bus.io.uartSel
     bus.io.uartBus <> uartDevice.io.bus
+    bus.io.uartInt := uartDevice.io.int
 
     // Video Device
     val vgaDevice = VgaDevice(vgaCd = clockCtrl.vgaCd)
@@ -93,6 +96,14 @@ case class Rt68IceTopLevel(romFile: String) extends Component {
     hdmiBridge.io.vga <> vgaDevice.io.vga
     io.gpdi.dp := hdmiBridge.io.gpdi_dp
     io.gpdi.dn := hdmiBridge.io.gpdi_dn
+
+    // USB HID Host
+    val usbDevice = UsbDevice(usbCd = clockCtrl.usbCd)
+    usbDevice.io.usb1 <> io.usb1
+    usbDevice.io.usb2 <> io.usb2
+    usbDevice.io.sel := bus.io.usbSel
+    bus.io.usbBus <> usbDevice.io.bus
+    bus.io.usbInt := usbDevice.io.int
   }
 
   // Remove io_ prefix
@@ -103,4 +114,3 @@ object Rt68IceTopLevelVerilog extends App {
   private val report = Config.spinal.generateVerilog(Rt68IceTopLevel(romFile = "monitor.hex"))
   report.mergeRTLSource("mergeRTL") // Merge all rtl sources into mergeRTL.vhd and mergeRTL.v files
 }
-

@@ -1,9 +1,9 @@
 # TODOs
 
 ## Build
-- Give ecpdap a try, it should be much faster than openFPGALoader
+- Give ecpdap a try, it should be much faster than openFPGALoader (it's not faster)
 ## Monitor
-- In case of bus error, print all registers
+- In case of bus error, print all registers (DONE)
 
 
 
@@ -24,8 +24,13 @@ If Yosys fails to parse the file, the standard practice in the open-source FPGA 
 You can grab the sv2v tool (usually available via standard package managers or as a pre-compiled binary for Linux) and update your Makefile to perform the translation on the fly:
 
 Makefile
-# Convert SV to V, then synthesize
+## Convert SV to V, then synthesize
+```
 rt68ice.json: rt68ice.v hw/verilog/sdram.sv
 sv2v hw/verilog/sdram.sv > hw/verilog/sdram_converted.v
 yosys -p 'read_verilog hw/verilog/sdram_converted.v rt68ice.v; synth_ecp5 -top TopLevelName -json rt68ice.json'
+```
 If you go this route, you would leave addRTLPath("hw/verilog/sdram.v") pointing to the converted .v file in your SpinalHDL blackbox definition, or simply let SpinalHDL generate the wrapper and handle the converted file exclusively in the Makefile.
+
+### Converted to SpinalHDL
+I converted the sdram module from system verilog to SpinalHDL using codex, and it worked.

@@ -1,9 +1,39 @@
 ; ----------------------------------------------------------
+; bin_to_dec_signed
+; Reentrant signed 32-bit decimal printer
+;
+; Input:
+;   D0.L = value
+;
+; Requires:
+;   put_chr(char in D0.B)
+;
+; Notes:
+;   - Prints a leading minus sign for negative values.
+;   - Handles the full signed range, including -2147483648.
+; ----------------------------------------------------------
+bin_to_dec_signed:
+        TST.L   D0
+        BPL.S   bin_to_dec
+
+        MOVE.L  D0,-(SP)
+        MOVE.B  #'-',D0
+        BSR     put_chr
+        MOVE.L  (SP)+,D0
+        NEG.L   D0                 ; $80000000 remains a valid unsigned magnitude
+
+; ----------------------------------------------------------
 ; bin_to_dec
 ; Reentrant unsigned 32-bit decimal printer
 ;
 ; Input:
 ;   D0.L = value
+;
+; Output:
+;   D0.B = last printed digit
+;
+; Preserves:
+;   D1-D4/A0
 ;
 ; Requires:
 ;   put_chr(char in D0.B)
