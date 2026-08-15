@@ -25,65 +25,79 @@ case class UsbDevice(usbCd: ClockDomain) extends Component {
   }
 
   class UsbHostSync(usbHost: UsbHidHostBB, clearInterrupt: Bool) extends Area {
-    // -- Port status ---
-    // Bit 7: conErr
-    // Bits 1-0: typ
-    // Bits 6-2: Reserved (0)
-    val status = BufferCC(
-      usbHost.io.conerr ## B"00000" ## usbHost.io.typ,
-      init = B"00000000"
-    )
+    // Capture a complete report in the USB domain and keep it stable while it
+    // crosses into the system domain. Status changes also update the mailbox,
+    // but only actual HID reports raise an interrupt.
+    val usbSnapshot = new ClockingArea(usbCd) {
+      val currentStatus = usbHost.io.conerr ## B"00000" ## usbHost.io.typ
 
-    // --- Interrupt ---
-    // 1. In the 12 MHz USB domain: Turn the 1-cycle pulse into a permanent level change
-    val reportToggle = new ClockingArea(usbCd) {
+      val status = Reg(Bits(8 bits)) init 0
+      val mouseBtn = Reg(Bits(8 bits)) init 0
+      val mouseDx = Reg(Bits(8 bits)) init 0
+      val mouseDy = Reg(Bits(8 bits)) init 0
+      val gamepad = Reg(Bits(10 bits)) init 0
+      val hasReport = RegInit(False)
       val toggle = RegInit(False)
-      when(usbHost.io.report) { toggle := !toggle }
+
+      val previousStatus = Reg(Bits(8 bits)) init 0
+      val statusChanged = currentStatus =/= previousStatus
+
+      when(usbHost.io.report || statusChanged) {
+        previousStatus := currentStatus
+        status := currentStatus
+        mouseBtn := usbHost.io.mouse_btn
+        mouseDx := usbHost.io.mouse_dx
+        mouseDy := usbHost.io.mouse_dy
+        gamepad :=
+          usbHost.io.game_l ## usbHost.io.game_r ##
+          usbHost.io.game_u ## usbHost.io.game_d ##
+          usbHost.io.game_a ## usbHost.io.game_b ##
+          usbHost.io.game_x ## usbHost.io.game_y ##
+          usbHost.io.game_sel ## usbHost.io.game_sta
+        hasReport := usbHost.io.report
+        toggle := !toggle
+      }
     }
 
-    // 2. Safely cross the level change into the System domain
-    val sysToggle = BufferCC(reportToggle.toggle, init = False)
+    // Synchronize the stable mailbox and its single-bit event toggle. The
+    // payload is consumed two extra system clocks after the toggle arrives so
+    // all independently synchronized bits have settled to the same snapshot.
+    val sysStatus = BufferCC(usbSnapshot.status, init = B"00000000")
+    val sysMouseBtn = BufferCC(usbSnapshot.mouseBtn, init = B"00000000")
+    val sysMouseDx = BufferCC(usbSnapshot.mouseDx, init = B"00000000")
+    val sysMouseDy = BufferCC(usbSnapshot.mouseDy, init = B"00000000")
+    val sysGamepad = BufferCC(usbSnapshot.gamepad, init = B"0000000000")
+    val sysHasReport = BufferCC(usbSnapshot.hasReport, init = False)
+    val sysToggle = BufferCC(usbSnapshot.toggle, init = False)
+    val sysEvent = sysToggle =/= RegNext(sysToggle, False)
+    val captureEvent = RegNext(RegNext(sysEvent, False), False)
 
-    // 3. In the System domain, detect the report and hold the interrupt level
-    // until software acknowledges it. A one-cycle pulse can be missed by the
-    // 68000 while it is between interrupt-sampling points.
-    val sysReportPulse = sysToggle =/= RegNext(sysToggle, False)
+    // All software-visible state lives in the system domain.
+    // Status: bit 7 conErr, bits 1-0 device type, bits 6-2 reserved.
+    val status = Reg(Bits(8 bits)) init 0
+    val mouseBtn = Reg(Bits(8 bits)) init 0
+    val mouseDxAcc = Reg(SInt(8 bits)) init 0
+    val mouseDyAcc = Reg(SInt(8 bits)) init 0
+    val gamepad = Reg(Bits(10 bits)) init 0
 
     val int = RegInit(False)
     when(clearInterrupt) {
       int := False
     }
-    when(sysReportPulse) {
-      int := True
+
+    when(captureEvent) {
+      status := sysStatus
+      mouseBtn := sysMouseBtn
+      gamepad := sysGamepad
+
+      when(sysHasReport) {
+        when(sysStatus(1 downto 0) === 2) {
+          mouseDxAcc := mouseDxAcc + sysMouseDx.asSInt
+          mouseDyAcc := mouseDyAcc + sysMouseDy.asSInt
+        }
+        int := True
+      }
     }
-
-    // --- Mouse ---
-    val mouseBtn = BufferCC(usbHost.io.mouse_btn, init = B"00000000")
-
-    // Accumulate dx/dy inside the USB clock domain
-    val accDx = Reg(SInt(8 bits)) init 0
-    val accDy = Reg(SInt(8 bits)) init 0
-
-    // TODO: accumulators should be cleared after a read
-    when(usbHost.io.report && usbHost.io.typ === 2) {
-      accDx := accDx + usbHost.io.mouse_dx.asSInt
-      accDy := accDy + usbHost.io.mouse_dy.asSInt
-    }
-
-    // Safely transfer the accumulating position counters across CDC
-    // TODO: this is wrong, BufferCC should only be used when one single bit changes at a time
-    val mouseDxAcc = BufferCC(accDx.asBits, init = B"00000000")
-    val mouseDyAcc = BufferCC(accDy.asBits, init = B"00000000")
-
-    // --- Gamepad ---
-    val gamepad = BufferCC(
-      usbHost.io.game_l ## usbHost.io.game_r ##
-      usbHost.io.game_u ## usbHost.io.game_d ##
-      usbHost.io.game_a ## usbHost.io.game_b ##
-      usbHost.io.game_x ## usbHost.io.game_y ##
-      usbHost.io.game_sel ## usbHost.io.game_sta,
-      init = B"0000000000"
-    )
 
     // --- Keyboard ---
     // TODO
@@ -125,16 +139,16 @@ case class UsbDevice(usbCd: ClockDomain) extends Component {
       io.bus.dataIn := io.bus.address(4 downto 1).mux(
         0  -> host1.status.resize(16),
         1  -> host1.mouseBtn.resize(16),
-        2  -> host1.mouseDxAcc.resize(16),
-        3  -> host1.mouseDyAcc.resize(16),
+        2  -> host1.mouseDxAcc.asBits.resize(16),
+        3  -> host1.mouseDyAcc.asBits.resize(16),
         4  -> host1.gamepad.resize(16),
         5  -> interruptStatus,
         6  -> B"x0000",
         7  -> B"x0000",
         8  -> host2.status.resize(16),
         9  -> host2.mouseBtn.resize(16),
-        10 -> host2.mouseDxAcc.resize(16),
-        11 -> host2.mouseDyAcc.resize(16),
+        10 -> host2.mouseDxAcc.asBits.resize(16),
+        11 -> host2.mouseDyAcc.asBits.resize(16),
         12 -> host2.gamepad.resize(16),
         13 -> B"x0000",
         14 -> B"x0000",
