@@ -35,7 +35,6 @@ case class UsbDevice(usbCd: ClockDomain) extends Component {
       val mouseBtn = Reg(Bits(8 bits)) init 0
       val mouseDx = Reg(Bits(8 bits)) init 0
       val mouseDy = Reg(Bits(8 bits)) init 0
-      val hidReport = Reg(Bits(32 bits)) init 0
       val gamepad = Reg(Bits(10 bits)) init 0
       val hasReport = RegInit(False)
       val toggle = RegInit(False)
@@ -49,7 +48,6 @@ case class UsbDevice(usbCd: ClockDomain) extends Component {
         mouseBtn := usbHost.io.mouse_btn
         mouseDx := usbHost.io.mouse_dx
         mouseDy := usbHost.io.mouse_dy
-        hidReport := usbHost.io.dbg_hid_report(31 downto 0)
         gamepad :=
           usbHost.io.game_l ## usbHost.io.game_r ##
           usbHost.io.game_u ## usbHost.io.game_d ##
@@ -68,7 +66,6 @@ case class UsbDevice(usbCd: ClockDomain) extends Component {
     val sysMouseBtn = BufferCC(usbSnapshot.mouseBtn, init = B"00000000")
     val sysMouseDx = BufferCC(usbSnapshot.mouseDx, init = B"00000000")
     val sysMouseDy = BufferCC(usbSnapshot.mouseDy, init = B"00000000")
-    val sysHidReport = BufferCC(usbSnapshot.hidReport, init = B(0, 32 bits))
     val sysGamepad = BufferCC(usbSnapshot.gamepad, init = B"0000000000")
     val sysHasReport = BufferCC(usbSnapshot.hasReport, init = False)
     val sysToggle = BufferCC(usbSnapshot.toggle, init = False)
@@ -83,24 +80,10 @@ case class UsbDevice(usbCd: ClockDomain) extends Component {
     val mouseDyLast = Reg(Bits(8 bits)) init 0
     val mouseDxAcc = Reg(SInt(8 bits)) init 0
     val mouseDyAcc = Reg(SInt(8 bits)) init 0
-    val hidReport = Reg(Bits(32 bits)) init 0
     val gamepad = Reg(Bits(10 bits)) init 0
 
-    // Capture a coherent diagnostic snapshot at the start of a status read.
-    // Making the acknowledgement an edge also prevents a new report from
-    // being cleared if the CPU holds the read cycle active for several clocks.
-    val acknowledge = clearInterrupt && !RegNext(clearInterrupt, False)
-    val mouseDxRead = Reg(Bits(8 bits)) init 0
-    val mouseDyRead = Reg(Bits(8 bits)) init 0
-    val hidReportRead = Reg(Bits(32 bits)) init 0
-    when(acknowledge) {
-      mouseDxRead := mouseDxLast
-      mouseDyRead := mouseDyLast
-      hidReportRead := hidReport
-    }
-
     val int = RegInit(False)
-    when(acknowledge) {
+    when(clearInterrupt) {
       int := False
     }
 
@@ -110,7 +93,6 @@ case class UsbDevice(usbCd: ClockDomain) extends Component {
       gamepad := sysGamepad
 
       when(sysHasReport) {
-        hidReport := sysHidReport
         when(sysStatus(1 downto 0) === 2) {
           mouseDxLast := sysMouseDx
           mouseDyLast := sysMouseDy
@@ -165,16 +147,16 @@ case class UsbDevice(usbCd: ClockDomain) extends Component {
         3  -> host1.mouseDyAcc.asBits.resize(16),
         4  -> host1.gamepad.resize(16),
         5  -> interruptStatus,
-        6  -> host1.mouseDxRead.resize(16),
-        7  -> host1.mouseDyRead.resize(16),
+        6  -> host1.mouseDxLast.resize(16),
+        7  -> host1.mouseDyLast.resize(16),
         8  -> host2.status.resize(16),
         9  -> host2.mouseBtn.resize(16),
         10 -> host2.mouseDxAcc.asBits.resize(16),
         11 -> host2.mouseDyAcc.asBits.resize(16),
         12 -> host2.gamepad.resize(16),
-        13 -> host2.hidReportRead(15 downto 0),
-        14 -> host2.hidReportRead(31 downto 16),
-        15 -> (host2.mouseDyRead ## host2.mouseDxRead),
+        13 -> host2.mouseDxLast.resize(16),
+        14 -> host2.mouseDyLast.resize(16),
+        15 -> B"x0000",
       )
     }
   }

@@ -20,7 +20,6 @@ class UsbHidHostBB extends BlackBox {
     val report = out Bool()     // pulse after report received from device.
                                 // key_*, mouse_*, game_* valid depending on typ
     val conerr = out Bool()     // connection or protocol error
-    val dbg_hid_report = out Bits(64 bits) // Last unparsed HID report bytes
 
     // Keyboard
     val key_modifiers = out Bits(8 bits)
@@ -45,3 +44,4 @@ class UsbHidHostBB extends BlackBox {
   addRTLPath("hw/verilog/usb_hid_host_rom.v") // Merge the file to the generated 'mergeRTL.v' file
   noIoPrefix() // Remove io_ prefix
 }
+
