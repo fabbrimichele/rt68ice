@@ -1,51 +1,47 @@
     section .text, code
 
-; ===========================
-; Program code
-; ===========================
+; Poll Host 2 with CPU interrupts masked. This diagnostic prints the parsed
+; per-report mouse deltas alongside the first four unparsed HID report bytes.
 start:
-    move.l  #usb_isr,VT_INT_6   ; Set USB interrupt handler
-    clr.b   mouse_updated
+    or.w    #$0700,SR               ; Keep USB interrupts disabled
 
     lea     msg_title,a0
     bsr     put_str
 
-    and.w   #$F8FF,SR           ; Enable all interrupt levels
+.wait_report:
+    move.w  USB_IRQ_STATUS,d1
 
-.wait:
-    tst.b   mouse_updated
-    beq     .wait
+    ; Host 1 shares the pending register. Acknowledge it so it cannot leave
+    ; the shared interrupt source permanently asserted during this test.
+    btst    #0,d1
+    beq     .check_host2
+    move.w  USB1_STATUS,d0
 
-    ; Take an atomic snapshot. New reports remain pending while interrupts are
-    ; masked and will be handled after they are enabled again.
-    or.w    #$0700,SR
+.check_host2:
+    btst    #1,d1
+    beq     .wait_report
 
-    move.b  mouse_raw_x,d0
-    ext.w   d0
-    ext.l   d0
-    move.l  d0,d2
+    move.w  USB2_STATUS,d0          ; Acknowledge and read Host 2 type
+    andi.w  #$0003,d0
+    cmpi.w  #2,d0                   ; Device type 2 is a mouse
+    bne     .wait_report
 
-    move.b  mouse_raw_y,d0
-    ext.w   d0
-    ext.l   d0
-    move.l  d0,d3
+    ; USB2_MOUSE_RAW packs the parser outputs as DY:DX.
+    move.w  USB2_MOUSE_RAW,d0
+    moveq   #0,d2
+    move.b  d0,d2
+    ext.w   d2
+    ext.l   d2                      ; D2.L = signed parsed DX
 
-    moveq   #0,d4
-    move.b  mouse_buttons,d4
+    lsr.w   #8,d0
+    moveq   #0,d3
+    move.b  d0,d3
+    ext.w   d3
+    ext.l   d3                      ; D3.L = signed parsed DY
 
-    move.b  mouse_acc_x,d0
-    ext.w   d0
-    ext.l   d0
-    move.l  d0,d5
-
-    move.b  mouse_acc_y,d0
-    ext.w   d0
-    ext.l   d0
-    move.l  d0,d6
-
-    clr.b   mouse_updated
-
-    and.w   #$F8FF,SR
+    ; Preserve report words while the decimal conversion routines run.
+    move.w  USB2_HID_REPORT_01,d4   ; D4.W = bytes 1:0
+    move.w  USB2_HID_REPORT_23,d5   ; D5.W = bytes 3:2
 
     lea     msg_dx,a0
     bsr     put_str
@@ -57,55 +53,16 @@ start:
     move.l  d3,d0
     bsr     bin_to_dec_signed
 
-    lea     msg_acc_x,a0
+    lea     msg_hid,a0
     bsr     put_str
-    move.l  d5,d0
-    bsr     bin_to_dec_signed
-
-    lea     msg_acc_y,a0
-    bsr     put_str
-    move.l  d6,d0
-    bsr     bin_to_dec_signed
-
-    lea     msg_buttons,a0
-    bsr     put_str
-    move.l  d4,d0
-    bsr     bin_to_dec
+    move.w  d5,d0
+    bsr     bin_to_hex_w
+    move.w  d4,d0
+    bsr     bin_to_hex_w
 
     lea     msg_newline,a0
     bsr     put_str
-    bra     .wait
-
-usb_isr:
-    movem.l d0-d1,-(sp)
-    move.w  USB_IRQ_STATUS,d1   ; Snapshot interrupt sources without clearing
-
-    ; This program ignores Host 1 data, but it must acknowledge Host 1 if it
-    ; shares the interrupt line and happens to have a pending report.
-    btst    #0,d1
-    beq     .host2
-    move.w  USB1_STATUS,d0
-
-.host2:
-    btst    #1,d1
-    beq     .done
-    move.w  USB2_STATUS,d0      ; Acknowledge Host 2
-
-    move.w  USB2_MOUSE_RAW_DX,d0
-    move.b  d0,mouse_raw_x
-    move.w  USB2_MOUSE_RAW_DY,d0
-    move.b  d0,mouse_raw_y
-    move.w  USB2_MOUSE_DX,d0
-    move.b  d0,mouse_acc_x
-    move.w  USB2_MOUSE_DY,d0
-    move.b  d0,mouse_acc_y
-    move.w  USB2_MOUSE_BTN,d0
-    move.b  d0,mouse_buttons
-    move.b  #1,mouse_updated    ; Publish the complete snapshot last
-
-.done:
-    movem.l (sp)+,d0-d1
-    rte
+    bra     .wait_report
 
 ; ===========================
 ; Include files
@@ -113,14 +70,13 @@ usb_isr:
     include '../../lib/asm/mem_map_usb.asm'
     include '../../lib/asm/console_io_uart.asm'
     include '../../lib/asm/conv_dec.asm'
-    include '../../lib/asm/isr_vector.asm'
+    include '../../lib/asm/conv_hex.asm'
 
 ; ===========================
-; Data Constants
-; Must be after code to avoid alignment issues
+; Data constants
 ; ===========================
 msg_title:
-    dc.b    CR,LF,"USB Host 2 mouse",CR,LF,NUL
+    dc.b    CR,LF,"USB Host 2 raw mouse reports",CR,LF,NUL
 
 msg_dx:
     dc.b    "DX=",NUL
@@ -128,31 +84,8 @@ msg_dx:
 msg_dy:
     dc.b    " DY=",NUL
 
-msg_acc_x:
-    dc.b    " ACCX=",NUL
-
-msg_acc_y:
-    dc.b    " ACCY=",NUL
-
-msg_buttons:
-    dc.b    " BTN=",NUL
+msg_hid:
+    dc.b    " HID32=",NUL
 
 msg_newline:
     dc.b    CR,LF,NUL
-
-; ===========================
-; RAM Data Section
-; ===========================
-    section .bss
-mouse_raw_x:
-    ds.b    1
-mouse_raw_y:
-    ds.b    1
-mouse_acc_x:
-    ds.b    1
-mouse_acc_y:
-    ds.b    1
-mouse_buttons:
-    ds.b    1
-mouse_updated:
-    ds.b    1
