@@ -24,7 +24,7 @@ case class UsbDevice(usbCd: ClockDomain) extends Component {
     val usb2  = master(Usb())
   }
 
-  class UsbHostSync(usbHost: UsbHidHostBB) extends Area {
+  class UsbHostSync(usbHost: UsbHidHostBB, clearInterrupt: Bool) extends Area {
     // -- Port status ---
     // Bit 7: conErr
     // Bits 1-0: typ
@@ -44,10 +44,18 @@ case class UsbDevice(usbCd: ClockDomain) extends Component {
     // 2. Safely cross the level change into the System domain
     val sysToggle = BufferCC(reportToggle.toggle, init = False)
 
-    // 3. In the System domain: Turn the level change BACK into a 1-cycle pulse
+    // 3. In the System domain, detect the report and hold the interrupt level
+    // until software acknowledges it. A one-cycle pulse can be missed by the
+    // 68000 while it is between interrupt-sampling points.
     val sysReportPulse = sysToggle =/= RegNext(sysToggle, False)
 
-    val int = sysReportPulse
+    val int = RegInit(False)
+    when(clearInterrupt) {
+      int := False
+    }
+    when(sysReportPulse) {
+      int := True
+    }
 
     // --- Mouse ---
     val mouseBtn = BufferCC(usbHost.io.mouse_btn, init = B"00000000")
@@ -93,12 +101,17 @@ case class UsbDevice(usbCd: ClockDomain) extends Component {
   }
 
   // --- 68000 bus interface ---
-  val host1 = new UsbHostSync(usbDomain.usbHost1)
-  val host2 = new UsbHostSync(usbDomain.usbHost2)
+  // Reading USB1_STATUS acknowledges the level-triggered interrupt. Keep a
+  // new report pending if it arrives during the acknowledgement read.
+  val host1StatusRead = io.sel &&
+    !io.bus.wr &&
+    (io.bus.uds || io.bus.lds) &&
+    (io.bus.address(4 downto 1) === 0)
 
-  // TODO: add interrupt for host2 (e.g. host1.int || host2.int)
-  //       and add to the status register which usb host triggered the interrupt
-  //       note that the interrupt status should be reset after read
+  val host1 = new UsbHostSync(usbDomain.usbHost1, host1StatusRead)
+  val host2 = new UsbHostSync(usbDomain.usbHost2, False)
+
+  // TODO: add interrupt acknowledgement and routing for host2.
   io.int := host1.int
 
   io.bus.dataIn := 0
