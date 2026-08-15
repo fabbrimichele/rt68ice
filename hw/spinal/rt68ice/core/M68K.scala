@@ -15,7 +15,7 @@ object M68KType extends Enumeration {
 //noinspection ScalaWeakerAccess
 case class M68K(
   cpuType: M68KType = M68000,
-  autovector: Boolean = true
+  autovector: Boolean = false // active low
 ) extends Component {
 
   val io = new Bundle {

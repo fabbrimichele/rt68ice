@@ -35,7 +35,19 @@ case class UsbDevice(usbCd: ClockDomain) extends Component {
     )
 
     // --- Interrupt ---
-    val int = BufferCC(usbHost.io.report, init = False)
+    // 1. In the 12 MHz USB domain: Turn the 1-cycle pulse into a permanent level change
+    val reportToggle = new ClockingArea(usbCd) {
+      val toggle = RegInit(False)
+      when(usbHost.io.report) { toggle := !toggle }
+    }
+
+    // 2. Safely cross the level change into the System domain
+    val sysToggle = BufferCC(reportToggle.toggle, init = False)
+
+    // 3. In the System domain: Turn the level change BACK into a 1-cycle pulse
+    val sysReportPulse = sysToggle =/= RegNext(sysToggle, False)
+
+    val int = sysReportPulse
 
     // --- Mouse ---
     val mouseBtn = BufferCC(usbHost.io.mouse_btn, init = B"00000000")
@@ -44,12 +56,14 @@ case class UsbDevice(usbCd: ClockDomain) extends Component {
     val accDx = Reg(SInt(8 bits)) init 0
     val accDy = Reg(SInt(8 bits)) init 0
 
+    // TODO: accumulators should be cleared after a read
     when(usbHost.io.report && usbHost.io.typ === 2) {
       accDx := accDx + usbHost.io.mouse_dx.asSInt
       accDy := accDy + usbHost.io.mouse_dy.asSInt
     }
 
     // Safely transfer the accumulating position counters across CDC
+    // TODO: this is wrong, BufferCC should only be used when one single bit changes at a time
     val mouseDxAcc = BufferCC(accDx.asBits, init = B"00000000")
     val mouseDyAcc = BufferCC(accDy.asBits, init = B"00000000")
 

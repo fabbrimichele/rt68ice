@@ -9,7 +9,12 @@ start:
     trap    #14
 
 usb_isr:
-    move.w  USB1_GAMEPAD,LEDS   ; Write gamepad status to LEDs
+    move.l  d0,-(sp)
+    move.w  USB1_STATUS,D0      ; Read status register -> clear interrupts
+    move.w  USB1_GAMEPAD,D0     ; Read gamepad status
+    move.w  D0,LEDS             ; Write gamepad status to LEDs
+    move.w  #1,LEDS             ; Write gamepad status to LEDs
+    move.l  (sp)+,d0
     rte
 
 ; ===========================

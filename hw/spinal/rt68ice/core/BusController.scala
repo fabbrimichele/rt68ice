@@ -89,8 +89,8 @@ case class BusController() extends Component {
   // IPL is active low
   when(io.usbInt) {
     io.ipl := B"001" // bitwise not 6
-  } elsewhen(io.uartInt) {
-    io.ipl := B"011" // bitwise not 4
+  /*} elsewhen(io.uartInt) {
+      io.ipl := B"011" // bitwise not 4 */
   } otherwise {
     io.ipl := B"111" // bitwise not 0
   }
