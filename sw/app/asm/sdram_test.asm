@@ -122,22 +122,22 @@ run_data_test:
 ; Output: d0.b -> 0 OK, 1 Error
 ; ------------------------------------------------------
 run_addr_test:
-    move.l  #RAM_START,a0           ; Base address (0x800000)
-    move.l  #RAM_START+$10000,a1    ; Distant row/bank address (0x810000)
+    move.l  #RAM_START+$700000,a0   ; Unused test area (0xF00000)
+    move.l  #RAM_START+$700400,a1   ; Must not alias with 0xF00000
 
     ; 1. Write unique patterns
-    move.w  #$AAAA,(a0)             ; Write to 0x800000
-    move.w  #$5555,2(a0)            ; Write to 0x800002
-    move.w  #$1234,(a1)             ; Write to 0x810000
+    move.w  #$AAAA,(a0)             ; Write to 0xF00000
+    move.w  #$5555,2(a0)            ; Write to 0xF00002
+    move.w  #$1234,(a1)             ; Write to 0xF00400
 
     ; 2. Read back and verify the first two
-    cmp.w   #$AAAA,(a0)             ; Did 0x800000 change?
+    cmp.w   #$AAAA,(a0)             ; Did 0xF00000 change?
     bne.s   .error
-    cmp.w   #$5555,2(a0)            ; Did 0x800002 change?
+    cmp.w   #$5555,2(a0)            ; Did 0xF00002 change?
     bne.s   .error
 
     ; 3. Verify the distant address
-    cmp.w   #$1234,(a1)             ; Did 0x810000 change?
+    cmp.w   #$1234,(a1)             ; Did 0xF00400 change?
     bne.s   .error
 
     moveq   #0,d0                   ; Success
