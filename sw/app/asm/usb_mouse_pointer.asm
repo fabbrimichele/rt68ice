@@ -10,6 +10,7 @@
 start:
     or.w    #$0700,SR               ; Mask interrupts during initialization
     move.l  #usb_isr,VT_INT_6
+    move.w  #$0003,USB_IRQ_ENABLE   ; Enable Host 1 and Host 2 USB interrupts
 
     clr.b   mouse_updated
     clr.b   have_sample

@@ -115,44 +115,52 @@ case class UsbDevice(usbCd: ClockDomain) extends Component {
   }
 
   // --- 68000 bus interface ---
+  // The USB map uses 16-bit registers.  Keep the global interrupt registers
+  // at word offsets 0-1 and reserve a 16-word block for each host.
+  val wordAddress = io.bus.address(5 downto 1)
   val registerRead = io.sel &&
     !io.bus.wr &&
+    (io.bus.uds || io.bus.lds)
+  val registerWrite = io.sel &&
+    io.bus.wr &&
     (io.bus.uds || io.bus.lds)
 
   // Reading a host's status register acknowledges only that host. Keep a new
   // report pending if it arrives during the acknowledgement read.
-  val host1StatusRead = registerRead && (io.bus.address(4 downto 1) === 0)
-  val host2StatusRead = registerRead && (io.bus.address(4 downto 1) === 8)
+  val host1StatusRead = registerRead && (wordAddress === 8)
+  val host2StatusRead = registerRead && (wordAddress === 24)
 
   val host1 = new UsbHostSync(usbDomain.usbHost1, host1StatusRead)
   val host2 = new UsbHostSync(usbDomain.usbHost2, host2StatusRead)
 
-  // Both hosts share the same interrupt level. USB_IRQ_STATUS lets software
-  // identify all pending sources without acknowledging either one.
-  io.int := host1.int || host2.int
+  // Both hosts share the same interrupt level. Reports remain pending while
+  // masked, allowing polling users to inspect them via USB_IRQ_STATUS.
+  val irqEnable = Reg(Bits(2 bits)) init 0
+  when(registerWrite && (wordAddress === 1)) {
+    irqEnable := io.bus.dataOut(1 downto 0)
+  }
+
+  io.int := (host1.int && irqEnable(0)) || (host2.int && irqEnable(1))
   val interruptStatus = (host2.int ## host1.int).resize(16)
 
   io.bus.dataIn := 0
   when(io.sel) {
     when(!io.bus.wr) {
       // Read
-      io.bus.dataIn := io.bus.address(4 downto 1).mux(
-        0  -> host1.status.resize(16),
-        1  -> host1.mouseBtn.resize(16),
-        2  -> host1.mouseDxAcc.asBits.resize(16),
-        3  -> host1.mouseDyAcc.asBits.resize(16),
-        4  -> host1.gamepad.resize(16),
-        5  -> interruptStatus,
-        6  -> B"x0000",
-        7  -> B"x0000",
-        8  -> host2.status.resize(16),
-        9  -> host2.mouseBtn.resize(16),
-        10 -> host2.mouseDxAcc.asBits.resize(16),
-        11 -> host2.mouseDyAcc.asBits.resize(16),
-        12 -> host2.gamepad.resize(16),
-        13 -> B"x0000",
-        14 -> B"x0000",
-        15 -> B"x0000",
+      io.bus.dataIn := wordAddress.mux(
+        0  -> interruptStatus,
+        1  -> irqEnable.resize(16),
+        8  -> host1.status.resize(16),
+        9  -> host1.mouseBtn.resize(16),
+        10 -> host1.mouseDxAcc.asBits.resize(16),
+        11 -> host1.mouseDyAcc.asBits.resize(16),
+        12 -> host1.gamepad.resize(16),
+        24 -> host2.status.resize(16),
+        25 -> host2.mouseBtn.resize(16),
+        26 -> host2.mouseDxAcc.asBits.resize(16),
+        27 -> host2.mouseDyAcc.asBits.resize(16),
+        28 -> host2.gamepad.resize(16),
+        default -> B(0, 16 bits),
       )
     }
   }

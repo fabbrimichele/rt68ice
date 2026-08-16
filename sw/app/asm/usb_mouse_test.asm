@@ -4,8 +4,10 @@
 ; Program code
 ; ===========================
 start:
+    or.w    #$0700,SR           ; Mask interrupts during setup
     move.l  #usb_isr,VT_INT_6   ; Set USB interrupt handler
     clr.b   mouse_updated
+    move.w  #$0003,USB_IRQ_ENABLE ; Enable Host 1 and Host 2 USB interrupts
 
     lea     msg_title,a0
     bsr     put_str
