@@ -11,30 +11,35 @@
 ; BIT-0: receive holding register
 
 start:
+    or.w    #$0700,sr           ; Mask interrupts while installing the vector
     move.l  #uart_isr,VT_INT_4  ; Set interrupt handler
+
+    clr.b   char
     move.b  #$01,UART_IER	    ; Enable interrupt on receive holding register
     and.w   #$f8ff,sr           ; Enable all interrupts on 68000 (Clear mask bits)
 .loop:
     cmp.b   #'Q',char
     bne     .loop
+
+    or.w    #$0700,sr           ; Prevent a final ISR while shutting down
     move.b  #$00,UART_IER	    ; Disable interrupt on receive holding register
-    and.w   #$ffff,sr           ; Disable all interrupts on 68000 (Clear mask bits)
     trap    #14
 
 uart_isr:
     movem.l d0,-(sp)            ; Save d0
-    move.w  UART_IIR,d0         ; Read interrupt status register (and ack interrupt)
-    cmp.w   #4,d0               ; Received Data Ready (0100)
-    beq     .read
-    cmp.w   #2,d0               ; Transmitter Holding Register Ready (0010)
-    beq     .write
+
+    ; The UART is wired to the upper byte of the 16-bit bus, so all UART
+    ; registers must be accessed with move.b.  A word read would see IIR $04
+    ; as $0400 and leave RBR unread, keeping the interrupt asserted.
+    move.b  UART_IIR,d0
+    andi.b  #$0f,d0             ; Keep the interrupt identification bits
+    cmpi.b  #4,d0               ; Received Data Ready (0100)
     bne     .ret
-.read:
-    move.w  UART_RBR,d0         ; Read character to d0
+
+    moveq   #0,d0
+    move.b  UART_RBR,d0         ; Read character and acknowledge RX interrupt
     move.w  d0,LEDS
     move.b  d0,char
-    bne     .ret
-.write:
 .ret:
     movem.l (sp)+,d0            ; Restore D0
     rte                         ; Return from int
@@ -57,5 +62,4 @@ uart_isr:
 ; ===========================
     section .bss
 char        DS.B    1
-
 
