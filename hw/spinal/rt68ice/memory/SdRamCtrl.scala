@@ -28,7 +28,8 @@ case class SdRamCtrl(config: SdRamCtrlConfig = SdRamCtrlConfig()) extends Compon
   val io = new Bundle {
     val initComplete = out Bool()
 
-    val p0Addr      = in Bits(25 bits)
+    // IS42S16160B word address: 2 bank + 13 row + 9 column bits.
+    val p0Addr      = in Bits(24 bits)
     val p0Data      = in Bits(16 bits)
     val p0ByteEn    = in Bits(2 bits)
     val p0Q         = out Bits(config.p0BurstLength * 16 bits)
@@ -122,7 +123,7 @@ case class SdRamCtrl(config: SdRamCtrlConfig = SdRamCtrlConfig()) extends Compon
   private val p0WrQueue = RegInit(False)
   private val p0RdQueue = RegInit(False)
   private val p0ByteEnQueue = Reg(Bits(2 bits)) init 0
-  private val p0AddrQueue = Reg(Bits(25 bits)) init 0
+  private val p0AddrQueue = Reg(Bits(24 bits)) init 0
   private val p0DataQueue = Reg(Bits(16 bits)) init 0
 
   private val readBuffer = Reg(Bits(128 bits)) init 0
@@ -132,7 +133,7 @@ case class SdRamCtrl(config: SdRamCtrlConfig = SdRamCtrlConfig()) extends Compon
   private val p0AddrCurrent = p0ReqQueue ? p0AddrQueue | io.p0Addr
   private val portReq = p0Req || p0ReqQueue
 
-  private val activePortAddr = Bits(10 bits)
+  private val activePortAddr = Bits(9 bits)
   private val activePortData = Bits(16 bits)
   private val activePortByteEn = Bits(2 bits)
 
@@ -141,7 +142,7 @@ case class SdRamCtrl(config: SdRamCtrlConfig = SdRamCtrlConfig()) extends Compon
   activePortByteEn := 0
   switch(activePort) {
     is(0) {
-      activePortAddr := p0AddrQueue(9 downto 0)
+      activePortAddr := p0AddrQueue(8 downto 0)
       activePortData := p0DataQueue
       activePortByteEn := p0ByteEnQueue
     }
@@ -168,8 +169,8 @@ case class SdRamCtrl(config: SdRamCtrlConfig = SdRamCtrlConfig()) extends Compon
 
   private def setActiveCommand(addr: Bits, port: Int = 0): Unit = {
     command := Command.active
-    bank := addr(24 downto 23)
-    address := addr(22 downto 10)
+    bank := addr(23 downto 22)
+    address := addr(21 downto 9)
     activePort := port
     delayCounter := U(scala.math.max(cyclesForActiveRow - 2, 0), 32 bits)
   }
@@ -262,7 +263,8 @@ case class SdRamCtrl(config: SdRamCtrlConfig = SdRamCtrlConfig()) extends Compon
       delayCounter := U(scala.math.max(cyclesAfterWriteForNextCommand - 2, 0), 32 bits)
 
       command := Command.write
-      address := B"2'b00" ## True ## activePortAddr
+      // A10 enables auto-precharge; A9 is not a column bit on the x16 SDRAM.
+      address := B"4'b0010" ## activePortAddr
       dqOutput := True
       dqData := activePortData
       dataMask := ~activePortByteEn
@@ -283,7 +285,8 @@ case class SdRamCtrl(config: SdRamCtrlConfig = SdRamCtrlConfig()) extends Compon
 
       p0RdQueue := False
       command := Command.read
-      address := B"2'b00" ## True ## activePortAddr
+      // A10 enables auto-precharge; A9 is not a column bit on the x16 SDRAM.
+      address := B"4'b0010" ## activePortAddr
       dataMask := 0
     }
 
