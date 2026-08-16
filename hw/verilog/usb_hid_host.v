@@ -24,9 +24,9 @@ module usb_hid_host (
     output reg [7:0] key1, key2, key3, key4,
 
     // mouse
-    output reg [7:0] mouse_btn,     // {5'bx, middle, right, left}
-    output reg signed [7:0] mouse_dx,      // signed 8-bit, cleared after `report` pulse
-    output reg signed [7:0] mouse_dy,      // signed 8-bit, cleared after `report` pulse
+    output reg [7:0] mouse_btn,         // {5'bx, middle, right, left}
+    output reg signed [11:0] mouse_dx,  // signed 12-bit, cleared after `report` pulse
+    output reg signed [11:0] mouse_dy,  // signed 12-bit, cleared after `report` pulse
 
     // gamepad 
     output reg game_l, game_r, game_u, game_d,  // left right up down
@@ -89,8 +89,12 @@ always @(posedge usbclk) begin : process_in_data
             end else if (typ == 2) begin    // mouse
                 case (rcvct)
                 0: mouse_btn <= ukpdat;
-                1: mouse_dx <= ukpdat;
-                2: mouse_dy <= ukpdat;
+                1: mouse_dx[7:0] <= ukpdat;
+                2: begin
+                    mouse_dx[11:8] <= ukpdat[3:0]; // lower 4 bits of byte 2 for dx
+                    mouse_dy[3:0]  <= ukpdat[7:4]; // upper 4 bits of byte 2 for dy
+                end
+                3: mouse_dy[11:4] <= ukpdat;       // remaining 8 bits of byte 3 for dy
                 endcase
             end else if (typ == 3) begin    // gamepad
                 // A typical report layout:
@@ -368,4 +372,3 @@ module ukp(
     reg    ukprdyd;
     reg    nakd;
 endmodule
-

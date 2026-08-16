@@ -27,8 +27,8 @@ class UsbHidHostBB extends BlackBox {
 
     // Mouse
     val mouse_btn = out Bits(8 bits)  // {5'bx, middle, right, left}
-    val mouse_dx = out Bits(8 bits)   // signed 8-bit, cleared after `report` pulse
-    val mouse_dy = out Bits(8 bits)   // signed 8-bit, cleared after `report` pulse
+    val mouse_dx = out Bits(12 bits)   // signed 12-bit, cleared after `report` pulse
+    val mouse_dy = out Bits(12 bits)   // signed 12-bit, cleared after `report` pulse
 
     val game_l,  game_r, game_u, game_d = out Bool()                    // left right up down
     val game_a, game_b, game_x, game_y, game_sel, game_sta = out Bool() // buttons
