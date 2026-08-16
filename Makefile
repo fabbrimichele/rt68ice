@@ -5,6 +5,7 @@ SCALA_PACKAGE = rt68ice
 VERILOG_SOURCES = hw/gen/$(TOP).v
 MERGED_VHDL = hw/gen/mergeRTL.vhd
 MERGED_VERILOG = hw/gen/mergeRTL.v
+SPINAL_SOURCES := $(shell find hw/spinal -type f -name '*.scala')
 #WAVE_FILE = simWorkspace/VgaRasterEngine/test/wave.fst
 #WAVE_FILE = simWorkspace/VgaDevice/test/wave.fst
 WAVE_FILE = simWorkspace/SdRamDevice/test/wave.vcd
@@ -19,6 +20,7 @@ ASM_SRC_DIR = sw/fw/asm
 BIN_GEN_DIR = hw/gen
 HEX_SPINAL_DIR = hw/spinal/rt68ice/memory
 HEX_CLASS_DIR = target/scala-2.13/classes/rt68ice/memory
+ASM_LIB_SOURCES := $(wildcard sw/lib/asm/*.asm)
 # Default linker script for firmware (fw) programs
 LD_SCRIPT = $(ASM_SRC_DIR)/fw.ld
 # Applications (App)
@@ -41,11 +43,11 @@ all: images $(TARGET).bit
 
 # 1. Generate Verilog from SpinalHDL (The bridge)
 spinal: $(VERILOG_SOURCES) $(MERGED_VHDL)
-$(VERILOG_SOURCES) $(MERGED_VHDL): hw/spinal/rt68ice/*.scala rom apps
+$(VERILOG_SOURCES) $(MERGED_VHDL): $(SPINAL_SOURCES) rom apps
 	sbt "runMain $(SCALA_PACKAGE).$(TOP)Verilog"
 
 # 2. Synthesis
-$(TARGET).json: $(VERILOG_TOP) $(MERGED_VHDL)
+$(TARGET).json: $(VERILOG_SOURCES) $(MERGED_VHDL)
 	#yosys -p "synth_ecp5 -json $@" $(VERILOG_SOURCES)
 	yosys -m ghdl -p "ghdl -C --std=08 -C -fsynopsys -C --latches $(MERGED_VHDL) -e TG68KdotC_Kernel; \
 		ghdl -C --std=08 -C -fsynopsys -C --latches $(MERGED_VHDL) -e T16450; \
@@ -109,7 +111,7 @@ rom: $(ROM_HEX_FILES)
 # When building the monitor hex file, temporarily replace the generic linker script
 $(HEX_CLASS_DIR)/monitor.hex: LD_SCRIPT = $(ASM_SRC_DIR)/monitor.ld
 
-$(HEX_CLASS_DIR)/%.hex: $(ASM_SRC_DIR)/%.asm
+$(HEX_CLASS_DIR)/%.hex: $(ASM_SRC_DIR)/%.asm $(ASM_LIB_SOURCES)
 	@echo "----------------------------------------------"
 	@echo "- Assembling and Converting '$*'"
 	@echo "----------------------------------------------"
@@ -136,7 +138,7 @@ apps: $(BIN_APP_TARGETS)
 
 # We use target-specific assignment (= or :=) so $* is evaluated inside the rule context
 $(TARGET_APP_DIR)/%.bin: RAW_FILE_NAME = $(TARGET_APP_DIR)/$*_raw.bin
-$(TARGET_APP_DIR)/%.bin: $(ASM_APP_DIR)/%.asm
+$(TARGET_APP_DIR)/%.bin: $(ASM_APP_DIR)/%.asm $(ASM_LIB_SOURCES)
 	@mkdir -p $(TARGET_APP_DIR)
 	# Assemble to a raw binary image (*_raw.bin)
 	vasmm68k_mot -Felf $< -o $(TARGET_APP_DIR)/$*.o
