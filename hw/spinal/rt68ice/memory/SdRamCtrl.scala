@@ -165,7 +165,15 @@ case class SdRamCtrl(config: SdRamCtrlConfig = SdRamCtrlConfig()) extends Compon
   io.sdRam.cas_n := command(1)
   io.sdRam.we_n := command(0)
   io.sdRam.cke := clockEnable
-  io.sdRam.clock := !ClockDomain.current.readClockWire
+
+  // Forward an inverted controller clock through the ECP5's dedicated DDR
+  // output register instead of routing a clock through ordinary FPGA fabric.
+  private val sdRamClock = new Ecp5OddrX1F
+  sdRamClock.io.D0 := False
+  sdRamClock.io.D1 := True
+  sdRamClock.io.SCLK := ClockDomain.current.readClockWire
+  sdRamClock.io.RST := False
+  io.sdRam.clock := sdRamClock.io.Q
 
   private def setActiveCommand(addr: Bits, port: Int = 0): Unit = {
     command := Command.active
