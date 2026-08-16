@@ -88,11 +88,11 @@ case class BusController() extends Component {
   // Only autovectors are used for interrupts
   // IPL is active low
   when(io.usbInt) {
-    io.ipl := B"001" // bitwise not 6
-  /*} elsewhen(io.uartInt) {
-      io.ipl := B"011" // bitwise not 4 */
+    io.ipl := B"001"        // bitwise not 6
+  } elsewhen(io.uartInt) {
+    io.ipl := B"011"        // bitwise not 4
   } otherwise {
-    io.ipl := B"111" // bitwise not 0
+    io.ipl := B"111"        // bitwise not 0
   }
 
 
