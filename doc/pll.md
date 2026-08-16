@@ -47,25 +47,24 @@ the same internal VCO (Voltage Controlled Oscillator).
 ## Commands for project
 The followings are the command used to generate the PLL for the project
 
-### Main PLL
-It includes CPU, SDRAM, VGA and HDIM clocks:
+### Video PLL
+It provides the HDMI and VGA clocks:
 ```Bash
-ecppll -i 25 \
-  --clkin_name clkin_25 \
-  -o 125 --clkout0_name clk_hdmi \
+ecppll -i 25 --clkin_name clkin_25 \
+  --clkout0 125 --clkout0_name clk_hdmi \
   --clkout1 25 --clkout1_name clk_vga \
-  --clkout2 26 --clkout2_name clk_cpu \
-  --clkout3 52 --clkout3_name clk_sdram --phase3 180 \
-  -f hw/verilog/pll_primary.v
+  -f hw/verilog/pll1.v
 ```
 
-### Secondary PLL
-It includes the USB clock, note it needs the input clock from the main PLL.
-The result must be copied to the `pll.v` and linked to the 125 MHz clock.
-See [icesugar-pro/clock.v](https://github.com/nand2mario/usb_hid_host/blob/main/boards/icesugar-pro/clock.v) for an example.
-```bash
-ecppll -i 125 \
-  --clkin_name clkin_125 \
-  -o 12 --clkout0_name clk_usb \
-  -f hw/verilog/pll_secondary.v
+### CPU, SDRAM and USB PLL
+It provides phase-related 25 MHz CPU and 50 MHz SDRAM clocks, plus the precise
+12 MHz USB clock:
+```Bash
+ecppll -i 25 --clkin_name clkin_25 \
+  --clkout0 25 --clkout0_name clk_cpu \
+  --clkout1 50 --clkout1_name clk_sdram --phase3 180 \
+  --clkout2 12 --clkout2_name clk_usb \
+  -f hw/verilog/pll2.v
 ```
+
+The two generated PLL instances are combined in `hw/verilog/pll.v`.
