@@ -4,7 +4,9 @@
 ; Program code
 ; ===========================
 start:
+    or.w    #$0700,SR           ; Mask interrupts during setup
     move.l  #usb_isr,VT_INT_6   ; Set USB interrupt handler
+    move.w  #$0003,USB_IRQ_ENABLE ; Enable Host 1 and Host 2 USB interrupts
     and.w   #$F8FF,SR           ; Enable all interrupts on 68000 (Clear mask bits)
 
 ; Stay resident so USB reports can invoke usb_isr.  trap #14 returns to the
