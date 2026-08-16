@@ -84,16 +84,16 @@ run_data_test:
     move.w  #1,d1
 .bit_loop:
     ; Write loop
-    lea     RAM_START,a2
-    move.l  #RAM_SIZE,d0
+    lea     RAM_TEST_START,a2
+    move.l  #RAM_TEST_WORDS,d0
 .wr_loop:
     move.w  d1,(a2)+
     subq.l  #1,d0
     bne.s   .wr_loop
 
     ; Read loop
-    lea     RAM_START,a2
-    move.l  #RAM_SIZE,d0
+    lea     RAM_TEST_START,a2
+    move.l  #RAM_TEST_WORDS,d0
 .rd_loop:
     move.w  (a2)+,d2
     cmp.w   d1,d2
@@ -149,15 +149,15 @@ run_addr_test:
 
 
 ; ------------------------------------------------------
-; 3. The "Pseudo-Random Soak" Test (Timing Stress)
+; 3. Longword Soak Test (Timing Stress)
 ; Floods the memory controller with back-to-back READ
 ; commands to catch race conditions and buffer clear failures.
 ;
 ; Output: d0.b -> 0 OK, 1 Error
 ; ------------------------------------------------------
 run_time_test:
-    ; 1 & 2. Allocate and fill a 1KB block (256 Longwords)
-    move.l  #RAM_START,a0
+    ; 1 & 2. Fill a 1KB block outside the running application.
+    move.l  #RAM_TEST_START,a0
     move.l  #$DEADBEEF,d1           ; Test pattern
     move.w  #255,d0                 ; 256 iterations (0 to 255)
 
@@ -165,12 +165,11 @@ run_time_test:
     move.l  d1,(a0)+                ; Write 32 bits and auto-increment
     dbra    d0,.fill_loop
 
-    ; 3 & 4. Tight loop to read back and verify 1,000,000 times
-    ;move.l  #1000000,d2             ; Outer loop counter (~6-7 mins at 8MHz)
-    move.l  #10,d2             ; Outer loop counter (~6-7 mins at 8MHz)
+    ; 3 & 4. Read the block back repeatedly and verify each longword.
+    move.l  #SOAK_PASSES,d2           ; Outer loop counter
 
 .soak_loop:
-    move.l  #RAM_START,a0           ; Reset pointer to start of 1KB block
+    move.l  #RAM_TEST_START,a0      ; Reset pointer to start of 1KB block
     move.w  #255,d0                 ; Reset inner counter to 256 longwords
 
 .rd_loop:
@@ -182,7 +181,7 @@ run_time_test:
     dbra    d0,.rd_loop             ; Inner loop (1KB)
 
     subq.l  #1,d2                   ; Decrement outer loop counter
-    bne.s   .soak_loop              ; Outer loop (1,000,000 times)
+    bne.s   .soak_loop              ; Repeat the configured number of passes
 
     moveq   #0,d0                   ; Success
     rts
@@ -203,8 +202,8 @@ run_time_test:
 run_bench_test:
     ; --- Setup ---
     movea.l #COUNTER,a0             ; Counter base
-    movea.l #RAM_START,a1           ; Source
-    movea.l #RAM_START+$1000,a2     ; Destination
+    movea.l #RAM_TEST_START,a1      ; Source outside the running application
+    movea.l #RAM_TEST_START+$1000,a2 ; Non-overlapping destination
     move.w  #(BENCH_WORDS-1),d1     ; DBRA loop count
 
     ; --- Benchmark Start ---
@@ -225,9 +224,12 @@ run_bench_test:
 ; ===========================
 ; Value Constants
 ; ===========================
-RAM_START   equ $800000      ; SDRAM start address
-RAM_SIZE    equ 4194304-1    ; In words
-BENCH_WORDS equ 256          ; Number of words copied by benchmark
+RAM_START       equ $800000          ; SDRAM start address
+RAM_END         equ $FFFFFF          ; SDRAM end address (inclusive)
+RAM_TEST_START  equ RAM_START+$10000 ; Reserve the first 64 KiB for this program
+RAM_TEST_WORDS  equ (RAM_END+1-RAM_TEST_START)/2
+SOAK_PASSES     equ 10
+BENCH_WORDS     equ 256              ; Number of words copied by benchmark
 
 ; ===========================
 ; Include files
