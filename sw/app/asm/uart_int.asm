@@ -13,8 +13,13 @@
 start:
     or.w    #$0700,sr           ; Mask interrupts while installing the vector
     move.l  #uart_isr,VT_INT_4  ; Set interrupt handler
+    move.l  #usb_isr,VT_INT_6   ; USB has higher priority than the UART
 
     clr.b   char
+    ; A connected mouse can leave a USB report pending.  Acknowledge both
+    ; hosts before interrupts are enabled so level 6 cannot starve UART level 4.
+    move.w  USB1_STATUS,d0
+    move.w  USB2_STATUS,d0
     move.b  #$01,UART_IER	    ; Enable interrupt on receive holding register
     and.w   #$f8ff,sr           ; Enable all interrupts on 68000 (Clear mask bits)
 .loop:
@@ -44,12 +49,23 @@ uart_isr:
     movem.l (sp)+,d0            ; Restore D0
     rte                         ; Return from int
 
+; USB has interrupt priority over the UART.  This demo does not consume USB
+; reports, but it must acknowledge them or a pending level-6 interrupt would
+; prevent the level-4 UART interrupt from being serviced.
+usb_isr:
+    movem.l d0,-(sp)
+    move.w  USB1_STATUS,d0
+    move.w  USB2_STATUS,d0
+    movem.l (sp)+,d0
+    rte
+
 ; ===========================
 ; Include files
 ; ===========================
     INCLUDE '../../lib/asm/isr_vector.asm'
     INCLUDE '../../lib/asm/mem_map_uart.asm'
     INCLUDE '../../lib/asm/mem_map_leds.asm'
+    INCLUDE '../../lib/asm/mem_map_usb.asm'
 
 ; ===========================
 ; Data Constants
@@ -62,4 +78,3 @@ uart_isr:
 ; ===========================
     section .bss
 char        DS.B    1
-
