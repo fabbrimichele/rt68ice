@@ -1,21 +1,21 @@
 MEMORY
 {
     /* The hardware maps the first 8 bytes to ROM, but we define the actual ROM storage */
-    RAM (rwx)   : ORIGIN = 0x00000000, LENGTH = 16K
+    SDRAM (rwx) : ORIGIN = 0x00800000, LENGTH = 8M
     ROM (rx)    : ORIGIN = 0x00004000, LENGTH = 16K
     FB  (rw)    : ORIGIN = 0x00100000, LENGTH = 76800
 }
 
 SECTIONS
 {
-    .text 0x00000400 : {
+    .text : {
         *(.text*)
         *(.rodata*)
-    } > RAM
+    } > SDRAM
 
     .bss (NOLOAD) : {
         *(.bss*)                /* buffers and variables go here */
-    } > RAM
+    } > SDRAM
 
     .fb (NOLOAD) : {
         _fb_start = .;
