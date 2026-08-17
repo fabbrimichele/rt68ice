@@ -65,9 +65,15 @@ case class BusController() extends Component {
   // Disable the CPU for one clock cycle when accessing memory
   // Detect if the CPU is trying to use the bus
   // We pause for Fetch (00), Data Read (10), and Data Write (11)
-  val busActive = (io.busState === B"00" ||
+  val memoryCycle = io.busState === B"00" ||
     io.busState === B"10" ||
-    io.busState === B"11") && !io.sdRamSel
+    io.busState === B"11"
+  val busActive = memoryCycle && !io.sdRamSel
+
+  // TG68K keeps driving its address output between transfers and may expose
+  // a post-incremented address before the next transfer begins. BERR is only
+  // meaningful while at least one data strobe qualifies a real bus transfer.
+  val cpuTransferActive = memoryCycle && (io.cpuBus.uds || io.cpuBus.lds)
 
   // The Handshake Logic
   when(busActive && !isWaiting) {
@@ -178,7 +184,7 @@ case class BusController() extends Component {
   } elsewhen usbMapping.hit(address) {
     io.usbSel := True
   } otherwise {
-    io.busErr := True // Out of bounds access! Trigger BERR
+    io.busErr := cpuTransferActive // Out-of-bounds active transfer
   }
 
   // ----------------------
