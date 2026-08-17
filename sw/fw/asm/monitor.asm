@@ -180,7 +180,7 @@ help_cmd:
 ; [L bytes of raw binary content]
 ;
 ; Example (File Content in Hex Bytes):
-; 00 00 08 10 ; Load Address: $00000810
+; 00 01 00 00 ; Load Address: $00010000
 ; 00 00 00 02 ; Content Length: 2 bytes (it doesn't include the headers)
 ; 55 55       ; Actual Content: Two bytes ($55, $55)
 ; -------------------------------------------------------------------------
