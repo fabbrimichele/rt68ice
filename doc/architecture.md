@@ -11,10 +11,13 @@ Design and implement a high-performance Motorola 680x0-compatible System-on-a-Ch
     * **68020 Configuration:** Enables 32-bit internal longword operations, improved bitfield instructions, and advanced addressing modes.
     * **Data Bus:** 16-bit external; direct 1:1 mapping to the iCESugar Pro’s 16-bit wide SDRAM chip.
 * **RAM:**
-    * **Vector Table:** 0x0 - 0x400 mapped to FPGA BRAM for high-speed exception and interrupt handling (bypassing SDRAM latency).
-    * **Main Memory:** 32MB SDRAM with a dedicated controller and L1 cache to mitigate row-access latencies and burst-mode penalties.
+    * **Low Memory:** The 8MB CPU window is contiguous from `0x000000` to `0x7FFFFF`, as expected by EmuTOS.
+    * **Vector Table:** The first 16KB is overlaid by FPGA BRAM for high-speed exception, interrupt, stack and firmware-data access. The first eight bytes are read from ROM for the reset stack pointer and program counter.
+    * **Main Memory:** The board's 32MB SDRAM is accessed through the 8MB low-memory CPU window. A larger window and cache can be added later.
 * **ROM:**
-    * System firmware stored in iCESugar SPI Flash; shadowed to SDRAM at boot for high-speed execution or executed via eXecute-In-Place (XIP).
+    * The 16KB boot ROM is mapped at the Atari-compatible `0xFC0000` address, with its first eight bytes also visible at reset-vector addresses `0x000000-0x000007`.
+* **Custom I/O:**
+    * The dedicated framebuffer is at `0xE00000`; custom peripherals occupy 16KB windows beginning at `0xF00000`.
 * **Graphic Modes:**
     * **Planar:** Hardware-accelerated bitplane support for EmuTOS compatibility.
     * **Chunky:** Linear 8-bit framebuffer for optimized DOOM rendering and uClinux console.

@@ -1,1 +1,1 @@
-LED         equ     $00008000   ; LED-mapped register base address
+LED         equ     $00F00000   ; LED-mapped register base address

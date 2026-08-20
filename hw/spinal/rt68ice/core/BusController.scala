@@ -127,23 +127,24 @@ case class BusController() extends Component {
   val interruptAckMapping = MaskMapping(0xFFFFFFF0L, 0xFFFFFFF0L)
   // Boot vectors look at the absolute first 8 bytes via a 3-bit wildcard mask
   val bootMapping     = MaskMapping(0x00000000L, 0xFFFFFFF8L)
-  val ramMapping      = SizeMapping(0x00000000L, 16 KiB)  // $000000 - $003FFF
-  val romMapping      = SizeMapping(0x00004000L, 16 KiB)  // $004000 - $007FFF
-  val ledMapping      = SizeMapping(0x00008000L, 16 KiB)  // $008000 - $00BFFF
-  val uartMapping     = SizeMapping(0x0000C000L, 16 KiB)  // $00C000 - $00FFFF
-  val vidPalMapping   = SizeMapping(0x00010000L, 16 KiB)  // $010000 - $013FFF
-  val vidCtrlMapping  = SizeMapping(0x00014000L, 16 KiB)  // $014000 - $017FFF
-  val counterMapping  = SizeMapping(0x00018000L, 16 KiB)  // $018000 - $01BFFF
-  val ledsMapping     = SizeMapping(0x00020000L, 16 KiB)  // $020000 - $023FFF
-  val usbMapping      = SizeMapping(0x00024000L, 16 KiB)  // $024000 - $027FFF
-  val vidFbMapping    = SizeMapping(0x00100000L, 128 KiB) // $100000 - $11FFFF - only the first 75KB are available
-  val sdRamMapping    = SizeMapping(0x00800000L, 8 MiB)   // $800000 - $FFFFFF - Map 8 MB out of 32 MB
+  val ramMapping      = SizeMapping(0x00000000L, 16 KiB)  // $000000 - $003FFF, overlays SDRAM
+  val sdRamMapping    = SizeMapping(0x00000000L, 8 MiB)   // $000000 - $7FFFFF
+  val vidFbMapping    = SizeMapping(0x00E00000L, 128 KiB) // $E00000 - $E1FFFF; first 75 KiB used
+  val ledMapping      = SizeMapping(0x00F00000L, 16 KiB)  // $F00000 - $F03FFF
+  val uartMapping     = SizeMapping(0x00F04000L, 16 KiB)  // $F04000 - $F07FFF
+  val vidPalMapping   = SizeMapping(0x00F08000L, 16 KiB)  // $F08000 - $F0BFFF
+  val vidCtrlMapping  = SizeMapping(0x00F0C000L, 16 KiB)  // $F0C000 - $F0FFFF
+  val counterMapping  = SizeMapping(0x00F10000L, 16 KiB)  // $F10000 - $F13FFF
+  val ledsMapping     = SizeMapping(0x00F14000L, 16 KiB)  // $F14000 - $F17FFF
+  val usbMapping      = SizeMapping(0x00F18000L, 16 KiB)  // $F18000 - $F1BFFF
+  val romMapping      = SizeMapping(0x00FC0000L, 16 KiB)  // $FC0000 - $FC3FFF
 
   saveMemoryLayout(
     "doc/memory_layout.md",
     "BOOT VECTORS" -> bootMapping,
-    "MAIN RAM" -> ramMapping,
-    "MAIN ROM" -> romMapping,
+    "FAST RAM" -> ramMapping,
+    "SDRAM" -> sdRamMapping,
+    "VIDEO FB" -> vidFbMapping,
     "LED PERIPH" -> ledMapping,
     "UART PERIPH" -> uartMapping,
     "VIDEO PALETTE" -> vidPalMapping,
@@ -151,8 +152,7 @@ case class BusController() extends Component {
     "COUNTER" -> counterMapping,
     "LED_ARRAY" -> ledsMapping,
     "USB HID HOST" -> usbMapping,
-    "VIDEO FB" -> vidFbMapping,
-    "SDRAM" -> sdRamMapping,
+    "MAIN ROM" -> romMapping,
   )
 
   // Decoder Execution Logic
@@ -163,6 +163,8 @@ case class BusController() extends Component {
     io.romSel := True
   } elsewhen ramMapping.hit(address) {
     io.ramSel := True
+  } elsewhen sdRamMapping.hit(address) {
+    io.sdRamSel := True
   } elsewhen romMapping.hit(address) {
     io.romSel := True
   } elsewhen ledMapping.hit(address) {
@@ -175,8 +177,6 @@ case class BusController() extends Component {
     io.vidCtrlSel := True
   } elsewhen vidFbMapping.hit(address) {
     io.vidFbSel := True
-  } elsewhen sdRamMapping.hit(address) {
-    io.sdRamSel := True
   } elsewhen counterMapping.hit(address) {
     io.counterSel := True
   } elsewhen ledsMapping.hit(address) {

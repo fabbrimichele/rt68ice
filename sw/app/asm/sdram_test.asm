@@ -122,22 +122,22 @@ run_data_test:
 ; Output: d0.b -> 0 OK, 1 Error
 ; ------------------------------------------------------
 run_addr_test:
-    move.l  #RAM_START+$700000,a0   ; Unused test area (0xF00000)
-    move.l  #RAM_START+$700400,a1   ; Must not alias with 0xF00000
+    move.l  #RAM_START+$700000,a0   ; Unused test area ($700000)
+    move.l  #RAM_START+$700400,a1   ; Must not alias with $700000
 
     ; 1. Write unique patterns
-    move.w  #$AAAA,(a0)             ; Write to 0xF00000
-    move.w  #$5555,2(a0)            ; Write to 0xF00002
-    move.w  #$1234,(a1)             ; Write to 0xF00400
+    move.w  #$AAAA,(a0)             ; Write to $700000
+    move.w  #$5555,2(a0)            ; Write to $700002
+    move.w  #$1234,(a1)             ; Write to $700400
 
     ; 2. Read back and verify the first two
-    cmp.w   #$AAAA,(a0)             ; Did 0xF00000 change?
+    cmp.w   #$AAAA,(a0)             ; Did $700000 change?
     bne.s   .error
-    cmp.w   #$5555,2(a0)            ; Did 0xF00002 change?
+    cmp.w   #$5555,2(a0)            ; Did $700002 change?
     bne.s   .error
 
     ; 3. Verify the distant address
-    cmp.w   #$1234,(a1)             ; Did 0xF00400 change?
+    cmp.w   #$1234,(a1)             ; Did $700400 change?
     bne.s   .error
 
     moveq   #0,d0                   ; Success
@@ -224,9 +224,10 @@ run_bench_test:
 ; ===========================
 ; Value Constants
 ; ===========================
-RAM_START       equ $800000          ; SDRAM start address
-RAM_END         equ $FFFFFF          ; SDRAM end address (inclusive)
-RAM_TEST_START  equ RAM_START+$10000 ; Reserve the first 64 KiB for this program
+RAM_START       equ $000000          ; SDRAM CPU window start address
+RAM_END         equ $7FFFFF          ; SDRAM CPU window end address (inclusive)
+APP_START       equ $010000          ; Applications are linked above low system memory
+RAM_TEST_START  equ APP_START+$10000 ; Reserve 64 KiB for this program
 RAM_TEST_WORDS  equ (RAM_END+1-RAM_TEST_START)/2
 SOAK_PASSES     equ 10
 BENCH_WORDS     equ 256              ; Number of words copied by benchmark
