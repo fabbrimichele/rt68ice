@@ -14,23 +14,29 @@ IOBUF PORT "led[1]" IO_TYPE=LVCMOS33;
 LOCATE COMP "led[2]" SITE "A12";
 IOBUF PORT "led[2]" IO_TYPE=LVCMOS33;
 
-// USB 1
+// USB 1 (top-left)
 LOCATE      COMP "usb1_dp"        SITE "E12";
 IOBUF       PORT "usb1_dp"        IO_TYPE=LVCMOS33;
 LOCATE      COMP "usb1_dm"        SITE "C13";
 IOBUF       PORT "usb1_dm"        IO_TYPE=LVCMOS33;
 
-// USB 2
+// USB 2 (top-right)
 LOCATE      COMP "usb2_dp"        SITE "D8";
 IOBUF       PORT "usb2_dp"        IO_TYPE=LVCMOS33;
 LOCATE      COMP "usb2_dm"        SITE "C7";
 IOBUF       PORT "usb2_dm"        IO_TYPE=LVCMOS33;
 
-// USB 3
-LOCATE      COMP "usb3_dp"        SITE "D8"; // TODO
+// USB 3 (bottom-left)
+LOCATE      COMP "usb3_dp"        SITE "D9";
 IOBUF       PORT "usb3_dp"        IO_TYPE=LVCMOS33;
-LOCATE      COMP "usb3_dm"        SITE "C7"; // TODO
+LOCATE      COMP "usb3_dm"        SITE "C8";
 IOBUF       PORT "usb3_dm"        IO_TYPE=LVCMOS33;
+
+// USB 4 (bottom-right)
+LOCATE      COMP "usb4_dp"        SITE "E14";
+IOBUF       PORT "usb4_dp"        IO_TYPE=LVCMOS33;
+LOCATE      COMP "usb4_dm"        SITE "E13";
+IOBUF       PORT "usb_dm"        IO_TYPE=LVCMOS33;
 
 // LED Array
 // MSB
