@@ -23,6 +23,7 @@ case class UsbDevice(usbCd: ClockDomain) extends Component {
     val usb1  = master(Usb())
     val usb2  = master(Usb())
     val usb3  = master(Usb())
+    val usb4  = master(Usb())
   }
 
   class UsbHostSync(usbHost: UsbHidHostBB, clearInterrupt: Bool) extends Area {
@@ -151,12 +152,16 @@ case class UsbDevice(usbCd: ClockDomain) extends Component {
     val usbHost3 = new UsbHidHostBB
     usbHost3.io.usb_dp := io.usb3.dp
     usbHost3.io.usb_dm := io.usb3.dm
+
+    val usbHost4 = new UsbHidHostBB
+    usbHost4.io.usb_dp := io.usb4.dp
+    usbHost4.io.usb_dm := io.usb4.dm
   }
 
   // --- 68000 bus interface ---
   // The USB map uses 16-bit registers.  Keep the global interrupt registers
   // at word offsets 0-1 and reserve a 16-word block for each host.
-  val wordAddress = io.bus.address(6 downto 1)
+  val wordAddress = io.bus.address(7 downto 1)
   val registerRead = io.sel &&
     !io.bus.wr &&
     (io.bus.uds || io.bus.lds)
@@ -169,20 +174,26 @@ case class UsbDevice(usbCd: ClockDomain) extends Component {
   val host1StatusRead = registerRead && (wordAddress === 8)
   val host2StatusRead = registerRead && (wordAddress === 24)
   val host3StatusRead = registerRead && (wordAddress === 40)
+  val host4StatusRead = registerRead && (wordAddress === 56)
 
   val host1 = new UsbHostSync(usbDomain.usbHost1, host1StatusRead)
   val host2 = new UsbHostSync(usbDomain.usbHost2, host2StatusRead)
   val host3 = new UsbHostSync(usbDomain.usbHost3, host3StatusRead)
+  val host4 = new UsbHostSync(usbDomain.usbHost4, host4StatusRead)
 
   // Both hosts share the same interrupt level. Reports remain pending while
   // masked, allowing polling users to inspect them via USB_IRQ_STATUS.
-  val irqEnable = Reg(Bits(3 bits)) init 0
+  val irqEnable = Reg(Bits(4 bits)) init 0
   when(registerWrite && (wordAddress === 1)) {
-    irqEnable := io.bus.dataOut(2 downto 0)
+    irqEnable := io.bus.dataOut(3 downto 0)
   }
 
-  io.int := (host1.int && irqEnable(0)) || (host2.int && irqEnable(1)) || (host3.int && irqEnable(2))
-  val interruptStatus = (host3.int ## host2.int ## host1.int).resize(16)
+  io.int :=
+    (host1.int && irqEnable(0)) ||
+    (host2.int && irqEnable(1)) ||
+    (host3.int && irqEnable(2)) ||
+    (host4.int && irqEnable(3))
+  val interruptStatus = (host4.int ## host3.int ## host2.int ## host1.int).resize(16)
 
   io.bus.dataIn := 0
   when(io.sel) {
@@ -221,6 +232,16 @@ case class UsbDevice(usbCd: ClockDomain) extends Component {
         47 -> host3.key2.resize(16),
         48 -> host3.key3.resize(16),
         49 -> host3.key4.resize(16),
+        56 -> host4.status.resize(16),
+        57 -> host4.mouseBtn.resize(16),
+        58 -> host4.mouseDxAcc.asBits.resize(16),
+        59 -> host4.mouseDyAcc.asBits.resize(16),
+        60 -> host4.gamepad.resize(16),
+        61 -> host4.keyModifiers.resize(16),
+        62 -> host4.key1.resize(16),
+        63 -> host4.key2.resize(16),
+        64 -> host4.key3.resize(16),
+        65 -> host4.key4.resize(16),
         default -> B(0, 16 bits),
       )
     }

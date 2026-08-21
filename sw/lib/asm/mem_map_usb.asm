@@ -6,8 +6,8 @@
 ; ---------------------------------------------------------------------------
 
 ; --- Global interrupt registers ---
-USB_IRQ_STATUS  equ $00F18000   ; Read-only pending bits: bit 0 Host 1, bit 1 Host 2, bit 2 Host 3. Does not acknowledge a host.
-USB_IRQ_ENABLE  equ $00F18002   ; Read/write mask bits: bit 0 Host 1, bit 1 Host 2, bit 2 Host 3. Reset value $0000 disables USB CPU interrupts.
+USB_IRQ_STATUS  equ $00F18000   ; Read-only pending bits: bit 0 Host 1, bit 1 Host 2, bit 2 Host 3, bit 3 Host 4. Does not acknowledge a host.
+USB_IRQ_ENABLE  equ $00F18002   ; Read/write mask bits: bit 0 Host 1, bit 1 Host 2, bit 2 Host 3, bit 3 Host 4. Reset value $0000 disables USB CPU interrupts.
 
 ; --- USB Host 1 (word offsets 8-23; registers 18-23 reserved) ---
 USB1_STATUS     equ $00F18010   ; Read acknowledges Host 1. Bit 7: conErr (1=Error). Bits 1-0: type (0=None, 1=KB, 2=Mouse, 3=Pad).
@@ -44,3 +44,15 @@ USB3_KEY1       equ $00F1805C   ; First USB HID boot-keyboard usage ID; zero mea
 USB3_KEY2       equ $00F1805E   ; Second USB HID boot-keyboard usage ID; zero means no key.
 USB3_KEY3       equ $00F18060   ; Third USB HID boot-keyboard usage ID; zero means no key.
 USB3_KEY4       equ $00F18062   ; Fourth USB HID boot-keyboard usage ID; zero means no key.
+
+; --- USB Host 4 (word offsets 56-71; registers 66-71 reserved) ---
+USB4_STATUS     equ $00F18070   ; Read acknowledges Host 4. Bit 7: conErr (1=Error). Bits 1-0: type (0=None, 1=KB, 2=Mouse, 3=Pad).
+USB4_MOUSE_BTN  equ $00F18072   ; Bits 2-0: middle, right, left buttons.
+USB4_MOUSE_DX   equ $00F18074   ; Signed 16-bit X accumulator.
+USB4_MOUSE_DY   equ $00F18076   ; Signed 16-bit Y accumulator.
+USB4_GAMEPAD    equ $00F18078   ; Bits 9-0: U, D, L, R, A, B, X, Y, Start, Select.
+USB4_KEY_MODS   equ $00F1807A   ; USB HID modifier bitmap: bits 7-0 are RGUI, RALT, RSHIFT, RCTRL, LGUI, LALT, LSHIFT, LCTRL.
+USB4_KEY1       equ $00F1807C   ; First USB HID boot-keyboard usage ID; zero means no key.
+USB4_KEY2       equ $00F1807E   ; Second USB HID boot-keyboard usage ID; zero means no key.
+USB4_KEY3       equ $00F18080   ; Third USB HID boot-keyboard usage ID; zero means no key.
+USB4_KEY4       equ $00F18082   ; Fourth USB HID boot-keyboard usage ID; zero means no key.
