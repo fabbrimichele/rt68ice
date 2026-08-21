@@ -6,7 +6,11 @@
 start:
     or.w    #$0700,SR           ; Mask interrupts during setup
     move.l  #usb_isr,VT_INT_6   ; Set USB interrupt handler
-    move.w  #$0003,USB_IRQ_ENABLE ; Enable Host 1 and Host 2 USB interrupts
+    clr.w   gamepad_state_1
+    clr.w   gamepad_state_2
+    clr.w   gamepad_state_3
+    clr.w   gamepad_state_4
+    move.w  #$000F,USB_IRQ_ENABLE ; Enable Host 1 through Host 4 USB interrupts
     and.w   #$F8FF,SR           ; Enable all interrupts on 68000 (Clear mask bits)
 
 ; Stay resident so USB reports can invoke usb_isr.  trap #14 returns to the
@@ -25,19 +29,47 @@ usb_isr:
     cmpi.w  #3,d0
     bne     .host2
     move.w  USB1_GAMEPAD,d0
-    move.w  d0,LEDS
+    move.w  d0,gamepad_state_1
 
 .host2:
     btst    #1,d1
-    beq     .done
+    beq     .host3
     move.w  USB2_STATUS,d0      ; Acknowledge USB host 2
     andi.w  #$0003,d0           ; A mouse report must not blank the LEDs
     cmpi.w  #3,d0
-    bne     .done
+    bne     .host3
     move.w  USB2_GAMEPAD,d0
-    move.w  d0,LEDS
+    move.w  d0,gamepad_state_2
+
+.host3:
+    btst    #2,d1
+    beq     .host4
+    move.w  USB3_STATUS,d0      ; Acknowledge USB host 3
+    andi.w  #$0003,d0           ; A mouse report must not blank the LEDs
+    cmpi.w  #3,d0
+    bne     .host4
+    move.w  USB3_GAMEPAD,d0
+    move.w  d0,gamepad_state_3
+
+.host4:
+    btst    #3,d1
+    beq     .done
+    move.w  USB4_STATUS,d0      ; Acknowledge USB host 4
+    andi.w  #$0003,d0           ; A mouse report must not blank the LEDs
+    cmpi.w  #3,d0
+    bne     .done
+    move.w  USB4_GAMEPAD,d0
+    move.w  d0,gamepad_state_4
 
 .done:
+    ; HID hosts report periodically even when idle.  Combine the last state
+    ; from every gamepad so an idle report from one host cannot erase another
+    ; host's currently pressed buttons from the LED display.
+    move.w  gamepad_state_1,d0
+    or.w    gamepad_state_2,d0
+    or.w    gamepad_state_3,d0
+    or.w    gamepad_state_4,d0
+    move.w  d0,LEDS
     movem.l (sp)+,d0-d1
     rte
 
@@ -63,4 +95,11 @@ DLY_VAL     equ     312500   ;
 ; RAM Data Section
 ; ===========================
     section .bss
-; Add here variables and buffers, e.g. `buffer ds.b 80`
+gamepad_state_1:
+    ds.w    1
+gamepad_state_2:
+    ds.w    1
+gamepad_state_3:
+    ds.w    1
+gamepad_state_4:
+    ds.w    1
