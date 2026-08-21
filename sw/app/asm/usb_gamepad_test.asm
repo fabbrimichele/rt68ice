@@ -6,7 +6,7 @@
 start:
     or.w    #$0700,SR           ; Mask interrupts during setup
     move.l  #usb_isr,VT_INT_6   ; Set USB interrupt handler
-    move.w  #$0003,USB_IRQ_ENABLE ; Enable Host 1 and Host 2 USB interrupts
+    move.w  #$000F,USB_IRQ_ENABLE ; Enable Host 1 through Host 4 USB interrupts
     and.w   #$F8FF,SR           ; Enable all interrupts on 68000 (Clear mask bits)
 
 ; Stay resident so USB reports can invoke usb_isr.  trap #14 returns to the
@@ -29,12 +29,32 @@ usb_isr:
 
 .host2:
     btst    #1,d1
-    beq     .done
+    beq     .host3
     move.w  USB2_STATUS,d0      ; Acknowledge USB host 2
     andi.w  #$0003,d0           ; A mouse report must not blank the LEDs
     cmpi.w  #3,d0
-    bne     .done
+    bne     .host3
     move.w  USB2_GAMEPAD,d0
+    move.w  d0,LEDS
+
+.host3:
+    btst    #2,d1
+    beq     .host4
+    move.w  USB3_STATUS,d0      ; Acknowledge USB host 3
+    andi.w  #$0003,d0           ; A mouse report must not blank the LEDs
+    cmpi.w  #3,d0
+    bne     .host4
+    move.w  USB3_GAMEPAD,d0
+    move.w  d0,LEDS
+
+.host4:
+    btst    #3,d1
+    beq     .done
+    move.w  USB4_STATUS,d0      ; Acknowledge USB host 4
+    andi.w  #$0003,d0           ; A mouse report must not blank the LEDs
+    cmpi.w  #3,d0
+    bne     .done
+    move.w  USB4_GAMEPAD,d0
     move.w  d0,LEDS
 
 .done:

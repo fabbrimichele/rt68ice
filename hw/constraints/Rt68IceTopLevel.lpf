@@ -36,7 +36,7 @@ IOBUF       PORT "usb3_dm"        IO_TYPE=LVCMOS33;
 LOCATE      COMP "usb4_dp"        SITE "E14";
 IOBUF       PORT "usb4_dp"        IO_TYPE=LVCMOS33;
 LOCATE      COMP "usb4_dm"        SITE "E13";
-IOBUF       PORT "usb_dm"        IO_TYPE=LVCMOS33;
+IOBUF       PORT "usb4_dm"        IO_TYPE=LVCMOS33;
 
 // LED Array
 // MSB
