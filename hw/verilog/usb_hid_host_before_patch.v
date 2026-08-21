@@ -36,28 +36,6 @@ module usb_hid_host (
     output [63:0] dbg_hid_report	// last HID report
 );
 
-// Keep the host idle after FPGA configuration so an already powered USB
-// device and the 12 MHz clock have time to settle before enumeration starts.
-// The protocol ROM begins at address zero when core_reset_n is released.
-localparam integer USB_STARTUP_CYCLES = 1200000; // 100 ms at 12 MHz
-reg [20:0] startup_count;
-reg startup_done;
-
-always @(posedge usbclk) begin
-    if (~usbrst_n) begin
-        startup_count <= 0;
-        startup_done <= 0;
-    end else if (~startup_done) begin
-        if (startup_count == USB_STARTUP_CYCLES - 1) begin
-            startup_done <= 1;
-        end else begin
-            startup_count <= startup_count + 1'b1;
-        end
-    end
-end
-
-wire core_reset_n = usbrst_n && startup_done;
-
 wire data_rdy;          // data ready
 wire data_strobe;       // data strobe for each byte
 wire [7:0] ukpdat;		// actual data
@@ -66,16 +44,12 @@ wire save;			    // save dat[b] to output register r
 wire [3:0] save_r;      // which register to save to
 wire [3:0] save_b;      // dat[b]
 wire connected;
-wire protocol_conerr;
-wire protocol_restart;
-
-assign conerr = core_reset_n && protocol_conerr;
 
 ukp ukp(
-    .usbrst_n(core_reset_n), .usbclk(usbclk),
+    .usbrst_n(usbrst_n), .usbclk(usbclk),
     .usb_dp(usb_dp), .usb_dm(usb_dm), .usb_oe(),
     .ukprdy(data_rdy), .ukpstb(data_strobe), .ukpdat(ukpdat), .save(save), .save_r(save_r), .save_b(save_b),
-    .connected(connected), .conerr(protocol_conerr), .restart(protocol_restart));
+    .connected(connected), .conerr(conerr));
 
 reg  [3:0] rcvct;		// counter for recv data
 reg  data_strobe_r, data_rdy_r;	// delayed data_strobe and data_rdy
@@ -91,146 +65,108 @@ assign dbg_hid_report = {dat[7], dat[6], dat[5], dat[4], dat[3], dat[2], dat[1],
 // assign dbg_dev = dev;
 
 reg valid = 0;		    // whether current gamepad report is valid
-integer dat_index;
 
 always @(posedge usbclk) begin : process_in_data
-    if (~core_reset_n || protocol_restart) begin
-        rcvct <= 0;
-        data_strobe_r <= 0;
-        data_rdy_r <= 0;
-        report <= 0;
-        valid <= 0;
-        key_modifiers <= 0;
-        key1 <= 0;
-        key2 <= 0;
-        key3 <= 0;
-        key4 <= 0;
-        mouse_btn <= 0;
-        mouse_dx <= 0;
-        mouse_dy <= 0;
-        game_l <= 0;
-        game_r <= 0;
-        game_u <= 0;
-        game_d <= 0;
-        game_a <= 0;
-        game_b <= 0;
-        game_x <= 0;
-        game_y <= 0;
-        game_sel <= 0;
-        game_sta <= 0;
-        for (dat_index = 0; dat_index < 8; dat_index = dat_index + 1)
-            dat[dat_index] <= 0;
-    end else begin
-        data_rdy_r <= data_rdy; data_strobe_r <= data_strobe;
-        report <= 0;                    // ensure pulse
-        if (report == 1) begin
-            // clear mouse movement for later
-            mouse_dx <= 0; mouse_dy <= 0;
-        end
-        if(~data_rdy) rcvct <= 0;
-        else begin
-            if(data_strobe && ~data_strobe_r) begin  // rising edge of ukp data strobe
-                dat[rcvct] <= ukpdat;
-
-                if (typ == 1) begin     // keyboard
-                    case (rcvct)
-                    0: key_modifiers <= ukpdat;
-                    2: key1 <= ukpdat;
-                    3: key2 <= ukpdat;
-                    4: key3 <= ukpdat;
-                    5: key4 <= ukpdat;
-                    endcase
-                end else if (typ == 2) begin    // mouse
-                    case (rcvct)
-                    0: mouse_btn <= ukpdat;
-                    1: mouse_dx[7:0] <= ukpdat;
-                    2: begin
-                        mouse_dx[11:8] <= ukpdat[3:0]; // lower 4 bits of byte 2 for dx
-                        mouse_dy[3:0]  <= ukpdat[7:4]; // upper 4 bits of byte 2 for dy
-                    end
-                    3: mouse_dy[11:4] <= ukpdat;       // remaining 8 bits of byte 3 for dy
-                    endcase
-                end else if (typ == 3) begin    // gamepad
-                    // A typical report layout:
-                    // - d[3] is X axis (0: left, 255: right)
-                    // - d[4] is Y axis
-                    // - d[5][7:4] is buttons YBAX
-                    // - d[6][5:4] is buttons START,SELECT
-                    // Variations:
-                    // - Some gamepads uses d[0] and d[1] for X and Y axis.
-                    // - Some transmits a different set when d[0][1:0] is 2 (a dualshock adapater)
-                    case (rcvct)
-                    0: begin
-                        if (ukpdat[1:0] != 2'b10) begin
-                            // for DualShock2 adapter, 2'b10 marks an irrelevant record
-                            valid <= 1;
-                            game_l <= 0; game_r <= 0; game_u <= 0; game_d <= 0;
-                        end else
-                            valid <= 0;
-                        if (ukpdat==8'h00) {game_l, game_r} <= 2'b10;
-                        if (ukpdat==8'hff) {game_l, game_r} <= 2'b01;
-                    end
-                    1: begin
-                        if (ukpdat==8'h00) {game_u, game_d} <= 2'b10;
-                        if (ukpdat==8'hff) {game_u, game_d} <= 2'b01;
-                    end
-                    3: if (valid) begin
-                        if (ukpdat[7:6]==2'b00) {game_l, game_r} <= 2'b10;
-                        if (ukpdat[7:6]==2'b11) {game_l, game_r} <= 2'b01;
-                    end
-                    4: if (valid) begin
-                        if (ukpdat[7:6]==2'b00) {game_u, game_d} <= 2'b10;
-                        if (ukpdat[7:6]==2'b11) {game_u, game_d} <= 2'b01;
-                    end
-                    5: if (valid) begin
-                        game_x <= ukpdat[4];
-                        game_a <= ukpdat[5];
-                        game_b <= ukpdat[6];
-                        game_y <= ukpdat[7];
-                    end
-                    6: if (valid) begin
-                        game_sel <= ukpdat[4];
-                        game_sta <= ukpdat[5];
-                    end
-                    endcase
-                    // TODO: add any special handling if needed
-                    // (using the detected controller type in 'dev')
-                end
-                rcvct <= rcvct + 1;
-            end
-        end
-        if(~data_rdy && data_rdy_r && typ != 0)    // falling edge of ukp data ready
-            report <= 1;
+    data_rdy_r <= data_rdy; data_strobe_r <= data_strobe;
+    report <= 0;                    // ensure pulse
+    if (report == 1) begin
+        // clear mouse movement for later
+        mouse_dx <= 0; mouse_dy <= 0;
     end
+    if(~data_rdy) rcvct <= 0;
+    else begin
+        if(data_strobe && ~data_strobe_r) begin  // rising edge of ukp data strobe
+            dat[rcvct] <= ukpdat;
+
+            if (typ == 1) begin     // keyboard
+                case (rcvct)
+                0: key_modifiers <= ukpdat;
+                2: key1 <= ukpdat;
+                3: key2 <= ukpdat;
+                4: key3 <= ukpdat;
+                5: key4 <= ukpdat;
+                endcase
+            end else if (typ == 2) begin    // mouse
+                case (rcvct)
+                0: mouse_btn <= ukpdat;
+                1: mouse_dx[7:0] <= ukpdat;
+                2: begin
+                    mouse_dx[11:8] <= ukpdat[3:0]; // lower 4 bits of byte 2 for dx
+                    mouse_dy[3:0]  <= ukpdat[7:4]; // upper 4 bits of byte 2 for dy
+                end
+                3: mouse_dy[11:4] <= ukpdat;       // remaining 8 bits of byte 3 for dy
+                endcase
+            end else if (typ == 3) begin    // gamepad
+                // A typical report layout:
+                // - d[3] is X axis (0: left, 255: right)
+                // - d[4] is Y axis
+                // - d[5][7:4] is buttons YBAX
+                // - d[6][5:4] is buttons START,SELECT
+                // Variations:
+                // - Some gamepads uses d[0] and d[1] for X and Y axis.
+                // - Some transmits a different set when d[0][1:0] is 2 (a dualshock adapater)
+                case (rcvct)
+                0: begin
+                    if (ukpdat[1:0] != 2'b10) begin
+                        // for DualShock2 adapter, 2'b10 marks an irrelevant record
+                        valid <= 1;
+                        game_l <= 0; game_r <= 0; game_u <= 0; game_d <= 0;
+                    end else
+                        valid <= 0;
+                    if (ukpdat==8'h00) {game_l, game_r} <= 2'b10;
+                    if (ukpdat==8'hff) {game_l, game_r} <= 2'b01;
+                end
+                1: begin
+                    if (ukpdat==8'h00) {game_u, game_d} <= 2'b10;
+                    if (ukpdat==8'hff) {game_u, game_d} <= 2'b01;
+                end
+                3: if (valid) begin 
+                    if (ukpdat[7:6]==2'b00) {game_l, game_r} <= 2'b10;
+                    if (ukpdat[7:6]==2'b11) {game_l, game_r} <= 2'b01;
+                end
+                4: if (valid) begin 
+                    if (ukpdat[7:6]==2'b00) {game_u, game_d} <= 2'b10;
+                    if (ukpdat[7:6]==2'b11) {game_u, game_d} <= 2'b01;
+                end
+                5: if (valid) begin
+                    game_x <= ukpdat[4];
+                    game_a <= ukpdat[5];
+                    game_b <= ukpdat[6];
+                    game_y <= ukpdat[7];
+                end
+                6: if (valid) begin
+                    game_sel <= ukpdat[4];
+                    game_sta <= ukpdat[5];
+                end
+                endcase
+                // TODO: add any special handling if needed 
+                // (using the detected controller type in 'dev')                
+            end
+            rcvct <= rcvct + 1;
+        end
+    end
+    if(~data_rdy && data_rdy_r && typ != 0)    // falling edge of ukp data ready
+        report <= 1;
 end
 
 reg save_delayed;
 reg connected_r;
-integer regs_index;
 always @(posedge usbclk) begin : response_recognition
-    if (~core_reset_n || protocol_restart) begin
-        typ <= 0;
-        save_delayed <= 0;
-        connected_r <= 0;
-        for (regs_index = 0; regs_index < 8; regs_index = regs_index + 1)
-            regs[regs_index] <= 0;
-    end else begin
-        save_delayed <= save;
-        if (save) begin
-            regs[save_r] <= dat[save_b];
-        end else if (save_delayed && ~save && save_r == 6) begin
-            // falling edge of save for bInterfaceProtocol
-            if (regs[4] == 3) begin  // bInterfaceClass. 3: HID, other: non-HID
-                if (regs[5] == 1)    // bInterfaceSubClass. 1: Boot device
-                    typ <= regs[6] == 1 ? 1 : 2;     // bInterfaceProtocol. 1: keyboard, 2: mouse
-                else
-                    typ <= 3;       // gamepad
-            end else
-                typ <= 0;
-        end
-        connected_r <= connected;
-        if (~connected & connected_r) typ <= 0;   // clear device type on disconnect
+    save_delayed <= save;
+    if (save) begin
+        regs[save_r] <= dat[save_b];
+    end else if (save_delayed && ~save && save_r == 6) begin     
+        // falling edge of save for bInterfaceProtocol
+        if (regs[4] == 3) begin  // bInterfaceClass. 3: HID, other: non-HID
+            if (regs[5] == 1)    // bInterfaceSubClass. 1: Boot device
+                typ <= regs[6] == 1 ? 1 : 2;     // bInterfaceProtocol. 1: keyboard, 2: mouse
+            else
+                typ <= 3;       // gamepad
+        end else
+            typ <= 0;                   
     end
+    connected_r <= connected;
+    if (~connected & connected_r) typ <= 0;   // clear device type on disconnect
 end
 
 endmodule
@@ -246,8 +182,7 @@ module ukp(
     output reg save,			// save: regs[save_r] <= dat[save_b]
     output reg [3:0] save_r, save_b,
     output reg connected,
-    output conerr,
-    output reg restart
+    output conerr
 );
 
     parameter S_OPCODE = 0;
@@ -301,51 +236,11 @@ module ukp(
 
     always @(posedge usbclk) begin
         if(~usbrst_n) begin 
-            insth <= 0;
-            inst_ready <= 0;
-            up <= 0;
-            um <= 0;
-            cond <= 0;
-            nak <= 1;
-            dmis <= 0;
-            ug <= 0;
-            ugw <= 0;
-            nrzon <= 0;
-            bank <= 0;
-            record1 <= 0;
-            mbit <= 0;
-            state <= S_OPCODE;
-            stated <= 0;
-            wk <= 0;
-            sb <= 0;
-            sadr <= 0;
-            pc <= 0;
-            wpc <= 0;
-            timing <= 0;
-            lb4 <= 0;
-            lb4w <= 0;
-            interval <= 0;
-            bitadr <= 0;
-            data <= 0;
-            nrztxct <= 0;
-            nrzrxct <= 0;
-            dmid <= 0;
-            conct <= 0;
-            dpi <= 0;
-            dmi <= 0;
-            ukprdy <= 0;
-            ukpdat <= 0;
-            save <= 0;
-            save_r <= 0;
-            save_b <= 0;
-            connected <= 0;
-            ukprdyd <= 0;
-            nakd <= 0;
-            restart <= 0;
+            pc <= 0; connected <= 0; cond <= 0; inst_ready <= 0; state <= S_OPCODE; timing <= 0; 
+            mbit <= 0; bitadr <= 0; nak <= 1; ug <= 0;
         end else begin
             dpi <= usb_dp; dmi <= usb_dm;
             save <= 0;		// ensure pulse
-            restart <= 0;
             if (inst_ready) begin
                 // Instruction decoding
                 case(state)
@@ -462,51 +357,7 @@ module ukp(
                 conct <= 0;     // reset watchdog on data received or START instruction
             else begin 
                 if(conct[23:22]!=2'b11) conct <= conct + 1;
-                else begin
-                    // Restart from the same deterministic state as reset. The
-                    // ROM will perform its normal bus-reset/enumeration path.
-                    insth <= 0;
-                    inst_ready <= 0;
-                    up <= 0;
-                    um <= 0;
-                    cond <= 0;
-                    nak <= 1;
-                    dmis <= 0;
-                    ug <= 0;
-                    ugw <= 0;
-                    nrzon <= 0;
-                    bank <= 0;
-                    record1 <= 0;
-                    mbit <= 0;
-                    state <= S_OPCODE;
-                    stated <= 0;
-                    wk <= 0;
-                    sb <= 0;
-                    sadr <= 0;
-                    pc <= 0;
-                    wpc <= 0;
-                    timing <= 0;
-                    lb4 <= 0;
-                    lb4w <= 0;
-                    interval <= 0;
-                    bitadr <= 0;
-                    data <= 0;
-                    nrztxct <= 0;
-                    nrzrxct <= 0;
-                    dmid <= 0;
-                    conct <= 0;
-                    dpi <= 0;
-                    dmi <= 0;
-                    ukprdy <= 0;
-                    ukpdat <= 0;
-                    save <= 0;
-                    save_r <= 0;
-                    save_b <= 0;
-                    connected <= 0;
-                    ukprdyd <= 0;
-                    nakd <= 0;
-                    restart <= 1;
-                end		// !! WDT ON
+                else begin pc <= 0; conct <= 0; end		// !! WDT ON
             end 
         end
     end
