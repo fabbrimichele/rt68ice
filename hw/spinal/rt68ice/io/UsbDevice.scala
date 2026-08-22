@@ -6,13 +6,6 @@ import spinal.lib._
 
 import scala.language.postfixOps
 
-/*
-  TODO:
-   - use 12 MHz clock (DONE)
-   - check if gamepad is recognized with 12 MHz clock
-   - find a keyboard that works
-   - interrupt
- */
 //noinspection TypeAnnotation
 //noinspection ScalaWeakerAccess
 case class UsbDevice(usbCd: ClockDomain) extends Component {
