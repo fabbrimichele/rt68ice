@@ -14,6 +14,7 @@ object BusControllerSim extends App {
     dut.io.busState #= 1 // No memory access
     dut.io.uartInt #= false
     dut.io.usbInt #= false
+    dut.io.timerInt #= false
 
     Seq(
       dut.io.romBus,
@@ -24,7 +25,8 @@ object BusControllerSim extends App {
       dut.io.sdRamBus,
       dut.io.counterBus,
       dut.io.ledsBus,
-      dut.io.usbBus
+      dut.io.usbBus,
+      dut.io.timerBus
     ).foreach(_.dataIn #= 0)
 
     dut.clockDomain.waitSampling(2)
@@ -60,5 +62,18 @@ object BusControllerSim extends App {
 
     driveTransfer(0xfffffff2L, busState = 2, uds = true, lds = true)
     assert(!dut.io.busErr.toBoolean, "An interrupt-acknowledge cycle raised BERR")
+
+    // Timer IRQ 5 sits between USB IRQ 6 and UART IRQ 4.
+    dut.io.timerInt #= true
+    sleep(1)
+    assert(dut.io.ipl.toInt == 2, "The timer did not request interrupt level 5")
+
+    dut.io.uartInt #= true
+    sleep(1)
+    assert(dut.io.ipl.toInt == 2, "UART incorrectly took priority over the timer")
+
+    dut.io.usbInt #= true
+    sleep(1)
+    assert(dut.io.ipl.toInt == 1, "USB did not take priority over the timer")
   }
 }

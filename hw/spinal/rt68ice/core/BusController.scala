@@ -28,6 +28,7 @@ case class BusController() extends Component {
     val counterBus  = master(M68KBus())
     val ledsBus     = master(M68KBus())
     val usbBus      = master(M68KBus())
+    val timerBus    = master(M68KBus())
 
     // Slave select signals (to peripherals)
     val romSel      = out Bool()
@@ -41,10 +42,12 @@ case class BusController() extends Component {
     val counterSel  = out Bool()
     val ledsSel     = out Bool()
     val usbSel      = out Bool()
+    val timerSel    = out Bool()
 
     // Interrupts
     val uartInt     = in Bool()
     val usbInt      = in Bool()
+    val timerInt    = in Bool()
   }
 
   // ---------------------------
@@ -95,6 +98,8 @@ case class BusController() extends Component {
   // IPL is active low
   when(io.usbInt) {
     io.ipl := B"001"        // bitwise not 6
+  } elsewhen(io.timerInt) {
+    io.ipl := B"010"        // bitwise not 5
   } elsewhen(io.uartInt) {
     io.ipl := B"011"        // bitwise not 4
   } otherwise {
@@ -115,6 +120,7 @@ case class BusController() extends Component {
   io.counterSel := False
   io.ledsSel    := False
   io.usbSel     := False
+  io.timerSel   := False
   io.vidFbSel   := False
   io.sdRamSel   := False
   io.busErr     := False
@@ -137,6 +143,7 @@ case class BusController() extends Component {
   val counterMapping  = SizeMapping(0x00F10000L, 16 KiB)  // $F10000 - $F13FFF
   val ledsMapping     = SizeMapping(0x00F14000L, 16 KiB)  // $F14000 - $F17FFF
   val usbMapping      = SizeMapping(0x00F18000L, 16 KiB)  // $F18000 - $F1BFFF
+  val timerMapping    = SizeMapping(0x00F1C000L, 16 KiB)  // $F1C000 - $F1FFFF
   val romMapping      = SizeMapping(0x00FC0000L, 16 KiB)  // $FC0000 - $FC3FFF
 
   saveMemoryLayout(
@@ -152,6 +159,7 @@ case class BusController() extends Component {
     "COUNTER" -> counterMapping,
     "LED_ARRAY" -> ledsMapping,
     "USB HID HOST" -> usbMapping,
+    "TIMER" -> timerMapping,
     "MAIN ROM" -> romMapping,
   )
 
@@ -183,6 +191,8 @@ case class BusController() extends Component {
     io.ledsSel := True
   } elsewhen usbMapping.hit(address) {
     io.usbSel := True
+  } elsewhen timerMapping.hit(address) {
+    io.timerSel := True
   } otherwise {
     io.busErr := cpuTransferActive // Out-of-bounds active transfer
   }
@@ -193,7 +203,7 @@ case class BusController() extends Component {
   // Separate standard peripherals from the smart SDRAM controller
   val buses = List(
     io.romBus, io.ramBus, io.ledBus, io.uartBus,
-    io.videoBus, io.counterBus, io.ledsBus, io.usbBus
+    io.videoBus, io.counterBus, io.ledsBus, io.usbBus, io.timerBus
   )
 
   for (bus <- buses) {
@@ -231,5 +241,7 @@ case class BusController() extends Component {
     io.cpuBus.dataIn := io.ledsBus.dataIn
   } elsewhen io.usbSel {
     io.cpuBus.dataIn := io.usbBus.dataIn
+  } elsewhen io.timerSel {
+    io.cpuBus.dataIn := io.timerBus.dataIn
   }
 }
