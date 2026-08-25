@@ -13,6 +13,7 @@ object MemoryMapSim extends App {
     dut.io.busState #= 2 // Data read
     dut.io.uartInt #= false
     dut.io.usbInt #= false
+    dut.io.timerInt #= false
 
     Seq(
       dut.io.romBus,
@@ -23,7 +24,8 @@ object MemoryMapSim extends App {
       dut.io.sdRamBus,
       dut.io.counterBus,
       dut.io.ledsBus,
-      dut.io.usbBus
+      dut.io.usbBus,
+      dut.io.timerBus
     ).foreach(_.dataIn #= 0)
 
     dut.clockDomain.waitSampling(2)
@@ -74,6 +76,9 @@ object MemoryMapSim extends App {
 
     driveAddress(0x00f18000L)
     assert(dut.io.usbSel.toBoolean, "USB is not mapped at $F18000")
+
+    driveAddress(0x00f1c000L)
+    assert(dut.io.timerSel.toBoolean, "The timer is not mapped at $F1C000")
 
     driveAddress(0x00fc0000L)
     assert(dut.io.romSel.toBoolean, "The boot ROM is not mapped at $FC0000")

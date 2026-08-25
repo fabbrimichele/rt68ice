@@ -3,7 +3,7 @@ package rt68ice
 import rt68ice.core._
 import rt68ice.io.{LedArrayDevice, LedDevice, T16450Device, Usb, UsbDevice}
 import rt68ice.memory.{Mem16Bit, SdRam, SdRamDevice}
-import rt68ice.timer.Counter
+import rt68ice.timer.{Counter, Timer}
 import rt68ice.video.{Gpdi, VgaDevice}
 import spinal.core._
 import spinal.lib.com.uart.Uart
@@ -62,6 +62,12 @@ case class Rt68IceTopLevel(romFile: String) extends Component {
     val counter = Counter()
     counter.io.sel := bus.io.counterSel
     bus.io.counterBus <> counter.io.bus
+
+    // Programmable timer
+    val timer = Timer()
+    timer.io.sel := bus.io.timerSel
+    bus.io.timerBus <> timer.io.bus
+    bus.io.timerInt := timer.io.int
 
     // LED Device
     val ledDevice = LedDevice()
