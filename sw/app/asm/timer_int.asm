@@ -23,8 +23,8 @@ start:
     move.w  #(TIMER_ENABLE+TIMER_AUTO_RELOAD+TIMER_IRQ_ENABLE),TIMER_CONTROL
     and.w   #$f8ff,sr           ; Enable interrupts on the 68000
 
-.loop:
-    bra     .loop               ; All work is performed by the ISR
+    ; Exit, monitor doesn't clear interrupts
+    trap    #14
 
 timer_isr:
     movem.l d0,-(sp)
