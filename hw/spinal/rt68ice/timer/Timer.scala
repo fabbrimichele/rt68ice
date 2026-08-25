@@ -29,7 +29,7 @@ object Timer {
 // The divider produces one timer tick every (divider + 1) input clocks.  The
 // timer expires after reloadValue ticks, then either stops or reloads itself.
 // Expiry is latched independently of the interrupt mask so the device can also
-// be polled.  Software acknowledges an expiry by writing one to STATUS bit 0.
+// be polled. Software acknowledges an expiry by reading STATUS.
 //noinspection TypeAnnotation
 //noinspection ScalaWeakerAccess
 case class Timer() extends Component {
@@ -57,8 +57,18 @@ case class Timer() extends Component {
 
   io.int := interruptPending && interruptEnable
 
-  // Timer operation. Bus commands below deliberately have higher assignment
-  // priority, so reload and acknowledgement are deterministic on expiry.
+  val wordAddress = io.bus.address(3 downto 1).asUInt
+  val registerRead = io.sel && !io.bus.wr && (io.bus.uds || io.bus.lds)
+  val registerWrite = io.sel && io.bus.wr && (io.bus.uds || io.bus.lds)
+
+  // Reading STATUS acknowledges the current expiry. Timer operation below has
+  // higher priority so an expiry coincident with the read remains pending.
+  when(registerRead && (wordAddress === StatusAddress)) {
+    interruptPending := False
+  }
+
+  // Timer operation. Register writes below deliberately have higher assignment
+  // priority, so stop, start and explicit reload commands are deterministic.
   when(enabled) {
     when(dividerCounter === divider) {
       dividerCounter := 0
@@ -79,10 +89,6 @@ case class Timer() extends Component {
   } otherwise {
     dividerCounter := 0
   }
-
-  val wordAddress = io.bus.address(3 downto 1).asUInt
-  val registerRead = io.sel && !io.bus.wr && (io.bus.uds || io.bus.lds)
-  val registerWrite = io.sel && io.bus.wr && (io.bus.uds || io.bus.lds)
 
   when(registerRead && (wordAddress === ValueHighAddress)) {
     valueLowLatch := value(15 downto 0).asBits
@@ -106,12 +112,6 @@ case class Timer() extends Component {
             value := reloadValue
             dividerCounter := 0
           }
-        }
-      }
-      is(StatusAddress) {
-        // STATUS uses write-one-to-clear semantics.
-        when(io.bus.lds && io.bus.dataOut(InterruptPendingBit)) {
-          interruptPending := False
         }
       }
       is(DividerHighAddress) {

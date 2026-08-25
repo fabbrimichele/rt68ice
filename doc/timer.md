@@ -8,7 +8,7 @@ cycles. A reload value of zero expires on the first divided tick.
 | Offset | Name | Access | Description |
 | :---: | :--- | :---: | :--- |
 | `0x00` | CONTROL | R/W | Bit 0 enable, bit 1 auto-reload, bit 2 interrupt enable, bit 3 reload command (write only) |
-| `0x02` | STATUS | R/W1C | Bit 0 interrupt pending, bit 1 running; write bit 0 to acknowledge the interrupt |
+| `0x02` | STATUS | R/C | Bit 0 interrupt pending, bit 1 running; reading acknowledges the interrupt |
 | `0x04` | DIVIDER_HI | R/W | Divider bits 31-16 |
 | `0x06` | DIVIDER_LO | R/W | Divider bits 15-0 |
 | `0x08` | RELOAD_HI | R/W | Reload value bits 31-16 |
@@ -18,8 +18,9 @@ cycles. A reload value of zero expires on the first divided tick.
 
 Setting enable on a stopped timer loads `RELOAD` and resets the divider phase.
 Writing CONTROL bit 3 reloads explicitly. On expiry, STATUS bit 0 remains set
-until acknowledged even if interrupts are disabled. In one-shot mode the timer
-stops; in auto-reload mode it starts the next interval immediately.
+until STATUS is read, even if interrupts are disabled. An expiry coincident
+with that read remains pending. In one-shot mode the timer stops; in
+auto-reload mode it starts the next interval immediately.
 
 At the default 25 MHz system clock, a 200 Hz EmuTOS tick can use `DIVIDER = 124`
 and `RELOAD = 1000` (or any other pair whose product is 125,000). The timer uses

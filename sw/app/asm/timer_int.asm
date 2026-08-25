@@ -11,7 +11,7 @@ start:
     clr.w   LEDS
 
     clr.w   TIMER_CONTROL       ; Stop the timer before changing its period
-    move.w  #TIMER_IRQ_PENDING,TIMER_STATUS ; Clear a pending interrupt
+    move.w  TIMER_STATUS,d0     ; Clear a pending interrupt
 
     ; (DIVIDER + 1) * RELOAD / 25 MHz = 0.5 seconds
     ; (24,999 + 1) * 500 / 25,000,000 = 0.5
@@ -27,9 +27,11 @@ start:
     bra     .loop               ; All work is performed by the ISR
 
 timer_isr:
+    movem.l d0,-(sp)
+    move.w  TIMER_STATUS,d0     ; Read the status to acknowledge the interrupt
     addq.w  #1,counter
     move.w  counter,LEDS
-    move.w  #TIMER_IRQ_PENDING,TIMER_STATUS ; Acknowledge the timer interrupt
+    movem.l (sp)+,d0
     rte
 
 ; ===========================

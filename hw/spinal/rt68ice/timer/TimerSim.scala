@@ -62,9 +62,7 @@ object TimerSim extends App {
     dut.clockDomain.waitSampling()
     assert(dut.io.int.toBoolean, "Periodic timer did not raise an interrupt")
     assert((readWord(0x02) & 1) != 0, "STATUS did not latch the expiry")
-
-    writeWord(0x02, 1)
-    assert(!dut.io.int.toBoolean, "W1C acknowledgement did not clear the interrupt")
+    assert(!dut.io.int.toBoolean, "STATUS read did not clear the interrupt")
 
     // Explicit reload restarts the divider phase and the high/low VALUE read
     // returns one coherent snapshot.
@@ -76,7 +74,6 @@ object TimerSim extends App {
     // In one-shot mode expiry stops the timer. Pending state remains visible
     // while masked and starts driving the IRQ as soon as it is unmasked.
     writeWord(0x00, 0)
-    writeWord(0x02, 1)
     writeWord(0x04, 0)
     writeWord(0x06, 0)
     writeWord(0x0a, 2)
@@ -84,13 +81,11 @@ object TimerSim extends App {
     dut.clockDomain.waitSampling(2)
 
     assert(!dut.io.int.toBoolean, "A masked timer expiry drove the interrupt output")
+    writeWord(0x00, 0x0004) // unmask the already-pending interrupt
+    assert(dut.io.int.toBoolean, "Unmasking a pending expiry did not raise the interrupt")
     val oneShotStatus = readWord(0x02)
     assert((oneShotStatus & 1) != 0, "Masked expiry was not latched")
     assert((oneShotStatus & 2) == 0, "One-shot timer did not stop after expiry")
-
-    writeWord(0x00, 0x0004) // unmask the already-pending interrupt
-    assert(dut.io.int.toBoolean, "Unmasking a pending expiry did not raise the interrupt")
-    writeWord(0x02, 1)
-    assert(!dut.io.int.toBoolean, "Final acknowledgement did not clear the interrupt")
+    assert(!dut.io.int.toBoolean, "Final STATUS read did not clear the interrupt")
   }
 }
