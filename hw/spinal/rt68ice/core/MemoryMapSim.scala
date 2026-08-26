@@ -14,6 +14,7 @@ object MemoryMapSim extends App {
     dut.io.uartInt #= false
     dut.io.usbInt #= false
     dut.io.timerInt #= false
+    dut.io.videoInt #= false
 
     Seq(
       dut.io.romBus,

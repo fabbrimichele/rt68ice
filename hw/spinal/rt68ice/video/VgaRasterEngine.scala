@@ -32,6 +32,7 @@ case class VgaRasterEngine() extends Component {
     val vSync   = out Bool()
     val hSync   = out Bool()
     val colorEn = out Bool()
+    val vBlankStart = out Bool()
   }
 
   val vgaCounter = VgaCounter(rgbConfig)
@@ -167,6 +168,18 @@ case class VgaRasterEngine() extends Component {
       ## videoPipeline.plane3Bit ## videoPipeline.plane2Bit ## videoPipeline.plane1Bit ## videoPipeline.plane0Bit),
     RES_MED -> (B"4'0" ## videoPipeline.plane3Bit ## videoPipeline.plane2Bit ## videoPipeline.plane1Bit ## videoPipeline.plane0Bit),
     default -> (B"6'0" ## videoPipeline.plane1Bit ## videoPipeline.plane0Bit)
+  )
+
+  // Pulse once per frame as the raster leaves the final visible pixel. Delay
+  // the event by the same amount as the video outputs so software observes
+  // vertical blanking at the connector-visible raster boundary.
+  val rawVBlankStart =
+    (vgaCounter.io.vCounter === vgaCounter.io.timings.v.colorEnd) &&
+      (vgaCounter.io.hCounter === vgaCounter.io.timings.h.colorEnd)
+
+  io.vBlankStart := io.resolution.mux(
+    RES_LOW -> Delay(rawVBlankStart, videoPipeline.lowResDelay),
+    default -> Delay(rawVBlankStart, videoPipeline.medHighResDelay)
   )
 
   when(io.resolution === RES_LOW) {

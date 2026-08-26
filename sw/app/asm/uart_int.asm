@@ -12,7 +12,7 @@
 
 start:
     or.w    #$0700,sr           ; Mask interrupts while installing the vector
-    move.l  #uart_isr,VT_INT_4  ; Set interrupt handler
+    move.l  #uart_isr,VT_INT_3  ; Set interrupt handler
 
     clr.b   char
     move.b  #$01,UART_IER	    ; Enable interrupt on receive holding register
