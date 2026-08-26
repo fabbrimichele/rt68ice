@@ -10,9 +10,10 @@
 start:
     or.w    #$0700,SR               ; Mask interrupts during initialization
     move.l  #usb_isr,VT_INT_6
-    move.w  #$0003,USB_IRQ_ENABLE   ; Enable Host 1 and Host 2 USB interrupts
+    move.l  #vbl_isr,VT_INT_4
 
     clr.b   mouse_updated
+    clr.b   vbl_pending
     clr.b   have_sample
     move.w  #(SCREEN_WIDTH/2),cursor_x
     move.w  #(SCREEN_HEIGHT/2),cursor_y
@@ -28,15 +29,23 @@ start:
     moveq   #CURSOR_COLOR,d2
     bsr     draw_cursor
 
+    move.w  VIDEO_IRQ_STATUS,d0     ; Clear an existing pending VBL
+    move.w  #VIDEO_IRQ_VBL,VIDEO_IRQ_ENABLE
+    move.w  #$0003,USB_IRQ_ENABLE   ; Enable Host 1 and Host 2 USB interrupts
     and.w   #$F8FF,SR               ; Enable all interrupt levels
 
 .wait:
-    tst.b   mouse_updated
+    tst.b   vbl_pending             ; Update the framebuffer once per frame
     beq     .wait
 
-    ; Copy the ISR snapshot atomically. Reports arriving while masked remain
-    ; pending and will be processed after interrupts are enabled again.
+    ; Consume the frame event and copy the latest USB snapshot atomically.
+    ; Reports or VBLs arriving while masked remain pending and will be handled
+    ; after interrupts are enabled again.
     or.w    #$0700,SR
+    clr.b   vbl_pending
+    tst.b   mouse_updated
+    beq     .resume_wait
+
     moveq   #0,d2
     move.b  mouse_acc_x,d2
     moveq   #0,d3
@@ -58,6 +67,10 @@ start:
     move.b  d3,last_acc_y
     move.b  #1,have_sample
     bra     .apply_buttons
+
+.resume_wait:
+    and.w   #$F8FF,SR
+    bra     .wait
 
 .calculate_delta:
     moveq   #0,d0
@@ -133,6 +146,11 @@ start:
     bra     .wait
 
 .exit:
+    or.w    #$0700,SR               ; Stop both interrupt sources cleanly
+    clr.w   VIDEO_IRQ_ENABLE
+    clr.w   USB_IRQ_ENABLE
+    move.w  VIDEO_IRQ_STATUS,d0     ; Clear a final pending VBL
+    and.w   #$F8FF,SR
     trap    #14
 
 ; ===========================
@@ -166,6 +184,16 @@ usb_isr:
 
 .done:
     movem.l (sp)+,d0-d1
+    rte
+
+; ===========================
+; Vertical-blank interrupt handler
+; ===========================
+vbl_isr:
+    movem.l d0,-(sp)
+    move.w  VIDEO_IRQ_STATUS,d0     ; Read status to acknowledge the VBL
+    move.b  #1,vbl_pending          ; Publish the frame boundary last
+    movem.l (sp)+,d0
     rte
 
 ; ===========================
@@ -315,6 +343,8 @@ mouse_acc_y:
 mouse_raw_buttons:
     ds.b    1
 mouse_updated:
+    ds.b    1
+vbl_pending:
     ds.b    1
 have_sample:
     ds.b    1

@@ -48,6 +48,7 @@ case class BusController() extends Component {
     val uartInt     = in Bool()
     val usbInt      = in Bool()
     val timerInt    = in Bool()
+    val videoInt    = in Bool()
   }
 
   // ---------------------------
@@ -100,8 +101,10 @@ case class BusController() extends Component {
     io.ipl := B"001"        // bitwise not 6
   } elsewhen(io.timerInt) {
     io.ipl := B"010"        // bitwise not 5
-  } elsewhen(io.uartInt) {
+  } elsewhen(io.videoInt) {
     io.ipl := B"011"        // bitwise not 4
+  } elsewhen(io.uartInt) {
+    io.ipl := B"100"        // bitwise not 3
   } otherwise {
     io.ipl := B"111"        // bitwise not 0
   }

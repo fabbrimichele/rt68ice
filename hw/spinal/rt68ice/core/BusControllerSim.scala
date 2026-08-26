@@ -15,6 +15,7 @@ object BusControllerSim extends App {
     dut.io.uartInt #= false
     dut.io.usbInt #= false
     dut.io.timerInt #= false
+    dut.io.videoInt #= false
 
     Seq(
       dut.io.romBus,
@@ -63,17 +64,27 @@ object BusControllerSim extends App {
     driveTransfer(0xfffffff2L, busState = 2, uds = true, lds = true)
     assert(!dut.io.busErr.toBoolean, "An interrupt-acknowledge cycle raised BERR")
 
-    // Timer IRQ 5 sits between USB IRQ 6 and UART IRQ 4.
+    // Interrupt priorities descend from USB 6 through UART 3.
     dut.io.timerInt #= true
     sleep(1)
     assert(dut.io.ipl.toInt == 2, "The timer did not request interrupt level 5")
 
-    dut.io.uartInt #= true
+    dut.io.videoInt #= true
     sleep(1)
-    assert(dut.io.ipl.toInt == 2, "UART incorrectly took priority over the timer")
+    assert(dut.io.ipl.toInt == 2, "Video incorrectly took priority over the timer")
 
     dut.io.usbInt #= true
     sleep(1)
     assert(dut.io.ipl.toInt == 1, "USB did not take priority over the timer")
+
+    dut.io.usbInt #= false
+    dut.io.timerInt #= false
+    sleep(1)
+    assert(dut.io.ipl.toInt == 3, "Video did not request interrupt level 4")
+
+    dut.io.videoInt #= false
+    dut.io.uartInt #= true
+    sleep(1)
+    assert(dut.io.ipl.toInt == 4, "UART did not request interrupt level 3")
   }
 }

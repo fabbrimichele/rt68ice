@@ -26,8 +26,8 @@ object VgaDeviceSim extends App {
     // 2. Initialize and Fork All Clock Domains
     // ------------------------------------------------------------
 
-    // Default system/CPU bus clock (e.g., 10 ns period -> 100 MHz)
-    dut.clockDomain.forkStimulus(period = 10)
+    // System/CPU bus clock (25 MHz)
+    dut.clockDomain.forkStimulus(period = 40)
 
     // VGA pixel clock (e.g., ~40 ns period -> 25 MHz for standard 640x480)
     dut.vgaCd.forkStimulus(period = 40)
@@ -36,6 +36,8 @@ object VgaDeviceSim extends App {
     // 3. Initialize Inputs to Safe Default States
     // ------------------------------------------------------------
     dut.io.fbSel #= false
+    dut.io.palSel #= false
+    dut.io.ctrlSel #= false
     dut.io.bus.wr #= false
     dut.io.bus.address #= 0
     dut.io.bus.dataOut #= 0
@@ -75,9 +77,54 @@ object VgaDeviceSim extends App {
     // Write a white pixel (RGB 565: 0xFFFF) at word 2
     writeBus(2, 0xFFFF)
 
-    //dut.clockDomain.waitRisingEdge(2)
+    // ------------------------------------------------------------
+    // 5. Test Step B: Enable, receive and acknowledge the VBL IRQ
+    // ------------------------------------------------------------
+    def writeControlRegister(byteOffset: Int, data16Bit: Int): Unit = {
+      dut.io.bus.address #= byteOffset
+      dut.io.bus.dataOut #= data16Bit
+      dut.io.bus.wr #= true
+      dut.io.bus.uds #= true
+      dut.io.bus.lds #= true
+      dut.io.ctrlSel #= true
 
-    dut.clockDomain.waitRisingEdge(250_000)
+      dut.clockDomain.waitRisingEdge()
+
+      dut.io.ctrlSel #= false
+      dut.io.bus.wr #= false
+      dut.io.bus.uds #= false
+      dut.io.bus.lds #= false
+    }
+
+    writeControlRegister(byteOffset = 4, data16Bit = 1)
+    assert(!dut.io.int.toBoolean, "VBL interrupt was active before vertical blank")
+
+    var pixelClocks = 0
+    while(!dut.io.int.toBoolean && pixelClocks < 430_000) {
+      dut.vgaCd.waitRisingEdge()
+      pixelClocks += 1
+    }
+    assert(dut.io.int.toBoolean, "VBL did not raise an interrupt within one frame")
+
+    dut.clockDomain.waitRisingEdge(4)
+    assert(dut.io.int.toBoolean, "VBL interrupt was not held pending")
+
+    dut.io.bus.address #= 2
+    dut.io.bus.wr #= false
+    dut.io.bus.uds #= true
+    dut.io.bus.lds #= true
+    dut.io.ctrlSel #= true
+    sleep(1)
+    assert((dut.io.bus.dataIn.toInt & 1) == 1, "IRQ_STATUS did not report VBL pending")
+
+    dut.clockDomain.waitRisingEdge()
+    sleep(1)
+    dut.io.ctrlSel #= false
+    dut.io.bus.uds #= false
+    dut.io.bus.lds #= false
+    assert(!dut.io.int.toBoolean, "Reading IRQ_STATUS did not clear the VBL interrupt")
+
+    println(s"[SIM] VBL interrupt asserted after $pixelClocks pixel clocks and cleared on status read")
 
 
     /*
