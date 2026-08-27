@@ -1,3 +1,5 @@
+import os
+import socket
 import struct
 import tempfile
 import unittest
@@ -43,6 +45,33 @@ class SerialLoadTest(unittest.TestCase):
 
         eot_call = mock.call(7, bytes((serial_load.EOT,)))
         self.assertEqual(write_all.call_args_list, [eot_call, eot_call])
+
+    def test_terminal_relays_output_input_and_honors_escape(self):
+        serial_side, device_side = socket.socketpair()
+        input_read, input_write = os.pipe()
+        output_read, output_write = os.pipe()
+        try:
+            device_side.sendall(b"board output\r\n")
+            os.write(input_write, b"key" + bytes((serial_load.TERMINAL_ESCAPE,)))
+
+            serial_load.terminal_session(
+                serial_side.fileno(),
+                input_fd=input_read,
+                output_fd=output_write,
+            )
+
+            self.assertEqual(device_side.recv(3), b"key")
+            os.close(output_write)
+            output_write = None
+            self.assertEqual(os.read(output_read, 4096), b"board output\r\n")
+        finally:
+            serial_side.close()
+            device_side.close()
+            os.close(input_read)
+            os.close(input_write)
+            os.close(output_read)
+            if output_write is not None:
+                os.close(output_write)
 
     def test_read_image_validates_header(self):
         image = struct.pack(">II", 0x00010000, 3) + b"abc"
