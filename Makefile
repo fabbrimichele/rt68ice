@@ -30,13 +30,14 @@ TARGET_APP_DIR := target/app
 # Where the board is connected
 SERIAL_PORT = /dev/ttyACM0
 SERIAL_BAUD = 57600
+SERIAL_SOCKET = /tmp/rt68ice-serial.sock
 RUN ?= 1
 # Image conversion settings
 ASSETS_IMG_DIR = assets/images
 IMG_TOOL = tools/img2planes.py
 
 
-.PHONY: all clean rom prog prog-flash view-wave monitor images
+.PHONY: all clean rom prog prog-flash view-wave monitor images serial-open serial-load
 
 all: images $(TARGET).bit
 
@@ -70,7 +71,7 @@ prog-flash: $(TARGET).bit
 	openFPGALoader -f -c cmsisdap --vid=0x1d50 --pid=0x602b $<
 
 serial-open:
-	picocom -b $(SERIAL_BAUD) $(SERIAL_PORT)
+	python3 tools/serial_terminal.py --port $(SERIAL_PORT) --baud $(SERIAL_BAUD) --socket $(SERIAL_SOCKET)
 
 reset:
 	openFPGALoader -c cmsisdap --vid=0x1d50 --pid=0x602b --reset
@@ -91,7 +92,7 @@ serial-load: apps
 	fi
 	# Test file existence
 	test -f $(TARGET_APP_DIR)/$(BIN)
-	python3 tools/serial_load.py --port $(SERIAL_PORT) --baud $(SERIAL_BAUD) $(if $(filter 0 false no,$(RUN)),--no-run,) $(TARGET_APP_DIR)/$(BIN)
+	python3 tools/serial_load.py --socket $(SERIAL_SOCKET) $(if $(filter 0 false no,$(RUN)),--no-run,) $(TARGET_APP_DIR)/$(BIN)
 
 clean:
 	rm -rf *.json *.config *.bit target hw/spinal/rt68ice/memory/*.hex

@@ -43,6 +43,25 @@ To load to the FLASH (permanent) the bit stream:
 ```sh
 make prog-flash
 ```
+
+## Serial Terminal and Program Loading
+
+Keep the serial terminal running in one shell:
+
+```sh
+make serial-open
+```
+
+Load and run an application from another shell:
+
+```sh
+make serial-load BIN=vga_vbl_int.bin
+```
+
+The terminal owns the serial port and temporarily proxies the XMODEM transfer,
+so it resumes displaying program output immediately after the upload. Press
+`Ctrl-]` to close the terminal. Use `RUN=0` to load without running the image.
+
 To view the simulation wave form:
 1. Run the simulation
 2. ```

@@ -2,10 +2,12 @@ import os
 import socket
 import struct
 import tempfile
+import threading
+import time
 import unittest
 from unittest import mock
 
-from tools import serial_load
+from tools import serial_load, serial_terminal
 
 
 class SerialLoadTest(unittest.TestCase):
@@ -46,33 +48,6 @@ class SerialLoadTest(unittest.TestCase):
         eot_call = mock.call(7, bytes((serial_load.EOT,)))
         self.assertEqual(write_all.call_args_list, [eot_call, eot_call])
 
-    def test_terminal_relays_output_input_and_honors_escape(self):
-        serial_side, device_side = socket.socketpair()
-        input_read, input_write = os.pipe()
-        output_read, output_write = os.pipe()
-        try:
-            device_side.sendall(b"board output\r\n")
-            os.write(input_write, b"key" + bytes((serial_load.TERMINAL_ESCAPE,)))
-
-            serial_load.terminal_session(
-                serial_side.fileno(),
-                input_fd=input_read,
-                output_fd=output_write,
-            )
-
-            self.assertEqual(device_side.recv(3), b"key")
-            os.close(output_write)
-            output_write = None
-            self.assertEqual(os.read(output_read, 4096), b"board output\r\n")
-        finally:
-            serial_side.close()
-            device_side.close()
-            os.close(input_read)
-            os.close(input_write)
-            os.close(output_read)
-            if output_write is not None:
-                os.close(output_write)
-
     def test_read_image_validates_header(self):
         image = struct.pack(">II", 0x00010000, 3) + b"abc"
         with tempfile.NamedTemporaryFile() as file:
@@ -99,6 +74,92 @@ class SerialLoadTest(unittest.TestCase):
             file.flush()
             with self.assertRaisesRegex(ValueError, "must be even"):
                 serial_load.read_image(file.name)
+
+
+class SerialTerminalTest(unittest.TestCase):
+    @staticmethod
+    def read_until(fd, expected, timeout=1.0):
+        deadline = time.monotonic() + timeout
+        received = bytearray()
+        while expected not in received:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                break
+            readable, _, _ = serial_terminal.select.select((fd,), (), (), remaining)
+            if not readable:
+                break
+            received.extend(os.read(fd, 4096))
+        return bytes(received)
+
+    def test_terminal_proxies_upload_then_resumes_interactive_io(self):
+        uart_terminal, uart_device = socket.socketpair()
+        proxy_terminal, uploader = socket.socketpair()
+        idle_server_read, idle_server_write = os.pipe()
+        input_read, input_write = os.pipe()
+        output_read, output_write = os.pipe()
+        errors = []
+
+        class IdleServer:
+            def fileno(self):
+                return idle_server_read
+
+        try:
+            def run_terminal():
+                try:
+                    serial_terminal.relay_terminal(
+                        uart_terminal.fileno(),
+                        IdleServer(),
+                        input_fd=input_read,
+                        output_fd=output_write,
+                        initial_client=proxy_terminal,
+                    )
+                except Exception as error:  # Preserve thread failures for the test.
+                    errors.append(error)
+
+            thread = threading.Thread(target=run_terminal, daemon=True)
+            thread.start()
+            uart_device.settimeout(1.0)
+            uploader.settimeout(1.0)
+            try:
+                uploader.sendall(b"load\r")
+                self.assertEqual(uart_device.recv(5), b"load\r")
+
+                uart_device.sendall(b"C")
+                self.assertEqual(uploader.recv(1), b"C")
+                uploader.close()
+
+                status = self.read_until(output_read, b"uploader disconnected")
+                self.assertIn(b"uploader connected", status)
+                self.assertIn(b"uploader disconnected", status)
+
+                uart_device.sendall(b"program output\r\n")
+                self.assertIn(
+                    b"program output\r\n",
+                    self.read_until(output_read, b"program output\r\n"),
+                )
+
+                os.write(input_write, b"key")
+                self.assertEqual(uart_device.recv(3), b"key")
+                os.write(input_write, bytes((serial_terminal.TERMINAL_ESCAPE,)))
+                thread.join(timeout=1.0)
+                self.assertFalse(thread.is_alive())
+                self.assertEqual(errors, [])
+            finally:
+                uploader.close()
+                if thread.is_alive():
+                    os.write(input_write, bytes((serial_terminal.TERMINAL_ESCAPE,)))
+                    thread.join(timeout=1.0)
+        finally:
+            uart_terminal.close()
+            uart_device.close()
+            proxy_terminal.close()
+            uploader.close()
+            os.close(idle_server_read)
+            os.close(idle_server_write)
+            os.close(input_read)
+            os.close(input_write)
+            os.close(output_read)
+            os.close(output_write)
 
 
 if __name__ == "__main__":

@@ -5,11 +5,11 @@ import argparse
 import binascii
 import os
 import select
+import socket
 import struct
 import sys
 import termios
 import time
-import tty
 
 
 SOH = 0x01
@@ -27,7 +27,6 @@ DEFAULT_RETRIES = 10
 DEFAULT_TIMEOUT = 3.0
 LOAD_MIN = 0x00010000
 LOAD_END = 0x00800000
-TERMINAL_ESCAPE = 0x1D  # Ctrl-]
 
 
 class TransferError(RuntimeError):
@@ -67,6 +66,12 @@ def write_all(fd, data):
         if written == 0:
             raise TransferError("serial port stopped accepting data")
         view = view[written:]
+
+
+def drain_output(fd):
+    """Wait for a direct TTY transport; a terminal proxy owns its TTY."""
+    if os.isatty(fd):
+        termios.tcdrain(fd)
 
 
 def crc16_xmodem(data):
@@ -121,49 +126,10 @@ def wait_for_prompt(fd, timeout):
             return True
 
 
-def terminal_session(serial_fd, input_fd=None, output_fd=None):
-    """Relay bytes between the local terminal and the serial port."""
-    if input_fd is None:
-        input_fd = sys.stdin.fileno()
-    if output_fd is None:
-        output_fd = sys.stdout.fileno()
-
-    saved_settings = None
-    if os.isatty(input_fd):
-        saved_settings = termios.tcgetattr(input_fd)
-        tty.setraw(input_fd, when=termios.TCSANOW)
-
-    try:
-        while True:
-            readable, _, _ = select.select((serial_fd, input_fd), (), ())
-
-            if serial_fd in readable:
-                data = os.read(serial_fd, 4096)
-                if not data:
-                    raise TransferError("serial port disconnected")
-                write_all(output_fd, data)
-
-            if input_fd in readable:
-                data = os.read(input_fd, 4096)
-                if not data:
-                    return
-
-                escape_index = data.find(bytes((TERMINAL_ESCAPE,)))
-                if escape_index >= 0:
-                    if escape_index:
-                        write_all(serial_fd, data[:escape_index])
-                    return
-
-                write_all(serial_fd, data)
-    finally:
-        if saved_settings is not None:
-            termios.tcsetattr(input_fd, termios.TCSADRAIN, saved_settings)
-
-
 def send_packet(fd, packet, timeout, retries):
     for _ in range(retries):
         write_all(fd, packet)
-        termios.tcdrain(fd)
+        drain_output(fd)
         response = read_control(fd, {ACK, NAK, CAN}, timeout)
         if response == ACK:
             return
@@ -176,7 +142,7 @@ def finish_transfer(fd, timeout, retries):
     """Support both EOT/ACK and the classic EOT/NAK/EOT/ACK ending."""
     for _ in range(retries):
         write_all(fd, bytes((EOT,)))
-        termios.tcdrain(fd)
+        drain_output(fd)
         response = read_control(fd, {ACK, NAK, CAN}, timeout)
         if response == ACK:
             return
@@ -208,7 +174,7 @@ def send_xmodem(fd, image, block_size, timeout, retries):
         finish_transfer(fd, timeout, retries)
     except TransferError:
         write_all(fd, bytes((CAN, CAN)))
-        termios.tcdrain(fd)
+        drain_output(fd)
         raise
 
 
@@ -246,6 +212,11 @@ def main():
     )
     parser.add_argument("bin_file", help="Binary file with 8-byte monitor header")
     parser.add_argument("--port", default="/dev/ttyACM0", help="Serial port path")
+    parser.add_argument(
+        "--socket",
+        dest="socket_path",
+        help="Use the Unix socket exposed by serial_terminal.py instead of opening the port",
+    )
     parser.add_argument("--baud", type=int, default=DEFAULT_BAUD, help="Serial baud rate")
     parser.add_argument(
         "--block-size",
@@ -273,11 +244,6 @@ def main():
         help="Maximum attempts for each block (default: 10)",
     )
     parser.add_argument("--no-run", action="store_true", help="Load without sending run")
-    parser.add_argument(
-        "--no-terminal",
-        action="store_true",
-        help="Exit after loading instead of opening an interactive terminal",
-    )
     args = parser.parse_args()
 
     if args.timeout <= 0 or args.start_timeout <= 0 or args.retries <= 0:
@@ -290,18 +256,31 @@ def main():
         return 1
 
     fd = None
+    transport_socket = None
     try:
-        fd = os.open(args.port, os.O_RDWR | os.O_NOCTTY)
-        configure_serial(fd, args.baud)
-        termios.tcflush(fd, termios.TCIFLUSH)
+        if args.socket_path:
+            transport_socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            try:
+                transport_socket.connect(args.socket_path)
+            except OSError as error:
+                raise TransferError(
+                    f"cannot connect to {args.socket_path}; start `make serial-open` first"
+                ) from error
+            fd = transport_socket.fileno()
+            destination = f"terminal at {args.socket_path}"
+        else:
+            fd = os.open(args.port, os.O_RDWR | os.O_NOCTTY)
+            configure_serial(fd, args.baud)
+            termios.tcflush(fd, termios.TCIFLUSH)
+            destination = args.port
 
         protocol_name = "XMODEM-1K" if args.block_size == 1024 else "XMODEM-CRC"
         print(
             f"--- Loading {payload_len} bytes at 0x{program_address:08X} "
-            f"to {args.port} using {protocol_name} ---"
+            f"to {destination} using {protocol_name} ---"
         )
         write_all(fd, b"load\r")
-        termios.tcdrain(fd)
+        drain_output(fd)
 
         response = read_control(fd, {CRC_REQUEST, CAN}, args.start_timeout)
         if response == CAN:
@@ -318,17 +297,14 @@ def main():
             run_cmd = f"run {program_address:08X}\r".encode("ascii")
             print(f"--- Running application at 0x{program_address:08X} ---")
             write_all(fd, run_cmd)
-            termios.tcdrain(fd)
-
-        if not args.no_terminal:
-            print("--- Terminal active; press Ctrl-] to exit ---")
-            terminal_session(fd)
-            print("\n--- Terminal closed ---")
+            drain_output(fd)
     except (OSError, ValueError, TransferError) as error:
         print(f"Error: {error}", file=sys.stderr)
         return 1
     finally:
-        if fd is not None:
+        if transport_socket is not None:
+            transport_socket.close()
+        elif fd is not None:
             os.close(fd)
 
     return 0
