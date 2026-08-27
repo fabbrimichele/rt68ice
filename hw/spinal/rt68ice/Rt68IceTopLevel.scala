@@ -49,7 +49,8 @@ case class Rt68IceTopLevel(romFile: String) extends Component {
     bus.io.cpuBus <> cpu.io.bus
 
     // ROM
-    val rom = Mem16Bit(sizeInWords = 1024, initFile = Some(romFile), readOnly = true)
+    // 4 KiB accommodates the monitor and its XMODEM receiver.
+    val rom = Mem16Bit(sizeInWords = 2048, initFile = Some(romFile), readOnly = true)
     rom.io.sel := bus.io.romSel
     bus.io.romBus <> rom.io.bus
 

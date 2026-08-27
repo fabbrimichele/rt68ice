@@ -168,51 +168,344 @@ help_cmd:
     bra     new_cmd
 
 ; -------------------------------------------------------------------------
-; Load from UART a binary content to memory.
+; Load an image from UART using XMODEM-CRC.
 ;
-; PROTOCOL: Length-Prefixed Binary (Big-Endian)
+; XMODEM is the transport.  The data carried by it retains the monitor image
+; format used by the application build:
 ;
-; HEADER (8 bytes, sent first):
-; [32-bit Load Address] (a0)
-; [32-bit Content Length] (d2)
+;   4 bytes: 32-bit big-endian load address
+;   4 bytes: 32-bit big-endian payload length (header not included)
+;   N bytes: payload
 ;
-; BODY:
-; [L bytes of raw binary content]
-;
-; Example (File Content in Hex Bytes):
-; 00 01 00 00 ; Load Address: $00010000
-; 00 00 00 02 ; Content Length: 2 bytes (it doesn't include the headers)
-; 55 55       ; Actual Content: Two bytes ($55, $55)
+; Both 128-byte SOH blocks and 1024-byte STX blocks are accepted.  A block is
+; CRC checked before its contents are used, and padding beyond payload length
+; is ignored.  Images may occupy $00010000 through $007FFFFF.
 ; -------------------------------------------------------------------------
 load_cmd:
     lea     msg_loading,a0
     bsr     put_str
+    bsr     xmodem_receive
+    tst.l   d0
+    beq     load_cmd_failed
 
-    ; Read header start address (32 bits)
-    jsr     read_32bit_word     ; Result in d1.L
-    move.l  d1,a0               ; a0 start address
-    ; Read content length
-    jsr     read_32bit_word     ; Result in d1.L
-                                ; d1 content lenght
-    cmp.l   #0,d1
-    beq     loa_cmd_done        ; If d1 = 0, exit
-
-    ; Read content
-loa_cmd_loop:
-    jsr     get_chr             ; Read byte from UART to d0
-    move.b  d0,(a0)+            ; Copy read byte to memory
-    subq.l  #1,d1               ; Decrement the FULL 32-bit counter
-                                ; (dbra replaced to support long > 64KB)
-    bne     loa_cmd_loop        ; If the counter hasn't reached 0, branch back
-
-loa_cmd_done:
     lea     msg_load_done,a0
     bsr     put_str
     bra     new_cmd
 
-; TODO: Load - Add checksum at the end
-; TODO: Load - Print the address where the program has been loaded
-;              or save it and change RUN to start from there
+load_cmd_failed:
+    lea     msg_load_failed,a0
+    bsr     put_str
+    bra     new_cmd
+
+; -------------------------------------------------------------------------
+; Receive one complete monitor image using XMODEM-CRC.
+; Output: d0.l = 1 on success, 0 on failure.
+; -------------------------------------------------------------------------
+xmodem_receive:
+    move.b  #1,xm_expected
+    clr.b   xm_started
+    move.b  #XM_MAX_RETRIES,xm_retries
+    clr.l   xm_remaining
+
+xm_request_start:
+    move.b  #XM_CRC_REQUEST,d0
+    bsr     put_chr
+
+xm_wait_control:
+    bsr     xm_get_byte_timeout
+    tst.l   d1
+    bne     xm_have_control
+
+    subq.b  #1,xm_retries
+    beq     xm_receive_failed
+    tst.b   xm_started
+    beq     xm_request_start
+    move.b  #XM_NAK,d0
+    bsr     put_chr
+    bra     xm_wait_control
+
+xm_have_control:
+    cmpi.b  #XM_SOH,d0
+    beq     xm_begin_128
+    cmpi.b  #XM_STX,d0
+    beq     xm_begin_1k
+    cmpi.b  #XM_EOT,d0
+    beq     xm_begin_eot
+    cmpi.b  #XM_CAN,d0
+    beq     xm_receive_failed
+
+    ; Discard unexpected bytes, but limit how long malformed input can keep
+    ; the monitor in transfer mode.
+    subq.b  #1,xm_retries
+    beq     xm_receive_failed
+    tst.b   xm_started
+    beq     xm_request_start
+    move.b  #XM_NAK,d0
+    bsr     put_chr
+    bra     xm_wait_control
+
+xm_begin_128:
+    move.w  #128,xm_block_size
+    bra     xm_receive_packet
+
+xm_begin_1k:
+    move.w  #1024,xm_block_size
+
+xm_receive_packet:
+    ; xm_read_packet always consumes the block number, complement, complete
+    ; data field and CRC before reporting validation failure.
+    bsr     xm_read_packet
+    tst.l   d0
+    beq     xm_retry_packet
+
+    bsr     xm_process_block
+    cmpi.l  #XM_PROCESS_FATAL,d0
+    beq     xm_receive_failed
+    tst.l   d0
+    beq     xm_retry_packet
+
+    move.b  #XM_ACK,d0
+    bsr     put_chr
+    move.b  #XM_MAX_RETRIES,xm_retries
+    bra     xm_wait_control
+
+xm_retry_packet:
+    subq.b  #1,xm_retries
+    beq     xm_receive_failed
+    move.b  #XM_NAK,d0
+    bsr     put_chr
+    bra     xm_wait_control
+
+xm_begin_eot:
+    ; Do not accept a truncated image, or EOT before the header was received.
+    tst.b   xm_started
+    beq     xm_receive_failed
+    tst.l   xm_remaining
+    bne     xm_receive_failed
+
+    ; Classic XMODEM termination is EOT/NAK/EOT/ACK.
+    move.b  #XM_NAK,d0
+    bsr     put_chr
+    move.b  #XM_MAX_RETRIES,xm_retries
+
+xm_wait_second_eot:
+    bsr     xm_get_byte_timeout
+    tst.l   d1
+    beq     xm_retry_eot
+    cmpi.b  #XM_EOT,d0
+    beq     xm_finish_receive
+    cmpi.b  #XM_CAN,d0
+    beq     xm_receive_failed
+
+xm_retry_eot:
+    subq.b  #1,xm_retries
+    beq     xm_receive_failed
+    move.b  #XM_NAK,d0
+    bsr     put_chr
+    bra     xm_wait_second_eot
+
+xm_finish_receive:
+    move.b  #XM_ACK,d0
+    bsr     put_chr
+    moveq   #1,d0
+    rts
+
+xm_receive_failed:
+    ; Two consecutive CAN bytes are the conventional XMODEM cancellation.
+    move.b  #XM_CAN,d0
+    bsr     put_chr
+    bsr     put_chr
+    moveq   #0,d0
+    rts
+
+; -------------------------------------------------------------------------
+; Read and CRC-check a packet after SOH/STX has already been consumed.
+; The data field is buffered at XM_BUFFER and is not copied to its final
+; address until validation succeeds.
+; Output: d0.l = 1 if valid, 0 on timeout/complement/CRC failure.
+; -------------------------------------------------------------------------
+xm_read_packet:
+    bsr     xm_get_byte_timeout
+    tst.l   d1
+    beq     xm_read_packet_failed
+    move.b  d0,xm_received
+
+    bsr     xm_get_byte_timeout
+    tst.l   d1
+    beq     xm_read_packet_failed
+    move.b  d0,d2               ; Block-number complement
+
+    lea     XM_BUFFER,a0
+    moveq   #0,d3
+    move.w  xm_block_size,d3
+    clr.w   d4                   ; CRC16-XMODEM, initial value zero
+
+xm_read_data:
+    bsr     xm_get_byte_timeout
+    tst.l   d1
+    beq     xm_read_packet_failed
+    move.b  d0,(a0)+
+
+    lsl.w   #8,d0
+    eor.w   d0,d4
+    moveq   #7,d5
+xm_crc_bit:
+    add.w   d4,d4
+    bcc     xm_crc_next_bit
+    eori.w  #$1021,d4
+xm_crc_next_bit:
+    dbra    d5,xm_crc_bit
+
+    subq.w  #1,d3
+    bne     xm_read_data
+
+    ; CRC is transmitted most-significant byte first.
+    bsr     xm_get_byte_timeout
+    tst.l   d1
+    beq     xm_read_packet_failed
+    moveq   #0,d6
+    move.b  d0,d6
+    lsl.w   #8,d6
+
+    bsr     xm_get_byte_timeout
+    tst.l   d1
+    beq     xm_read_packet_failed
+    or.b    d0,d6
+
+    moveq   #0,d0
+    move.b  xm_received,d0
+    not.b   d0
+    cmp.b   d0,d2
+    bne     xm_read_packet_failed
+    cmp.w   d4,d6
+    bne     xm_read_packet_failed
+
+    moveq   #1,d0
+    rts
+
+xm_read_packet_failed:
+    moveq   #0,d0
+    rts
+
+; -------------------------------------------------------------------------
+; Process a validated block.
+; Handles the expected block and acknowledges a duplicate of the previous
+; block without copying it a second time.
+; Output: d0.l = 1 accepted, 0 wrong block, XM_PROCESS_FATAL invalid image.
+; -------------------------------------------------------------------------
+xm_process_block:
+    moveq   #0,d0
+    move.b  xm_received,d0
+    cmp.b   xm_expected,d0
+    beq     xm_process_new
+
+    tst.b   xm_started
+    beq     xm_process_rejected
+    moveq   #0,d1
+    move.b  xm_expected,d1
+    subq.b  #1,d1
+    cmp.b   d1,d0
+    beq     xm_process_accepted ; Sender missed the ACK: do not copy twice
+    bra     xm_process_rejected
+
+xm_process_new:
+    moveq   #0,d5               ; Bytes to skip before payload in this block
+    tst.b   xm_started
+    bne     xm_copy_block_data
+
+    ; The first validated block contains the monitor image header.
+    lea     XM_BUFFER,a0
+    move.l  (a0),d1             ; Load address, big-endian CPU representation
+    move.l  4(a0),d2            ; Payload length
+
+    cmpi.l  #XM_LOAD_MIN,d1
+    bcs     xm_process_fatal
+    btst    #0,d1
+    bne     xm_process_fatal    ; 68000 program entry addresses must be even
+    tst.l   d2
+    beq     xm_process_fatal
+    move.l  d1,d3
+    add.l   d2,d3
+    bcs     xm_process_fatal    ; 32-bit address overflow
+    cmpi.l  #XM_LOAD_END,d3
+    bhi     xm_process_fatal
+
+    move.l  d1,xm_destination
+    move.l  d2,xm_remaining
+    move.b  #1,xm_started
+    moveq   #8,d5
+
+xm_copy_block_data:
+    ; A new data block after the advertised payload is a malformed image.
+    tst.l   xm_remaining
+    beq     xm_process_fatal
+
+    lea     XM_BUFFER,a0
+    adda.l  d5,a0
+    moveq   #0,d2
+    move.w  xm_block_size,d2
+    sub.l   d5,d2               ; Available payload bytes in this block
+
+    move.l  xm_remaining,d3
+    cmp.l   d2,d3
+    bls     xm_use_remaining
+    bra     xm_have_copy_length
+xm_use_remaining:
+    move.l  d3,d2
+xm_have_copy_length:
+    move.l  d2,d4
+    movea.l xm_destination,a1
+
+xm_copy_byte:
+    move.b  (a0)+,d0
+    move.b  d0,(a1)+
+    subq.l  #1,d2
+    bne     xm_copy_byte
+
+    move.l  a1,xm_destination
+    sub.l   d4,xm_remaining
+    addq.b  #1,xm_expected
+
+xm_process_accepted:
+    moveq   #1,d0
+    rts
+
+xm_process_rejected:
+    moveq   #0,d0
+    rts
+
+xm_process_fatal:
+    moveq   #XM_PROCESS_FATAL,d0
+    rts
+
+; -------------------------------------------------------------------------
+; Poll the UART for a byte with an approximately two-second timeout.
+; COUNTER's high word advances once every 65536 clocks, and word subtraction
+; deliberately provides wrap-safe elapsed timing.
+; Output: d0.b = byte and d1.l = 1, or d1.l = 0 on timeout.
+; -------------------------------------------------------------------------
+xm_get_byte_timeout:
+    movem.l d2/d3,-(sp)
+    move.w  COUNTER,d2
+xm_get_byte_wait:
+    move.b  UART_LSR,d1
+    btst    #0,d1
+    bne     xm_get_byte_ready
+
+    move.w  COUNTER,d3
+    sub.w   d2,d3
+    cmpi.w  #XM_TIMEOUT_TICKS,d3
+    bcs     xm_get_byte_wait
+    moveq   #0,d1
+    movem.l (sp)+,d2/d3
+    rts
+
+xm_get_byte_ready:
+    moveq   #0,d0
+    move.b  UART_RBR,d0
+    moveq   #1,d1
+    movem.l (sp)+,d2/d3
+    rts
 
 run_cmd:
     ; JUMP to the specified address
@@ -603,36 +896,10 @@ print_reg:
 ; Libraries
 ; ------------------------------
     include '../../lib/asm/mem_map_video.asm'
+    include '../../lib/asm/mem_map_counter.asm'
     include '../../lib/asm/console_io_uart.asm'
     include '../../lib/asm/conv_hex.asm'
     include '../../lib/asm/isr_vector.asm'
-
-
-; -------------------------------------------------------------
-; read_32bit_word: Reads 4 bytes from UART and assembles into d1.L
-; Input: None
-; Output: d1.L = 32-bit value
-; Uses: get_chr (assumed to return 8-bit char in d0.B)
-; -------------------------------------------------------------
-read_32bit_word:
-    movem.l d0/d2,-(sp)     ; Save d0 (used for get_chr) and d2 (used for loop counter)
-
-    moveq   #4-1,d2         ; d2 = 3 (loop 4 times for 4 bytes)
-    clr.l   d1              ; d1 = Accumulator (cleared for the 32-bit result)
-
-read_loop:
-    bsr     get_chr         ; d0.B = Get one byte from the serial port
-
-    ; 1. Shift the current result (d1) left by 8 bits (makes room for the new byte)
-    lsl.l   #8,d1
-
-    ; 2. OR the new byte (d0.B) into the least significant position of d1
-    or.b    d0,d1
-
-    dbra    d2,read_loop    ; Loop 4 times total (d2 counts down from 3)
-
-    movem.l (sp)+,d0/d2      ; Restore registers
-    rts
 
 
 init_vector_table:
@@ -677,13 +944,14 @@ msg_title       dc.b    'RT68F Monitor v0.1',CR,LF,NUL
 msg_unknown     dc.b    'Error: Unknown command or syntax',CR,LF,NUL
 msg_help        dc.b    'dump  <ADDR>       - Dump from ADDR (HEX)',CR,LF
                 dc.b    'write <ADDR> <VAL> - Write to ADDR (HEX) the VALUE (HEX)',CR,LF
-                dc.b    'load               - Load from UART to memory',CR,LF
+                dc.b    'load               - Load an XMODEM-CRC image',CR,LF
                 dc.b    'run   <ADDR>       - Run program at ADDR (HEX)',CR,LF
                 dc.b    'fbclr              - Clear framebuffer',CR,LF
                 dc.b    'help               - Print this list of commands',CR,LF
                 dc.b    NUL
 msg_loading     dc.b    'Loading...',CR,LF,NUL
 msg_load_done   dc.b    'Done.',CR,LF,NUL
+msg_load_failed dc.b    'Load failed.',CR,LF,NUL
 msg_bus_err     dc.b    'Bus Error!',CR,LF,NUL
 
 ; Registers names
@@ -720,9 +988,31 @@ fbclr_str       dc.b    'fbclr',NUL
 IN_BUF:
     ds.b    80
 IN_BUF_END:
+xm_expected:       ds.b    1
+xm_started:        ds.b    1
+xm_retries:        ds.b    1
+xm_received:       ds.b    1
+xm_block_size:     ds.w    1
+xm_remaining:      ds.l    1
+xm_destination:    ds.l    1
 
 ; ===========================
 ; Constants
 ; ===========================
 ; Program Constants
 DLY_VAL         equ 1333333     ; Delay iterations, 1.33 million = 0.5 sec at 32MHz
+
+; XMODEM control bytes and receiver settings
+XM_SOH              equ $01
+XM_STX              equ $02
+XM_EOT              equ $04
+XM_ACK              equ $06
+XM_NAK              equ $15
+XM_CAN              equ $18
+XM_CRC_REQUEST      equ $43
+XM_BUFFER           equ $00008000
+XM_LOAD_MIN         equ $00010000
+XM_LOAD_END         equ $00800000
+XM_TIMEOUT_TICKS    equ 763      ; About 2 seconds at a 25 MHz system clock
+XM_MAX_RETRIES      equ 10
+XM_PROCESS_FATAL    equ 2

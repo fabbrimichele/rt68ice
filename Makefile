@@ -29,9 +29,8 @@ LD_SCRIPT_APP = $(ASM_APP_DIR)/app.ld
 TARGET_APP_DIR := target/app
 # Where the board is connected
 SERIAL_PORT = /dev/ttyACM0
-SERIAL_BAUD = 19200
+SERIAL_BAUD = 57600
 RUN ?= 1
-#SERIAL_BAUD = 57600
 # Image conversion settings
 ASSETS_IMG_DIR = assets/images
 IMG_TOOL = tools/img2planes.py
@@ -115,6 +114,7 @@ $(HEX_CLASS_DIR)/%.hex: $(ASM_SRC_DIR)/%.asm $(ASM_LIB_SOURCES)
 	@echo "----------------------------------------------"
 	@echo "- Assembling and Converting '$*'"
 	@echo "----------------------------------------------"
+	@mkdir -p $(BIN_GEN_DIR) $(HEX_SPINAL_DIR) $(HEX_CLASS_DIR)
 	# Assemble the 68000 code to an ELF object file
 	vasmm68k_mot -Felf $< -o $(BIN_GEN_DIR)/$*.o
 	# Link object file
@@ -147,11 +147,11 @@ $(TARGET_APP_DIR)/%.bin: $(ASM_APP_DIR)/%.asm $(ASM_LIB_SOURCES)
 	# Calculate length and prepend the header. All steps in ONE shell session.
 	SHELL_RAW_FILE="$(RAW_FILE_NAME)"; \
 	SYM_FILE="$(TARGET_APP_DIR)/$*.sym"; \
-	FILE_SIZE=$$(stat -c %s $$SHELL_RAW_FILE); \
+	FILE_SIZE=$$(wc -c < "$$SHELL_RAW_FILE" | tr -d '[:space:]'); \
 	HEX_SIZE=$$(printf "%08X" "$$FILE_SIZE"); \
 	DETECTED_ADDR=$$(awk '/^[[:space:]]*[0-9a-fA-F]{8}[[:space:]]+\.text/ {print $$1; exit}' "$$SYM_FILE"); \
 	HEADER_HEX=$$DETECTED_ADDR$$HEX_SIZE; \
-	echo "$$HEADER_HEX" | xxd -r -p | cat - $$SHELL_RAW_FILE > $@
+	echo "$$HEADER_HEX" | xxd -r -p | cat - "$$SHELL_RAW_FILE" > $@
 
 
 # =========================================================================
