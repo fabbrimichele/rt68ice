@@ -17,10 +17,14 @@ LPF     = hw/constraints/$(TOP).lpf
 # Software settings
 # Firmware (FW)
 ASM_SRC_DIR = sw/fw/asm
+can FW_C_SRC_DIR = sw/fw/c
 BIN_GEN_DIR = hw/gen
 HEX_SPINAL_DIR = hw/spinal/rt68ice/memory
 HEX_CLASS_DIR = target/scala-2.13/classes/rt68ice/memory
 ASM_LIB_SOURCES := $(wildcard sw/lib/asm/*.asm)
+M68K_CC ?= m68k-elf-gcc
+M68K_CFLAGS := -m68000 -std=c11 -Os -ffreestanding -fno-builtin -fno-common -fomit-frame-pointer -fno-unwind-tables -fno-asynchronous-unwind-tables -Wall -Wextra -Werror
+HOST_CC ?= clang
 # Default linker script for firmware (fw) programs
 LD_SCRIPT = $(ASM_SRC_DIR)/fw.ld
 # Applications (App)
@@ -37,7 +41,7 @@ ASSETS_IMG_DIR = assets/images
 IMG_TOOL = tools/img2planes.py
 
 
-.PHONY: all clean rom prog prog-flash view-wave monitor images serial-open serial-load
+.PHONY: all clean rom prog prog-flash view-wave monitor monitor-size test-xmodem images serial-open serial-load
 
 all: images $(TARGET).bit
 
@@ -102,14 +106,12 @@ clean:
 # =========================================================================
 # SW PIPELINE 1: Firmware / ROM Initializers (.asm -> .hex)
 # =========================================================================
-ASM_SOURCES := $(wildcard $(ASM_SRC_DIR)/*.asm)
+ASM_SOURCES := $(filter-out $(ASM_SRC_DIR)/monitor.asm $(ASM_SRC_DIR)/monitor_start.asm,$(wildcard $(ASM_SRC_DIR)/*.asm))
 # Convert 'sw/fw/asm/filename.asm' targets into 'target/scala-2.13/classes/rt68ice/memory/filename.hex'
-ROM_HEX_FILES := $(patsubst $(ASM_SRC_DIR)/%.asm,$(HEX_CLASS_DIR)/%.hex,$(ASM_SOURCES))
+ASM_ROM_HEX_FILES := $(patsubst $(ASM_SRC_DIR)/%.asm,$(HEX_CLASS_DIR)/%.hex,$(ASM_SOURCES))
+ROM_HEX_FILES := $(ASM_ROM_HEX_FILES) $(HEX_CLASS_DIR)/monitor.hex
 
 rom: $(ROM_HEX_FILES)
-
-# When building the monitor hex file, temporarily replace the generic linker script
-$(HEX_CLASS_DIR)/monitor.hex: LD_SCRIPT = $(ASM_SRC_DIR)/monitor.ld
 
 $(HEX_CLASS_DIR)/%.hex: $(ASM_SRC_DIR)/%.asm $(ASM_LIB_SOURCES)
 	@echo "----------------------------------------------"
@@ -126,6 +128,43 @@ $(HEX_CLASS_DIR)/%.hex: $(ASM_SRC_DIR)/%.asm $(ASM_LIB_SOURCES)
 	mkdir -p $(HEX_CLASS_DIR)
 	# Copy the hex file to the Scala classes path for resource loading
 	cp $(HEX_SPINAL_DIR)/$*.hex $@
+
+# The ROM monitor is freestanding C, with a deliberately tiny assembly entry
+# point for reset/trap handling and the non-returning RUN jump.
+$(BIN_GEN_DIR)/monitor_start.o: $(ASM_SRC_DIR)/monitor_start.asm
+	@mkdir -p $(BIN_GEN_DIR)
+	vasmm68k_mot -Felf $< -o $@
+
+$(BIN_GEN_DIR)/monitor.o: $(FW_C_SRC_DIR)/monitor.c $(FW_C_SRC_DIR)/xmodem.h
+	@mkdir -p $(BIN_GEN_DIR)
+	$(M68K_CC) $(M68K_CFLAGS) -I$(FW_C_SRC_DIR) -c $< -o $@
+
+$(BIN_GEN_DIR)/monitor_xmodem.o: $(FW_C_SRC_DIR)/xmodem.c $(FW_C_SRC_DIR)/xmodem.h
+	@mkdir -p $(BIN_GEN_DIR)
+	$(M68K_CC) $(M68K_CFLAGS) -I$(FW_C_SRC_DIR) -c $< -o $@
+
+$(HEX_CLASS_DIR)/monitor.hex: $(BIN_GEN_DIR)/monitor_start.o $(BIN_GEN_DIR)/monitor.o $(BIN_GEN_DIR)/monitor_xmodem.o $(ASM_SRC_DIR)/monitor.ld
+	@echo "----------------------------------------------"
+	@echo "- Linking C monitor"
+	@echo "----------------------------------------------"
+	@mkdir -p $(BIN_GEN_DIR) $(HEX_SPINAL_DIR) $(HEX_CLASS_DIR)
+	vlink -T $(ASM_SRC_DIR)/monitor.ld -b rawbin1 -M$(BIN_GEN_DIR)/monitor.sym -o $(BIN_GEN_DIR)/monitor.bin $(BIN_GEN_DIR)/monitor_start.o $(BIN_GEN_DIR)/monitor.o $(BIN_GEN_DIR)/monitor_xmodem.o
+	xxd -p -c 2 $(BIN_GEN_DIR)/monitor.bin | awk '{print toupper($$0)}' > $(HEX_SPINAL_DIR)/monitor.hex
+	cp $(HEX_SPINAL_DIR)/monitor.hex $@
+
+monitor: $(HEX_CLASS_DIR)/monitor.hex
+
+monitor-size: $(HEX_CLASS_DIR)/monitor.hex
+	wc -c $(BIN_GEN_DIR)/monitor.bin
+
+# This test drives the target receiver with the same on-the-wire protocol as
+# tools/serial_load.py.  It does not need a 68k cross compiler or hardware.
+target/tests/xmodem_receiver: $(FW_C_SRC_DIR)/xmodem.c $(FW_C_SRC_DIR)/xmodem.h tests/test_xmodem_receiver.c
+	@mkdir -p target/tests
+	$(HOST_CC) -std=c11 -Wall -Wextra -Werror -pedantic -I$(FW_C_SRC_DIR) $(FW_C_SRC_DIR)/xmodem.c tests/test_xmodem_receiver.c -o $@
+
+test-xmodem: target/tests/xmodem_receiver
+	$<
 
 # =========================================================================
 # SW PIPELINE 2: User Apps via UART (.asm -> Custom Headered .bin)

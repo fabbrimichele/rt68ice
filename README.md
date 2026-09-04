@@ -67,3 +67,17 @@ To view the simulation wave form:
 2. ```
    make view-wave
    ```
+
+## ROM monitor
+
+The ROM monitor is freestanding C, with the XMODEM receiver kept in a separate
+hardware-independent module and covered by a host test.  Building the monitor
+requires a bare-metal 68000 GCC cross compiler (`m68k-elf-gcc` by default):
+
+```sh
+make monitor
+make test-xmodem
+```
+
+See [the monitor guide](./doc/monitor.md) for its source layout, protocol
+contract, test coverage and toolchain override.

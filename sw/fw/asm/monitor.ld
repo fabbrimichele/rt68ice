@@ -15,8 +15,8 @@ SECTIONS
     /* Define the boundary where the user loading area begins */
     _user_ram_start = _vector_table_end;
 
-    /* Force the monitor's private variables to start exactly at $3F00 */
-    .bss 0x00003F00 (NOLOAD) : {
+    /* Reserve a 512-byte stack for the freestanding C monitor. */
+    .bss 0x00003E00 (NOLOAD) : {
         _bss_start = .;
         *(.bss*)
         _bss_end = .;
