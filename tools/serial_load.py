@@ -51,7 +51,7 @@ def main():
     )
     parser.add_argument("bin_file", help="Binary file with 8-byte monitor header")
     parser.add_argument("--port", default="/dev/ttyACM0", help="Serial port path")
-    parser.add_argument("--baud", type=int, default=19200, help="Serial baud rate")
+    parser.add_argument("--baud", type=int, default=57600, help="Serial baud rate")
     parser.add_argument(
         "--prompt-delay",
         type=float,

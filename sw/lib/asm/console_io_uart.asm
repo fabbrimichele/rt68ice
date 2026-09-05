@@ -59,7 +59,7 @@ get_chr:
 ; =============================================================================
 ; Routine:    uart_init
 ; Purpose:    Initializes the T16450/16550 UART hardware layout.
-;             Configures 19200 baud rate (at 20MHz), 8N1 frame, and disables
+;             Configures 57600 baud rate (at 25MHz), 8N1 frame, and disables
 ;             peripheral interrupts.
 ; Input:      None.
 ; Output:     None.
@@ -74,8 +74,8 @@ uart_init:
 	;move.b  #27,UART_RBR    ; set divisor LSB to 26 (DLL): 8.333MHz/16/26 = 19290 (should be 19200, still in specs)
 	;move.b  #9,UART_RBR     ; set divisor LSB to 9 (DLL): 8.333MHz/16/9 = 57870 (should be 57600, still in specs)
 	;move.b  #101,UART_RBR   ; set divisor LSB to 101 (DLL): 31.250MHz/16/101 = 19337 (error = 0.7%)
-	move.b  #85,UART_RBR    ; set divisor LSB to 92 (DLL): 26.0417MHz/16/85 = 19148 (error = 0.27%)
-
+	;move.b  #85,UART_RBR    ; set divisor LSB to 92 (DLL): 26.0417MHz/16/85 = 19148 (error = 0.27%)
+	move.b  #9,UART_RBR     ; set divisor LSB to 9 (DLL): 25.000MHz/16/27 = 57870 (should be 57600, still in specs)
 
 	move.b  #$03,UART_LCR	; set options to 8N1
 	move.b  #$00,UART_IER	; disable interrupt
