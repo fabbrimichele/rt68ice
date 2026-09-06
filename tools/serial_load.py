@@ -100,6 +100,9 @@ def main():
             return 0
 
         load_wait = wire_time_seconds(len(image), args.baud) + args.wire_margin
+        if load_wait > 5:
+            load_wait = 5
+
         print(f"--- Waiting {load_wait:.2f}s for UART transfer to finish ---")
         time.sleep(load_wait)
         time.sleep(args.prompt_delay)
