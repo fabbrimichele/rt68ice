@@ -91,8 +91,8 @@ case class UsbDevice(usbCd: ClockDomain) extends Component {
     val key3 = Reg(Bits(8 bits)) init 0
     val key4 = Reg(Bits(8 bits)) init 0
     val mouseBtn = Reg(Bits(8 bits)) init 0
-    val mouseDxAcc = Reg(SInt(16 bits)) init 0
-    val mouseDyAcc = Reg(SInt(16 bits)) init 0
+    val mouseDxLast = Reg(SInt(16 bits)) init 0
+    val mouseDyLast = Reg(SInt(16 bits)) init 0
     val gamepad = Reg(Bits(10 bits)) init 0
 
     val int = RegInit(False)
@@ -121,8 +121,8 @@ case class UsbDevice(usbCd: ClockDomain) extends Component {
 
       when(sysHasReport) {
         when(sysStatus(1 downto 0) === 2) {
-          mouseDxAcc := mouseDxAcc + sysMouseDx.asSInt
-          mouseDyAcc := mouseDyAcc + sysMouseDy.asSInt
+          mouseDxLast := sysMouseDx.asSInt.resize(16)
+          mouseDyLast := sysMouseDy.asSInt.resize(16)
         }
         int := True
       }
@@ -197,8 +197,8 @@ case class UsbDevice(usbCd: ClockDomain) extends Component {
         1  -> irqEnable.resize(16),
         8  -> host1.status.resize(16),
         9  -> host1.mouseBtn.resize(16),
-        10 -> host1.mouseDxAcc.asBits.resize(16),
-        11 -> host1.mouseDyAcc.asBits.resize(16),
+        10 -> host1.mouseDxLast.asBits.resize(16),
+        11 -> host1.mouseDyLast.asBits.resize(16),
         12 -> host1.gamepad.resize(16),
         13 -> host1.keyModifiers.resize(16),
         14 -> host1.key1.resize(16),
@@ -207,8 +207,8 @@ case class UsbDevice(usbCd: ClockDomain) extends Component {
         17 -> host1.key4.resize(16),
         24 -> host2.status.resize(16),
         25 -> host2.mouseBtn.resize(16),
-        26 -> host2.mouseDxAcc.asBits.resize(16),
-        27 -> host2.mouseDyAcc.asBits.resize(16),
+        26 -> host2.mouseDxLast.asBits.resize(16),
+        27 -> host2.mouseDyLast.asBits.resize(16),
         28 -> host2.gamepad.resize(16),
         29 -> host2.keyModifiers.resize(16),
         30 -> host2.key1.resize(16),
@@ -217,8 +217,8 @@ case class UsbDevice(usbCd: ClockDomain) extends Component {
         33 -> host2.key4.resize(16),
         40 -> host3.status.resize(16),
         41 -> host3.mouseBtn.resize(16),
-        42 -> host3.mouseDxAcc.asBits.resize(16),
-        43 -> host3.mouseDyAcc.asBits.resize(16),
+        42 -> host3.mouseDxLast.asBits.resize(16),
+        43 -> host3.mouseDyLast.asBits.resize(16),
         44 -> host3.gamepad.resize(16),
         45 -> host3.keyModifiers.resize(16),
         46 -> host3.key1.resize(16),
@@ -227,8 +227,8 @@ case class UsbDevice(usbCd: ClockDomain) extends Component {
         49 -> host3.key4.resize(16),
         56 -> host4.status.resize(16),
         57 -> host4.mouseBtn.resize(16),
-        58 -> host4.mouseDxAcc.asBits.resize(16),
-        59 -> host4.mouseDyAcc.asBits.resize(16),
+        58 -> host4.mouseDxLast.asBits.resize(16),
+        59 -> host4.mouseDyLast.asBits.resize(16),
         60 -> host4.gamepad.resize(16),
         61 -> host4.keyModifiers.resize(16),
         62 -> host4.key1.resize(16),

@@ -1,8 +1,7 @@
     section .text, code
 
-; Compatibility note: the USB host assumes byte-aligned signed 8-bit X/Y
-; values. Mice that use packed 12-bit axes in report protocol will produce
-; incorrect movement unless their HID reports are decoded differently.
+; The USB host decodes the M100 packed 12-bit X/Y report fields and exposes
+; each report as a sign-extended 16-bit relative delta.
 
 ; ===========================
 ; Program code
@@ -14,7 +13,6 @@ start:
 
     clr.b   mouse_updated
     clr.b   vbl_pending
-    clr.b   have_sample
     move.w  #(SCREEN_WIDTH/2),cursor_x
     move.w  #(SCREEN_HEIGHT/2),cursor_y
 
@@ -46,10 +44,8 @@ start:
     tst.b   mouse_updated
     beq     .resume_wait
 
-    moveq   #0,d2
-    move.b  mouse_acc_x,d2
-    moveq   #0,d3
-    move.b  mouse_acc_y,d3
+    move.w  mouse_dx,d2
+    move.w  mouse_dy,d3
     moveq   #0,d1
     move.b  mouse_raw_buttons,d1
     clr.b   mouse_updated
@@ -57,35 +53,17 @@ start:
 
     btst    #2,d1                   ; Middle button exits the program
     bne     .exit
-
-    tst.b   have_sample
-    bne     .calculate_delta
-
-    ; The hardware registers are wrapping accumulators. Use the first report
-    ; only as the reference point so the cursor does not jump at startup.
-    move.b  d2,last_acc_x
-    move.b  d3,last_acc_y
-    move.b  #1,have_sample
-    bra     .apply_buttons
+    bra     .calculate_delta
 
 .resume_wait:
     and.w   #$F8FF,SR
     bra     .wait
 
 .calculate_delta:
-    moveq   #0,d0
-    move.b  d2,d0
-    sub.b   last_acc_x,d0
-    move.b  d2,last_acc_x
-    ext.w   d0
-    move.w  d0,d4                  ; D4.W = signed X delta
-
-    moveq   #0,d0
-    move.b  d3,d0
-    sub.b   last_acc_y,d0
-    move.b  d3,last_acc_y
-    ext.w   d0
-    move.w  d0,d5                  ; D5.W = signed Y delta
+    ; USB2_MOUSE_DX/DY now contain one signed relative delta per report,
+    ; rather than a running accumulator.
+    move.w  d2,d4                  ; D4.W = signed X delta
+    move.w  d3,d5                  ; D5.W = signed Y delta
 
     ; Mice normally send periodic reports even when they have not moved.
     ; Do not erase and redraw the cursor for a zero-delta report: updating the
@@ -177,9 +155,9 @@ usb_isr:
     move.w  USB2_MOUSE_BTN,d0
     move.b  d0,mouse_raw_buttons
     move.w  USB2_MOUSE_DX,d0
-    move.b  d0,mouse_acc_x
+    move.w  d0,mouse_dx
     move.w  USB2_MOUSE_DY,d0
-    move.b  d0,mouse_acc_y
+    move.w  d0,mouse_dy
     move.b  #1,mouse_updated        ; Publish complete snapshot last
 
 .done:
@@ -336,23 +314,16 @@ CURSOR_PLANE_MASK equ   2
 ; RAM data
 ; ===========================
     section .bss
-mouse_acc_x:
-    ds.b    1
-mouse_acc_y:
-    ds.b    1
+mouse_dx:
+    ds.w    1
+mouse_dy:
+    ds.w    1
 mouse_raw_buttons:
     ds.b    1
 mouse_updated:
     ds.b    1
 vbl_pending:
     ds.b    1
-have_sample:
-    ds.b    1
-last_acc_x:
-    ds.b    1
-last_acc_y:
-    ds.b    1
-    even
 cursor_x:
     ds.w    1
 cursor_y:
