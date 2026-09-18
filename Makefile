@@ -66,9 +66,12 @@ $(TARGET).bit: $(TARGET).config
 prog: # $(TARGET).bit
 	openFPGALoader -c cmsisdap --vid=0x1d50 --pid=0x602b $(TARGET).bit
 
-# 5. Load to FLASH (permanent)
+# 6. Load to FLASH (permanent)
 prog-flash: $(TARGET).bit
 	openFPGALoader -f -c cmsisdap --vid=0x1d50 --pid=0x602b $<
+
+reset:
+	openFPGALoader -c cmsisdap --vid=0x1d50 --pid=0x602b -r
 
 serial-open:
 	picocom -b $(SERIAL_BAUD) $(SERIAL_PORT)

@@ -1,0 +1,1 @@
+Refer to: https://codeberg.org/icebreaker-fpga/icebreaker-pmod/src/branch/main/dip-switch/v1.1a/dip-switch-sch.pdf
