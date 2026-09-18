@@ -12,7 +12,6 @@ object VgaDevice {
   val ControlAddress = 0
   val InterruptStatusAddress = 1
   val InterruptEnableAddress = 2
-
   val VerticalBlankInterruptBit = 0
 }
 
