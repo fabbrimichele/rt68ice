@@ -38,15 +38,17 @@ IOBUF       PORT "usb4_dp"        IO_TYPE=LVCMOS33;
 LOCATE      COMP "usb4_dm"        SITE "B5";
 IOBUF       PORT "usb4_dm"        IO_TYPE=LVCMOS33;
 
-// SPI - SD Card
-// MISO -> DAT0, MOSI -> CMD, CS   -> DAT3, DAT1 & DAT2 unused
-LOCATE      COMP "sd_miso"        SITE "D8";
+// SPI - PMOD SD card in the left P5 position.
+// The PMOD pin labels map to P5 as follows:
+// DAT0/D0 (MISO) -> C6, CMD (MOSI) -> C7, DAT3/D3 (CS) -> D9,
+// CLK -> D8. DAT1/D1 and DAT2/D2 are unused in SPI mode.
+LOCATE      COMP "sd_miso"        SITE "D7";
 IOBUF       PORT "sd_miso"        IO_TYPE=LVCMOS33;
-LOCATE      COMP "sd_mosi"        SITE "D9";
+LOCATE      COMP "sd_mosi"        SITE "D8";
 IOBUF       PORT "sd_mosi"        IO_TYPE=LVCMOS33;
-LOCATE      COMP "sd_cs"          SITE "C9";
+LOCATE      COMP "sd_cs"          SITE "C8";
 IOBUF       PORT "sd_cs"          IO_TYPE=LVCMOS33;
-LOCATE      COMP "sd_clk"         SITE "C8";
+LOCATE      COMP "sd_clk"         SITE "C7";
 IOBUF       PORT "sd_clk"         IO_TYPE=LVCMOS33;
 
 // LED Array

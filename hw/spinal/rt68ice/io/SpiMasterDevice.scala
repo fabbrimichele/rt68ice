@@ -16,10 +16,14 @@ case class SpiMasterDevice(config: SpiMasterConfig) extends Component {
   }
 
   val spiMaster = new SpiMasterBB
+  // The address decoder remains selected while the CPU holds an SPI address
+  // between transactions.  Qualify it with a byte-lane strobe so the VHDL
+  // core only sees an actual 68000 bus access, as it did in rt68f via !AS.
+  val spiAccess = io.sel && (io.bus.uds || io.bus.lds)
 
   // 68000 bus
   spiMaster.io.addr := io.bus.address(2 downto 1).asBits
-  spiMaster.io.cs := io.sel
+  spiMaster.io.cs := spiAccess
   spiMaster.io.data_in := io.bus.dataOut(7 downto 0)
   spiMaster.io.rw := !io.bus.wr
   io.bus.dataIn := spiMaster.io.data_out.resized
