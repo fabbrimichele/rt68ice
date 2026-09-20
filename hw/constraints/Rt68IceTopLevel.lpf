@@ -2,17 +2,17 @@
 // - https://github.com/wuxx/icesugar-pro/blob/master/src/litex_linux/top_bg256.lpf
 // - https://github.com/litex-hub/litex-boards/blob/master/litex_boards/platforms/muselab_icesugar_pro.py
 
-LOCATE COMP "clk" SITE "P6";
-IOBUF PORT "clk" IO_TYPE=LVCMOS33;
-FREQUENCY PORT "clk" 25 MHZ;
+LOCATE      COMP "clk"            SITE "P6";
+IOBUF       PORT "clk"            IO_TYPE=LVCMOS33;
+FREQUENCY   PORT "clk"            25 MHZ;
 
 // RGB LED is connected to B11 (red), A11 (green), A12 (blue)
-LOCATE COMP "led[0]" SITE "B11";
-IOBUF PORT "led[0]" IO_TYPE=LVCMOS33;
-LOCATE COMP "led[1]" SITE "A11";
-IOBUF PORT "led[1]" IO_TYPE=LVCMOS33;
-LOCATE COMP "led[2]" SITE "A12";
-IOBUF PORT "led[2]" IO_TYPE=LVCMOS33;
+LOCATE      COMP "led[0]"         SITE "B11";
+IOBUF       PORT "led[0]"         IO_TYPE=LVCMOS33;
+LOCATE      COMP "led[1]"         SITE "A11";
+IOBUF       PORT "led[1]"         IO_TYPE=LVCMOS33;
+LOCATE      COMP "led[2]"         SITE "A12";
+IOBUF       PORT "led[2]"         IO_TYPE=LVCMOS33;
 
 // USB 1 (top-left)
 LOCATE      COMP "usb1_dp"        SITE "R5";
@@ -37,6 +37,19 @@ LOCATE      COMP "usb4_dp"        SITE "A5";
 IOBUF       PORT "usb4_dp"        IO_TYPE=LVCMOS33;
 LOCATE      COMP "usb4_dm"        SITE "B5";
 IOBUF       PORT "usb4_dm"        IO_TYPE=LVCMOS33;
+
+// SPI - PMOD SD card in the left P5 position.
+// The PMOD's far connector row maps to P5's far connector row:
+// DAT0/D0 (MISO) -> D7, CMD (MOSI) -> D8, DAT3/D3 (CS) -> C8,
+// CLK -> C7. DAT1/D1 (C6) and DAT2/D2 (D9) are unused in SPI mode.
+LOCATE      COMP "sd_miso"        SITE "D7";
+IOBUF       PORT "sd_miso"        IO_TYPE=LVCMOS33;
+LOCATE      COMP "sd_mosi"        SITE "D8";
+IOBUF       PORT "sd_mosi"        IO_TYPE=LVCMOS33;
+LOCATE      COMP "sd_cs"          SITE "C8";
+IOBUF       PORT "sd_cs"          IO_TYPE=LVCMOS33;
+LOCATE      COMP "sd_clk"         SITE "C7";
+IOBUF       PORT "sd_clk"         IO_TYPE=LVCMOS33;
 
 // LED Array
 // MSB
@@ -73,7 +86,6 @@ LOCATE COMP "leds[1]"  SITE "H13";
 IOBUF  PORT "leds[1]"  IO_TYPE=LVCMOS33;
 LOCATE COMP "leds[0]"  SITE "J13";
 IOBUF  PORT "leds[0]"  IO_TYPE=LVCMOS33;
-
 
 // Serial
 LOCATE COMP "uart_txd" SITE "B9";

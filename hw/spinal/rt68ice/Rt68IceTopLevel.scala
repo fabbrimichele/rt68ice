@@ -1,7 +1,7 @@
 package rt68ice
 
 import rt68ice.core._
-import rt68ice.io.{LedArrayDevice, LedDevice, T16450Device, Usb, UsbDevice}
+import rt68ice.io.{LedArrayDevice, LedDevice, Spi, SpiMasterConfig, SpiMasterDevice, T16450Device, Usb, UsbDevice}
 import rt68ice.memory.{Mem16Bit, SdRam, SdRamDevice}
 import rt68ice.timer.{Counter, Timer}
 import rt68ice.video.{Gpdi, VgaDevice}
@@ -25,6 +25,7 @@ case class Rt68IceTopLevel(romFile: String) extends Component {
     val usb2 = master(Usb())
     val usb3 = master(Usb())
     val usb4 = master(Usb())
+    val sd = master(Spi())
   }
 
   val clockCtrl = ClockCtrl()
@@ -115,6 +116,15 @@ case class Rt68IceTopLevel(romFile: String) extends Component {
     usbDevice.io.sel := bus.io.usbSel
     bus.io.usbBus <> usbDevice.io.bus
     bus.io.usbInt := usbDevice.io.int
+
+    // --------------------------------
+    // SPI Device (SD card and Flash Mem)
+    // --------------------------------
+    val spiMaster = SpiMasterDevice(SpiMasterConfig(portCount = 1)) // TODO: add flash
+    io.sd <> spiMaster.io.spis(0)
+    //io.flash <> spiMaster.io.spis(1)
+    bus.io.spiBus <> spiMaster.io.bus
+    spiMaster.io.sel := bus.io.spiSel
   }
 
   // Remove io_ prefix
