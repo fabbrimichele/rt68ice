@@ -39,9 +39,9 @@ LOCATE      COMP "usb4_dm"        SITE "B5";
 IOBUF       PORT "usb4_dm"        IO_TYPE=LVCMOS33;
 
 // SPI - PMOD SD card in the left P5 position.
-// The PMOD pin labels map to P5 as follows:
-// DAT0/D0 (MISO) -> C6, CMD (MOSI) -> C7, DAT3/D3 (CS) -> D9,
-// CLK -> D8. DAT1/D1 and DAT2/D2 are unused in SPI mode.
+// The PMOD's far connector row maps to P5's far connector row:
+// DAT0/D0 (MISO) -> D7, CMD (MOSI) -> D8, DAT3/D3 (CS) -> C8,
+// CLK -> C7. DAT1/D1 (C6) and DAT2/D2 (D9) are unused in SPI mode.
 LOCATE      COMP "sd_miso"        SITE "D7";
 IOBUF       PORT "sd_miso"        IO_TYPE=LVCMOS33;
 LOCATE      COMP "sd_mosi"        SITE "D8";

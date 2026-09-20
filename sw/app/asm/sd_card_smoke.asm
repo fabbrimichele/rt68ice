@@ -54,9 +54,8 @@ start:
     tst.b   d1
     bne     fail_init
 
-    ; Once initialization is complete, use the maximum rate this 25 MHz
-    ; system-clock SPI core can generate: 25 MHz / 2 = 12.5 MHz.
-    move.b  #SPI_CONFIG_FAST,SPI_CONF
+    ; Keep the conservative initialization clock for this smoke test. This
+    ; separates basic SD-card verification from high-speed signal timing.
 
     PRINT   msg_read
     bsr     sd_read_lba0
@@ -144,6 +143,7 @@ sd_initialize:
     bsr     sd_command
     tst.b   d1
     bne     .error
+    tst.b   d0                       ; R1=$00 only once initialization ends
     beq     .success
     cmpi.b  #$01,d0
     bne     .error
@@ -165,14 +165,19 @@ sd_initialize:
 sd_read_lba0:
     movem.l d2-d4/a0-a1,-(sp)
 
+    ; Progress markers distinguish a rejected CMD17 from a missing data token.
+    move.b  #'1',d0
+    bsr     put_chr
     lea     cmd17_lba0,a0
     bsr     sd_command
     tst.b   d1
-    bne     .error
+    bne     .command_timeout
     tst.b   d0                       ; CMD17 expected R1 = $00
-    bne     .error
+    bne     .command_rejected
 
     ; Wait for the data-start token, with a finite timeout.
+    move.b  #'T',d0
+    bsr     put_chr
     move.w  #$ffff,d4
 .wait_token:
     move.b  #$ff,d0
@@ -186,6 +191,8 @@ sd_read_lba0:
     bra     .error
 
 .token_received:
+    move.b  #'D',d0
+    bsr     put_chr
     lea     sector_buffer,a1
     move.w  #511,d3
 .read_byte:
@@ -209,6 +216,13 @@ sd_read_lba0:
 
     moveq   #0,d1
     bra     .finish
+.command_timeout:
+    move.b  #'X',d0                  ; no R1 response before timeout
+    bsr     put_chr
+    bra     .error
+.command_rejected:
+    bsr     put_hex_byte             ; print the nonzero R1 status
+    bra     .error
 .error:
     moveq   #1,d1
 .finish:
@@ -216,6 +230,25 @@ sd_read_lba0:
     moveq   #1,d0
     bsr     spi_set_cs
     movem.l (sp)+,d2-d4/a0-a1
+    rts
+
+; Print D0.B as two uppercase hexadecimal digits. D2 is caller-saved here.
+put_hex_byte:
+    move.b  d0,d2
+    lsr.b   #4,d0
+    bsr     .nibble
+    bsr     put_chr
+    move.b  d2,d0
+    andi.b  #$0f,d0
+    bsr     .nibble
+    bra     put_chr
+.nibble:
+    cmpi.b  #10,d0
+    bcs     .digit
+    addi.b  #'A'-10,d0
+    rts
+.digit:
+    addi.b  #'0',d0
     rts
 
 ; ---------------------------------------------------------------------------
@@ -329,7 +362,6 @@ SPI_SELECT_DEVICE0       equ     $02
 SPI_START_DESELECTED     equ     $01
 SPI_START_SELECTED       equ     $03
 SPI_CONFIG_SLOW          equ     $0e    ; 8-bit, clk/128 (195.3125 kHz)
-SPI_CONFIG_FAST          equ     $08    ; 8-bit, clk/2
 
 cmd0:        dc.b    $40,$00,$00,$00,$00,$95
 cmd8:        dc.b    $48,$00,$00,$01,$aa,$87
@@ -337,14 +369,14 @@ cmd55:       dc.b    $77,$00,$00,$00,$00,$ff
 acmd41:      dc.b    $69,$40,$00,$00,$00,$ff
 cmd17_lba0:  dc.b    $51,$00,$00,$00,$00,$ff
 
-msg_banner:          dc.b    'SD SPI smoke test',LF,NUL
+msg_banner:          dc.b    'SD SPI smoke test',CR,LF,NUL
 msg_init:            dc.b    'Initializing card... ',NUL
-msg_read:            dc.b    'Reading LBA 0... ',NUL
-msg_ok:              dc.b    'OK: MBR signature $55AA',LF,NUL
-msg_timeout:         dc.b    'SPI timeout',LF,NUL
-msg_init_fail:       dc.b    'SD initialization failed',LF,NUL
-msg_read_fail:       dc.b    'CMD17/read failed',LF,NUL
-msg_signature_fail:  dc.b    'Read completed, but MBR signature is not $55AA',LF,NUL
+msg_read:            dc.b    CR,LF,'Reading LBA 0... ',NUL
+msg_ok:              dc.b    'OK: MBR signature $55AA',CR,LF,NUL
+msg_timeout:         dc.b    'SPI timeout',CR,LF,NUL
+msg_init_fail:       dc.b    'SD initialization failed',CR,LF,NUL
+msg_read_fail:       dc.b    'CMD17/read failed',CR,LF,NUL
+msg_signature_fail:  dc.b    'Read completed, but MBR signature is not $55AA',CR,LF,NUL
 
     include '../../lib/asm/mem_map_leds.asm'
     include '../../lib/asm/console_io_uart.asm'
