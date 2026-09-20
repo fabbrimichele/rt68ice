@@ -13,4 +13,5 @@
 | LED_ARRAY       | 0x00F14000 | 0x00F17FFF |   16 KB |
 | USB HID HOST    | 0x00F18000 | 0x00F1BFFF |   16 KB |
 | TIMER           | 0x00F1C000 | 0x00F1FFFF |   16 KB |
+| SPI             | 0x00F20000 | 0x00F23FFF |   16 KB |
 | MAIN ROM        | 0x00FC0000 | 0x00FC3FFF |   16 KB |
