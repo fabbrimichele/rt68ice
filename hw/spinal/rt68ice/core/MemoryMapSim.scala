@@ -42,10 +42,10 @@ object MemoryMapSim extends App {
     driveAddress(0x00000008L)
     assert(dut.io.ramSel.toBoolean, "Low vector memory is not mapped to fast RAM")
 
-    driveAddress(0x00003ffeL)
+    driveAddress(0x000003feL)
     assert(dut.io.ramSel.toBoolean, "The end of fast RAM is not mapped")
 
-    driveAddress(0x00004000L)
+    driveAddress(0x00000400L)
     assert(dut.io.sdRamSel.toBoolean, "SDRAM does not follow the fast RAM overlay")
 
     driveAddress(0x007ffffeL)

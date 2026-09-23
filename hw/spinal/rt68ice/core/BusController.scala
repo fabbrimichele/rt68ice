@@ -139,7 +139,7 @@ case class BusController() extends Component {
   val interruptAckMapping = MaskMapping(0xFFFFFFF0L, 0xFFFFFFF0L)
   // Boot vectors look at the absolute first 8 bytes via a 3-bit wildcard mask
   val bootMapping     = MaskMapping(0x00000000L, 0xFFFFFFF8L)
-  val ramMapping      = SizeMapping(0x00000000L, 16 KiB)  // $000000 - $003FFF, overlays SDRAM
+  val ramMapping      = SizeMapping(0x00000000L, 1 KiB)   // $000000 - $0003FF, overlays SDRAM
   val sdRamMapping    = SizeMapping(0x00000000L, 8 MiB)   // $000000 - $7FFFFF
   val vidFbMapping    = SizeMapping(0x00E00000L, 128 KiB) // $E00000 - $E1FFFF; first 75 KiB used
   val ledMapping      = SizeMapping(0x00F00000L, 16 KiB)  // $F00000 - $F03FFF

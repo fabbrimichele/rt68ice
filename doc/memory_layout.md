@@ -2,7 +2,7 @@
 | Device | Start Address | End Address | Size |
 | :--- | :---: | :---: | ---: |
 | BOOT VECTORS    | 0x00000000 | 0x00000007 | 8 Bytes |
-| FAST RAM        | 0x00000000 | 0x00003FFF |   16 KB |
+| FAST RAM        | 0x00000000 | 0x000003FF |    1 KB |
 | SDRAM           | 0x00000000 | 0x007FFFFF | 8192 KB |
 | VIDEO FB        | 0x00E00000 | 0x00E1FFFF |  128 KB |
 | LED PERIPH      | 0x00F00000 | 0x00F03FFF |   16 KB |

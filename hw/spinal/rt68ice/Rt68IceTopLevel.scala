@@ -55,7 +55,7 @@ case class Rt68IceTopLevel(romFile: String) extends Component {
     bus.io.romBus <> rom.io.bus
 
     // RAM
-    val ram = Mem16Bit(sizeInWords = 8192)
+    val ram = Mem16Bit(sizeInWords = 512)
     ram.io.sel := bus.io.ramSel
     bus.io.ramBus <> ram.io.bus
 
