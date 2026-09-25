@@ -75,7 +75,7 @@ reset:
 	openFPGALoader -c cmsisdap --vid=0x1d50 --pid=0x602b -r
 
 serial-open:
-	picocom -b $(SERIAL_BAUD) $(SERIAL_PORT)
+	picocom --omap delbs -b $(SERIAL_BAUD) $(SERIAL_PORT)
 
 reset:
 	openFPGALoader -c cmsisdap --vid=0x1d50 --pid=0x602b --reset
