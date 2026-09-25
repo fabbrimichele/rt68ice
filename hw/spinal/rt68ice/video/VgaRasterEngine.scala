@@ -13,6 +13,7 @@ object VgaRasterEngine {
   val RES_LOW   = 0
   val RES_MED   = 1
   val RES_HIGH  = 2
+  val RES_MONO  = 3
 }
 
 //noinspection TypeAnnotation
@@ -76,21 +77,24 @@ case class VgaRasterEngine() extends Component {
     val planeStride = io.resolution.mux(
       RES_LOW -> U(8, 4 bits).resized,  // 8 words per block line segment
       RES_MED -> U(4, 4 bits).resized,  // 4 words per block line segment
-      default -> U(2, 4 bits).resized   // 2 words per block line segment
+      RES_HIGH -> U(2, 4 bits).resized, // 2 words per block line segment
+      default -> U(1, 4 bits).resized   // 1 word per block line segment
     )
 
     // Address offset pointer steps evenly across words
     val planeFetchOffset = io.resolution.mux(
       RES_LOW -> cycleCounter(2 downto 0),                  // Steps 0-7 once per block
       RES_MED -> cycleCounter(1 downto 0).resized,          // Steps 0-3
-      default -> (B"2'0" ## cycleCounter(0)).asUInt.resized // Steps 0-1
+      RES_HIGH -> (B"2'0" ## cycleCounter(0)).asUInt.resized, // Steps 0-1
+      default -> U(0, 3 bits)                               // Mono has one word per block
     )
 
     // Calculate vertical line baseline offset based on the line width
     val lineBaseAddress = io.resolution.mux(
       RES_LOW -> ((virtualY << 7) + (virtualY << 5)),         // Y * 160
       RES_MED -> ((virtualY << 7) + (virtualY << 5)),         // Y * 160
-      default -> ((virtualY << 6) + (virtualY << 4)).resized  // Y * 80
+      RES_HIGH -> ((virtualY << 6) + (virtualY << 4)).resized, // Y * 80
+      default -> ((virtualY << 5) + (virtualY << 3)).resized  // Y * 40
     )
 
     // Safely increment only when the physical block is completely finished rendering
@@ -110,6 +114,7 @@ case class VgaRasterEngine() extends Component {
     for(i <- 0 until 8) {
       fetchEnable(i) := io.resolution.mux(
         RES_LOW -> (pixelX(4 downto 0) === (i * 2 + 1)), // Pulses on 1, 3, 5, 7, 9, 11, 13, 15
+        RES_MONO -> (if (i == 0) pixelX(3 downto 0) === 1 else False),
         default -> (pixelX(3 downto 0) === (i + 1))      // Pulses on 1, 2, 3, 4, 5, 6, 7, 8
       )
     }
@@ -167,7 +172,8 @@ case class VgaRasterEngine() extends Component {
     RES_LOW -> (videoPipeline.plane7Bit ## videoPipeline.plane6Bit ## videoPipeline.plane5Bit ## videoPipeline.plane4Bit
       ## videoPipeline.plane3Bit ## videoPipeline.plane2Bit ## videoPipeline.plane1Bit ## videoPipeline.plane0Bit),
     RES_MED -> (B"4'0" ## videoPipeline.plane3Bit ## videoPipeline.plane2Bit ## videoPipeline.plane1Bit ## videoPipeline.plane0Bit),
-    default -> (B"6'0" ## videoPipeline.plane1Bit ## videoPipeline.plane0Bit)
+    RES_HIGH -> (B"6'0" ## videoPipeline.plane1Bit ## videoPipeline.plane0Bit),
+    default -> (B"7'0" ## videoPipeline.plane0Bit)
   )
 
   // Pulse once per frame as the raster leaves the final visible pixel. Delay

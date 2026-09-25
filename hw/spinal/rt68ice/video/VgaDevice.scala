@@ -32,10 +32,10 @@ case class VgaDevice(vgaCd: ClockDomain) extends Component {
   // ----------------------
   // Memory definitions
   // ----------------------
-  // Framebuffer: 640x480 2bpp = 75 KB
+  // Framebuffer: sized for the largest mode, 640x480 2bpp = 75 KiB
   val framebuffer = Mem(Bits(16 bits), 38400)
 
-  // Palette: 4 colors
+  // Palette: 256 entries; each video mode uses the entries addressable by its bitplanes
   val palette = VgaPalette(vgaCd)
   palette.io.address := io.bus.address
   palette.io.lds := io.bus.lds
@@ -45,7 +45,8 @@ case class VgaDevice(vgaCd: ClockDomain) extends Component {
   palette.io.sel := io.palSel
 
   // Control register
-  // bits 1-0: screen mode (0 = 320x240 8bpp, 1 = 640x240 4bpp, 2 = 640x480 2bpp)
+  // bits 1-0: screen mode (0 = 320x240 8bpp, 1 = 640x240 4bpp,
+  //                            2 = 640x480 2bpp, 3 = 640x480 1bpp)
   val ctrlReg = Reg(Bits(16 bits)) init 0
   val resolution = ctrlReg(1 downto 0)
   val interruptEnable = RegInit(False)
