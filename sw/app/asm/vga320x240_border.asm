@@ -4,7 +4,7 @@
 ; Program code
 ; ===========================
 start:
-    move.w  #0,VIDEO_CTRL                       ; Set low-res (320*240px 8bpp)
+    move.w  #VIDEO_MODE_320X240_8BPP,VIDEO_CTRL ; Set low-res (320*240px 8bpp)
     bsr     clr_screen
     bsr     draw_bands
     bsr     draw_border

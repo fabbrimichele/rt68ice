@@ -44,11 +44,10 @@ case class VgaDevice(vgaCd: ClockDomain) extends Component {
   palette.io.dataOut := io.bus.dataOut
   palette.io.sel := io.palSel
 
-  // Control register
-  // bits 1-0: screen mode (0 = 320x240 8bpp, 1 = 640x240 4bpp,
-  //                            2 = 640x480 2bpp, 3 = 640x480 1bpp)
+  // Control register: bits 2-0 select the screen mode. Modes 6 and 7 fall
+  // back to 640x480 1bpp; see VgaRasterEngine for the complete mode table.
   val ctrlReg = Reg(Bits(16 bits)) init 0
-  val resolution = ctrlReg(1 downto 0)
+  val resolution = ctrlReg(2 downto 0)
   val interruptEnable = RegInit(False)
   val interruptPending = RegInit(False)
 
