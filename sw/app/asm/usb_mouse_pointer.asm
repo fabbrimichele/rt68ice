@@ -16,7 +16,7 @@ start:
     move.w  #(SCREEN_WIDTH/2),cursor_x
     move.w  #(SCREEN_HEIGHT/2),cursor_y
 
-    move.w  #2,VIDEO_CTRL           ; 640x480, two bitplanes
+    move.w  #VIDEO_MODE_640X480_2BPP,VIDEO_CTRL ; 640x480, two bitplanes
     lea     VIDEO_PLTE,a0
     move.l  #$00000000,(a0)         ; Palette 0: black
     move.l  #$00FFFFFF,4(a0)        ; Palette 1: drawing

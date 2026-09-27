@@ -17,7 +17,7 @@ object VgaMonoRasterEngineSim extends App {
     rasterEngine.videoPipeline.virtualY.simPublic()
     rasterEngine
   }.doSim { dut =>
-    dut.io.resolution #= VgaRasterEngine.RES_MONO
+    dut.io.resolution #= VgaRasterEngine.MODE_640X480_1BPP
     dut.io.memData #= 0
     dut.clockDomain.forkStimulus(period = 40)
 
