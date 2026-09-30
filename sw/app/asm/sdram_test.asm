@@ -122,13 +122,13 @@ run_data_test:
 ; Output: d0.b -> 0 OK, 1 Error
 ; ------------------------------------------------------
 run_addr_test:
-    move.l  #RAM_START+$700000,a0   ; Unused test area ($700000)
-    move.l  #RAM_START+$700400,a1   ; Must not alias with $700000
+    move.l  #RAM_START+$000400,a0   ; SDRAM bank 0 test address
+    move.l  #RAM_START+$800400,a1   ; SDRAM bank 1: must not alias with $000400
 
     ; 1. Write unique patterns
-    move.w  #$AAAA,(a0)             ; Write to $700000
-    move.w  #$5555,2(a0)            ; Write to $700002
-    move.w  #$1234,(a1)             ; Write to $700400
+    move.w  #$AAAA,(a0)             ; Write to $000400
+    move.w  #$5555,2(a0)            ; Write to $000402
+    move.w  #$1234,(a1)             ; Write to $800400
 
     ; 2. Read back and verify the first two
     cmp.w   #$AAAA,(a0)             ; Did $700000 change?
@@ -225,7 +225,7 @@ run_bench_test:
 ; Value Constants
 ; ===========================
 RAM_START       equ $000000          ; SDRAM CPU window start address
-RAM_END         equ $7FFFFF          ; SDRAM CPU window end address (inclusive)
+RAM_END         equ $DFFFFF          ; SDRAM CPU window end address (inclusive)
 APP_START       equ $010000          ; Applications are linked above low system memory
 RAM_TEST_START  equ APP_START+$10000 ; Reserve 64 KiB for this program
 RAM_TEST_WORDS  equ (RAM_END+1-RAM_TEST_START)/2

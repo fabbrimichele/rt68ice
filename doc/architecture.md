@@ -11,9 +11,9 @@ Design and implement a high-performance Motorola 680x0-compatible System-on-a-Ch
     * **68020 Configuration:** Enables 32-bit internal longword operations, improved bitfield instructions, and advanced addressing modes.
     * **Data Bus:** 16-bit external; direct 1:1 mapping to the iCESugar Pro’s 16-bit wide SDRAM chip.
 * **RAM:**
-    * **Low Memory:** The 8MB CPU window is contiguous from `0x000000` to `0x7FFFFF`, as expected by EmuTOS.
+    * **Low Memory:** The 14MB CPU window is contiguous from `0x000000` to `0xDFFFFF`.
     * **Vector Table:** The first 16KB is overlaid by FPGA BRAM for high-speed exception, interrupt, stack and firmware-data access. The first eight bytes are read from ROM for the reset stack pointer and program counter.
-    * **Main Memory:** The board's 32MB SDRAM is accessed through the 8MB low-memory CPU window. A larger window and cache can be added later.
+    * **Main Memory:** The board's 32MB SDRAM is accessed through the 14MB low-memory CPU window. A larger window and cache can be added later.
 * **ROM:**
     * The 16KB boot ROM is mapped at the Atari-compatible `0xFC0000` address, with its first eight bytes also visible at reset-vector addresses `0x000000-0x000007`.
 * **Custom I/O:**
