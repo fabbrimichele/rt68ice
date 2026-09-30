@@ -8,8 +8,8 @@ import scala.language.postfixOps
 //noinspection TypeAnnotation
 //noinspection ScalaWeakerAccess
 case class SdRam() extends Bundle with IMasterSlave {
-  val dq    = Analog(Bits(16 bits))  // 16 bit bidirectional data bus
-  val a     = Bits(13 bits)          // 13 bit multiplexed address bus
+  val dq    = Analog(Bits(16 bits))  // 16-bit bidirectional data bus
+  val a     = Bits(13 bits)          // 13-bit multiplexed address bus
   val dm    = Bits(2 bits)           // two byte masks
   val ba    = Bits(2 bits)           // two banks
   val cs_n  = Bool()                 // a single chip select

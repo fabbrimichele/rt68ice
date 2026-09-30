@@ -140,7 +140,9 @@ case class BusController() extends Component {
   // Boot vectors look at the absolute first 8 bytes via a 3-bit wildcard mask
   val bootMapping     = MaskMapping(0x00000000L, 0xFFFFFFF8L)
   val ramMapping      = SizeMapping(0x00000000L, 1 KiB)   // $000000 - $0003FF, overlays SDRAM
-  val sdRamMapping    = SizeMapping(0x00000000L, 8 MiB)   // $000000 - $7FFFFF
+  val sdRamMapping1   = SizeMapping(0x00000000L, 8 MiB)   // $000000 - $7FFFFF
+  val sdRamMapping2   = SizeMapping(0x00800000L, 4 MiB)   // $800000 - $BFFFFF
+  val sdRamMapping3   = SizeMapping(0x00C00000L, 2 MiB)   // $C00000 - $DFFFFF
   val vidFbMapping    = SizeMapping(0x00E00000L, 128 KiB) // $E00000 - $E1FFFF; first 75 KiB used
   val ledMapping      = SizeMapping(0x00F00000L, 16 KiB)  // $F00000 - $F03FFF
   val uartMapping     = SizeMapping(0x00F04000L, 16 KiB)  // $F04000 - $F07FFF
@@ -157,7 +159,9 @@ case class BusController() extends Component {
     "doc/memory_layout.md",
     "BOOT VECTORS" -> bootMapping,
     "FAST RAM" -> ramMapping,
-    "SDRAM" -> sdRamMapping,
+    "SDRAM 8MB" -> sdRamMapping1,
+    "SDRAM 4MB" -> sdRamMapping2,
+    "SDRAM 2MB" -> sdRamMapping3,
     "VIDEO FB" -> vidFbMapping,
     "LED PERIPH" -> ledMapping,
     "UART PERIPH" -> uartMapping,
@@ -179,7 +183,7 @@ case class BusController() extends Component {
     io.romSel := True
   } elsewhen ramMapping.hit(address) {
     io.ramSel := True
-  } elsewhen sdRamMapping.hit(address) {
+  } elsewhen (sdRamMapping1.hit(address) || sdRamMapping2.hit(address) || sdRamMapping3.hit(address)) {
     io.sdRamSel := True
   } elsewhen romMapping.hit(address) {
     io.romSel := True

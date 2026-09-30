@@ -33,9 +33,9 @@ case class SdRamDevice(sdRamCd: ClockDomain) extends Component {
     // --- CPU/Chipset interface ---
     sdRam.io.p0Data   := io.bus.dataOut
     io.bus.dataIn     := sdRam.io.p0Q
-    // Map the 8 MiB CPU window ($000000-$7FFFFF) to SDRAM bank 0.
-    // Dropping the fixed decode bit produces a 22-bit word offset.
-    sdRam.io.p0Addr   := io.bus.address(22 downto 1).resized
+    // Pass enough CPU address bits to access up to 16 MiB of SDRAM.
+    // Dropping the byte-select bit produces a 23-bit word offset.
+    sdRam.io.p0Addr   := io.bus.address(23 downto 1).resized
     sdRam.io.p0ByteEn := io.bus.uds ## io.bus.lds
 
     // 1. Request Generation

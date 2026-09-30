@@ -49,10 +49,22 @@ object MemoryMapSim extends App {
     assert(dut.io.sdRamSel.toBoolean, "SDRAM does not follow the fast RAM overlay")
 
     driveAddress(0x007ffffeL)
-    assert(dut.io.sdRamSel.toBoolean, "The final SDRAM word is not mapped")
+    assert(dut.io.sdRamSel.toBoolean, "The end of the first 8 MiB SDRAM mapping is not mapped")
 
     driveAddress(0x00800000L)
-    assert(dut.io.busErr.toBoolean, "The address after the SDRAM window is unexpectedly mapped")
+    assert(dut.io.sdRamSel.toBoolean, "The second SDRAM bank is not mapped at $800000")
+
+    driveAddress(0x00bffffeL)
+    assert(dut.io.sdRamSel.toBoolean, "The end of the 4 MiB SDRAM extension is not mapped")
+
+    driveAddress(0x00c00000L)
+    assert(dut.io.sdRamSel.toBoolean, "The final 2 MiB SDRAM mapping is not mapped at $C00000")
+
+    driveAddress(0x00dffffeL)
+    assert(dut.io.sdRamSel.toBoolean, "The final SDRAM word at $DFFFFE is not mapped")
+
+    driveAddress(0x00e20000L)
+    assert(dut.io.busErr.toBoolean, "The unmapped address after the framebuffer is unexpectedly mapped")
 
     driveAddress(0x00e00000L)
     assert(dut.io.vidFbSel.toBoolean, "The framebuffer is not mapped at $E00000")
