@@ -177,6 +177,8 @@ begin
             spi_clk_divide  <= "111"; -- Default divider 128
             transfer_length <= "11";
             spi_data_buf    <= (others => '0');
+            spi_cs          <= '0';   -- All physical CS outputs inactive high.
+            spi_addr        <= "000"; -- Default device index; not selected.
         elsif falling_edge(clk) then
             start <= '0';
             if cs = '1' and rw = '0' then

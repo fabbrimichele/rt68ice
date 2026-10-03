@@ -32,12 +32,15 @@ SERIAL_PORT = /dev/ttyACM0
 #SERIAL_BAUD = 19200
 SERIAL_BAUD = 57600
 RUN ?= 1
+# Headered EmuTOS image; flash offset must match FLASH_IMAGE_OFFSET in monitor.asm.
+EMUTOS_IMAGE ?= ../emutos-ice/emutos-rt68ice.img
+EMUTOS_FLASH_OFFSET := 1048576
 # Image conversion settings
 ASSETS_IMG_DIR = assets/images
 IMG_TOOL = tools/img2planes.py
 
 
-.PHONY: all clean rom prog prog-flash view-wave monitor images
+.PHONY: all clean rom prog prog-flash prog-emutos view-wave monitor images
 
 all: images $(TARGET).bit
 
@@ -70,6 +73,14 @@ prog: # $(TARGET).bit
 # 6. Load to FLASH (permanent)
 prog-flash: $(TARGET).bit
 	openFPGALoader -f -c cmsisdap --vid=0x1d50 --pid=0x602b $<
+
+# Program only the application region, preserving the FPGA bitstream at zero.
+# Do not depend on the sibling image: it must be built with its rt68ice target.
+prog-emutos:
+	test -f "$(EMUTOS_IMAGE)"
+	openFPGALoader -c cmsisdap --vid=0x1d50 --pid=0x602b \
+		--write-flash --file-type bin --offset $(EMUTOS_FLASH_OFFSET) --verify \
+		"$(EMUTOS_IMAGE)"
 
 reset:
 	openFPGALoader -c cmsisdap --vid=0x1d50 --pid=0x602b -r
