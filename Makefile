@@ -142,20 +142,17 @@ apps: $(BIN_APP_TARGETS)
 
 # We use target-specific assignment (= or :=) so $* is evaluated inside the rule context
 $(TARGET_APP_DIR)/%.bin: RAW_FILE_NAME = $(TARGET_APP_DIR)/$*_raw.bin
-$(TARGET_APP_DIR)/%.bin: $(ASM_APP_DIR)/%.asm $(ASM_LIB_SOURCES)
+$(TARGET_APP_DIR)/%.bin: $(ASM_APP_DIR)/%.asm $(ASM_LIB_SOURCES) tools/make_monitor_image.py
 	@mkdir -p $(TARGET_APP_DIR)
 	# Assemble to a raw binary image (*_raw.bin)
 	vasmm68k_mot -Felf $< -o $(TARGET_APP_DIR)/$*.o
 	# Link object file
 	vlink -T $(LD_SCRIPT_APP) -b rawbin1 -M$(TARGET_APP_DIR)/$*.sym -o $(RAW_FILE_NAME) $(TARGET_APP_DIR)/$*.o
-	# Calculate length and prepend the header. All steps in ONE shell session.
+	# Prepend the magic, load address, length, and CRC-32 monitor header.
 	SHELL_RAW_FILE="$(RAW_FILE_NAME)"; \
 	SYM_FILE="$(TARGET_APP_DIR)/$*.sym"; \
-	FILE_SIZE=$$(stat -c %s $$SHELL_RAW_FILE); \
-	HEX_SIZE=$$(printf "%08X" "$$FILE_SIZE"); \
 	DETECTED_ADDR=$$(awk '/^[[:space:]]*[0-9a-fA-F]{8}[[:space:]]+\.text/ {print $$1; exit}' "$$SYM_FILE"); \
-	HEADER_HEX=$$DETECTED_ADDR$$HEX_SIZE; \
-	echo "$$HEADER_HEX" | xxd -r -p | cat - $$SHELL_RAW_FILE > $@
+	python3 tools/make_monitor_image.py --address "$$DETECTED_ADDR" "$$SHELL_RAW_FILE" "$@"
 
 
 # =========================================================================
@@ -174,13 +171,13 @@ IMG_TARGETS := $(patsubst $(ASSETS_IMG_DIR)/%.jpg, $(TARGET_APP_DIR)/%_320x240_8
 images: $(IMG_TARGETS)
 
 # Pattern rule for .jpg
-$(TARGET_APP_DIR)/%_320x240_8bpp.bin: $(ASSETS_IMG_DIR)/%.jpg
+$(TARGET_APP_DIR)/%_320x240_8bpp.bin: $(ASSETS_IMG_DIR)/%.jpg tools/img2planes.py
 	@mkdir -p $(TARGET_APP_DIR)
 	@echo "--- Converting Image: $< ---"
 	./$(IMG_TOOL) $< -o $(TARGET_APP_DIR)
 
 # Pattern rule for .jpeg
-$(TARGET_APP_DIR)/%_320x240_8bpp.bin: $(ASSETS_IMG_DIR)/%.jpeg
+$(TARGET_APP_DIR)/%_320x240_8bpp.bin: $(ASSETS_IMG_DIR)/%.jpeg tools/img2planes.py
 	@mkdir -p $(TARGET_APP_DIR)
 	@echo "--- Converting Image: $< ---"
 	./$(IMG_TOOL) $< -o $(TARGET_APP_DIR)

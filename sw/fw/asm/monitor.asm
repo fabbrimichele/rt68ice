@@ -3,6 +3,8 @@
 ; ------------------------------
     section .text, code
 
+IMAGE_MAGIC equ     $52543638   ; ASCII "RT68"
+
 ; ------------------------------
 ; Initial Reset sp and PC in Vector Table
 ; ------------------------------
@@ -170,47 +172,80 @@ help_cmd:
 ; -------------------------------------------------------------------------
 ; Load from UART a binary content to memory.
 ;
-; PROTOCOL: Length-Prefixed Binary (Big-Endian)
+; PROTOCOL: Magic- and CRC-32-protected binary (Big-Endian)
 ;
-; HEADER (8 bytes, sent first):
+; HEADER (16 bytes, sent first):
+; [32-bit Magic: 'RT68']
 ; [32-bit Load Address] (a0)
-; [32-bit Content Length] (d2)
+; [32-bit Content Length] (d1)
+; [32-bit CRC-32/ISO-HDLC of body] (d3)
 ;
 ; BODY:
 ; [L bytes of raw binary content]
-;
-; Example (File Content in Hex Bytes):
-; 00 01 00 00 ; Load Address: $00010000
-; 00 00 00 02 ; Content Length: 2 bytes (it doesn't include the headers)
-; 55 55       ; Actual Content: Two bytes ($55, $55)
 ; -------------------------------------------------------------------------
 load_cmd:
     lea     msg_loading,a0
     bsr     put_str
+
+    ; Reject streams which do not use this monitor image format before
+    ; interpreting any received value as an address or a length.
+    jsr     read_32bit_word
+    cmpi.l  #IMAGE_MAGIC,d1
+    bne     loa_cmd_bad_magic
 
     ; Read header start address (32 bits)
     jsr     read_32bit_word     ; Result in d1.L
     move.l  d1,a0               ; a0 start address
     ; Read content length
     jsr     read_32bit_word     ; Result in d1.L
-                                ; d1 content lenght
+                                ; d1 content length
+    move.l  d1,d5               ; Preserve length while reading CRC field.
+    ; Read expected CRC-32/ISO-HDLC of the body.
+    jsr     read_32bit_word
+    move.l  d1,d3
+    move.l  d5,d1               ; Restore length for the receive loop.
+
+    ; CRC-32/ISO-HDLC: initial value $FFFFFFFF, reflected polynomial
+    ; $EDB88320, and final XOR $FFFFFFFF.
+    moveq   #-1,d4
     cmp.l   #0,d1
-    beq     loa_cmd_done        ; If d1 = 0, exit
+    beq     loa_cmd_crc_check
 
     ; Read content
 loa_cmd_loop:
     jsr     get_chr             ; Read byte from UART to d0
     move.b  d0,(a0)+            ; Copy read byte to memory
+    eor.b   d0,d4               ; XOR the byte into the CRC accumulator
+    moveq   #7,d2
+loa_cmd_crc_bit:
+    lsr.l   #1,d4
+    bcc     loa_cmd_crc_next_bit
+    eori.l  #$EDB88320,d4
+loa_cmd_crc_next_bit:
+    dbra    d2,loa_cmd_crc_bit
     subq.l  #1,d1               ; Decrement the FULL 32-bit counter
                                 ; (dbra replaced to support long > 64KB)
     bne     loa_cmd_loop        ; If the counter hasn't reached 0, branch back
 
-loa_cmd_done:
+loa_cmd_crc_check:
+    not.l   d4                  ; Apply CRC-32 final XOR.
+    cmp.l   d3,d4
+    bne     loa_cmd_bad_crc
+
     lea     msg_load_done,a0
     bsr     put_str
     bra     new_cmd
 
-; TODO: Load - Add checksum at the end
+loa_cmd_bad_magic:
+    lea     msg_load_bad_magic,a0
+    bsr     put_str
+    bra     new_cmd
+
+loa_cmd_bad_crc:
+    lea     msg_load_bad_crc,a0
+    bsr     put_str
+    bra     new_cmd
+
 ; TODO: Load - Print the address where the program has been loaded
 ;              or save it and change RUN to start from there
 
@@ -684,6 +719,8 @@ msg_help        dc.b    'dump  <ADDR>       - Dump from ADDR (HEX)',CR,LF
                 dc.b    NUL
 msg_loading     dc.b    'Loading...',CR,LF,NUL
 msg_load_done   dc.b    'Done.',CR,LF,NUL
+msg_load_bad_magic dc.b 'Error: Invalid image magic.',CR,LF,NUL
+msg_load_bad_crc dc.b   'Error: CRC mismatch.',CR,LF,NUL
 msg_bus_err     dc.b    'Bus Error!',CR,LF,NUL
 
 ; Registers names
