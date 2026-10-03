@@ -47,9 +47,9 @@ def wire_time_seconds(byte_count, baud):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Load a monitor-headered binary over UART and optionally run it."
+        description="Send an image to the monitor over UART and optionally run it."
     )
-    parser.add_argument("bin_file", help="Binary file with 8-byte monitor header")
+    parser.add_argument("bin_file", help="Binary file with a monitor load header")
     parser.add_argument("--port", default="/dev/ttyACM0", help="Serial port path")
     parser.add_argument("--baud", type=int, default=57600, help="Serial baud rate")
     parser.add_argument(
@@ -70,19 +70,13 @@ def main():
     with open(args.bin_file, "rb") as file:
         image = file.read()
 
+    # The monitor owns all header validation.  The sender only needs the new
+    # header's load-address field for the optional automatic RUN command.
     if len(image) < 8:
-        print(f"Error: {args.bin_file} is too small for a monitor header", file=sys.stderr)
+        print(f"Error: {args.bin_file} is too small to contain a load address", file=sys.stderr)
         return 1
 
-    program_address, payload_len = struct.unpack(">II", image[:8])
-    expected_size = payload_len + 8
-    if len(image) != expected_size:
-        print(
-            f"Error: header length is {payload_len} bytes, "
-            f"but file size is {len(image)} bytes ({expected_size} expected)",
-            file=sys.stderr,
-        )
-        return 1
+    program_address = struct.unpack(">I", image[4:8])[0]
 
     fd = os.open(args.port, os.O_RDWR | os.O_NOCTTY)
     try:

@@ -4,18 +4,24 @@ import os
 import sys
 import struct
 import argparse
+import zlib
 from PIL import Image
+
+
+IMAGE_MAGIC = b'RT68'
 
 def convert_jpeg_to_interleaved_8bp(image_path, output_bin_path, output_pal_path,
                                     img_load_addr=0x100000, pal_load_addr=0x10000):
     """
     Converts a JPEG image to a 320x240 8-bitplane word-interleaved binary file
     and a 32-bit xxRRGGBB palette file. Both files are prefixed with a
-    custom 8-byte big-endian header for a 68000 loader.
+    custom 16-byte big-endian header for the RT68 monitor loader.
 
-    Header structure (8 bytes):
-        [0:4] -> 32-bit Target Load Address
-        [4:8] -> 32-bit Raw Payload Length (excluding header)
+    Header structure (16 bytes):
+        [0:4]   -> ASCII magic "RT68"
+        [4:8]   -> 32-bit Target Load Address
+        [8:12]  -> 32-bit Raw Payload Length (excluding header)
+        [12:16] -> CRC-32/ISO-HDLC of raw payload
     """
     # 1. Load image and force resize to target resolution
     print(f"Loading '{image_path}'...")
@@ -42,8 +48,11 @@ def convert_jpeg_to_interleaved_8bp(image_path, output_bin_path, output_pal_path
 
     pal_payload_len = len(pal_payload) # Should be 1024 bytes
 
-    # Prepend 8-byte header to palette
-    pal_header = struct.pack('>II', pal_load_addr, pal_payload_len)
+    # Prepend magic, address, length, and CRC-32 to palette.
+    pal_header = struct.pack(
+        '>4sIII', IMAGE_MAGIC, pal_load_addr, pal_payload_len,
+        zlib.crc32(pal_payload) & 0xFFFFFFFF
+    )
 
     with open(output_pal_path, 'wb') as pal_file:
         pal_file.write(pal_header + pal_payload)
@@ -83,8 +92,11 @@ def convert_jpeg_to_interleaved_8bp(image_path, output_bin_path, output_pal_path
 
     img_payload_len = len(img_payload) # Should be 76800 bytes
 
-    # Prepend 8-byte header to image binary
-    img_header = struct.pack('>II', img_load_addr, img_payload_len)
+    # Prepend magic, address, length, and CRC-32 to image data.
+    img_header = struct.pack(
+        '>4sIII', IMAGE_MAGIC, img_load_addr, img_payload_len,
+        zlib.crc32(img_payload) & 0xFFFFFFFF
+    )
 
     with open(output_bin_path, 'wb') as bin_file:
         bin_file.write(img_header + img_payload)
