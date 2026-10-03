@@ -214,7 +214,7 @@ flash_load:
     tst.b   d6
     bne     image_timeout
     move.b  #$00,SPI_STATUS
-    move.b  #$0e,SPI_CONFIG    ; 8-bit, clock/128; same as flash smoke test.
+    move.b  #$0b,SPI_CONFIG    ; 8-bit, 25 MHz / 16 = 1.5625 MHz.
     move.b  #$12,SPI_STATUS
     moveq   #$05,d0            ; Read status; never interrupt an erase/program.
     bsr     flash_transfer

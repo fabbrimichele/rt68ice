@@ -70,9 +70,13 @@ SPI timeouts, busy flash, invalid headers/ranges and CRC failures return to the
 monitor without executing the image. A failed CRC can leave partial/untrusted
 data in SDRAM; do not manually run that data.
 
-Flash loading uses read-only SPI commands at about 195 kHz and releases chip
-select and the dedicated clock before returning or jumping. At this speed,
-loading a roughly 230 KiB EmuTOS image takes at least about ten seconds.
+Flash loading uses read-only SPI commands at 1.5625 MHz (25 MHz / 16) and
+releases chip select and the dedicated clock before returning or jumping.
+The roughly 230 KiB EmuTOS image has an ideal SPI transfer time of about
+1.2 seconds; CPU polling, memory writes and CRC calculation add overhead.
+The earlier 195 kHz loader took about 12 seconds on the board. Measure the
+new command-to-EmuTOS-start time and repeat boots to validate the faster clock.
+The standalone flash smoke test deliberately retains its slower 195 kHz clock.
 The monitor does not program flash. `make prog` only loads the FPGA into SRAM,
 so it does not install EmuTOS at the application offset. Installing that image
 requires a separate, offset-aware flash programming operation that preserves
@@ -120,6 +124,17 @@ ghdl -a --std=08 -fsynopsys --workdir="$spi_test_dir" \
 ghdl -e --std=08 -fsynopsys --workdir="$spi_test_dir" spi_master_reset_tb
 ghdl -r --std=08 -fsynopsys --workdir="$spi_test_dir" \
   spi_master_reset_tb --assert-level=error --stop-time=1us
+```
+
+The loader clock has a separate loopback regression checking 1.5625 MHz
+timing, BUSY status, received bytes and flash CS held between transfers:
+
+```sh
+ghdl -a --std=08 -fsynopsys --workdir="$spi_test_dir" \
+  hw/vhdl/tests/spi_master_transfer_tb.vhd
+ghdl -e --std=08 -fsynopsys --workdir="$spi_test_dir" spi_master_transfer_tb
+ghdl -r --std=08 -fsynopsys --workdir="$spi_test_dir" \
+  spi_master_transfer_tb --assert-level=error --stop-time=100us
 ```
 
 ### Read-only board test
