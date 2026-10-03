@@ -65,6 +65,12 @@ object BusControllerSim extends App {
     assert(dut.io.sdRamSel.toBoolean, "The final 2 MiB SDRAM mapping was not selected")
     assert(!dut.io.busErr.toBoolean, "The final 2 MiB SDRAM mapping raised BERR")
 
+    // This is the upper-SDRAM address reported by EmuTOS after the Line-F
+    // exception. It must remain a valid, strobe-qualified SDRAM transfer.
+    driveTransfer(0x00d82000L, busState = 2, uds = true, lds = true)
+    assert(dut.io.sdRamSel.toBoolean, "$D82000 was not selected as SDRAM")
+    assert(!dut.io.busErr.toBoolean, "$D82000 raised BERR")
+
     driveTransfer(0x00dffffeL, busState = 3, uds = true, lds = true)
     assert(dut.io.sdRamSel.toBoolean, "The final SDRAM word was not selected")
     assert(!dut.io.busErr.toBoolean, "The final SDRAM word raised BERR")
