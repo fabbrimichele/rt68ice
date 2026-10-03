@@ -4,6 +4,11 @@
     section .text, code
 
 IMAGE_MAGIC equ     $52543638   ; ASCII "RT68"
+FLASH_IMAGE_OFFSET equ $00100000
+FLASH_IMAGE_MAX equ $02000000-FLASH_IMAGE_OFFSET-16
+SPI_DATA equ $00F20001
+SPI_STATUS equ $00F20005
+SPI_CONFIG equ $00F20007
 
 ; ------------------------------
 ; Initial Reset sp and PC in Vector Table
@@ -114,6 +119,16 @@ process_cmd:
     btst    #0,d0
     bne     help_cmd        ; d0.0 = 1 execute HELP
 
+    lea     loadflash_str,a1
+    bsr     parse_no_args
+    btst    #0,d0
+    bne     loadflash_cmd
+
+    lea     boot_str,a1
+    bsr     parse_no_args
+    btst    #0,d0
+    bne     boot_cmd
+
     ; Parse LOAD
     bsr     parse_load
     btst    #0,d0
@@ -184,26 +199,94 @@ help_cmd:
 ; [L bytes of raw binary content]
 ; -------------------------------------------------------------------------
 load_cmd:
+    moveq   #0,d7              ; UART load; no SPI cleanup or automatic jump.
+    lea     image_uart_byte,a6
+    bra     image_load
+
+loadflash_cmd:
+    moveq   #1,d7              ; Flash load only.
+    bra     flash_load
+boot_cmd:
+    moveq   #2,d7              ; Flash load then execute ONLY after valid CRC.
+flash_load:
+    lea     image_flash_byte,a6
+    bsr     flash_wait_ready
+    tst.b   d6
+    bne     image_timeout
+    move.b  #$00,SPI_STATUS
+    move.b  #$0e,SPI_CONFIG    ; 8-bit, clock/128; same as flash smoke test.
+    move.b  #$12,SPI_STATUS
+    moveq   #$05,d0            ; Read status; never interrupt an erase/program.
+    bsr     flash_transfer
+    tst.b   d6
+    bne     image_timeout
+    bsr     image_flash_byte
+    tst.b   d6
+    bne     image_timeout
+    move.b  #$10,SPI_STATUS
+    btst    #0,d0
+    bne     image_flash_busy
+    move.b  #$12,SPI_STATUS
+    lea     flash_read_command,a0
+    moveq   #4,d2
+.command:
+    move.b  (a0)+,d0
+    bsr     flash_transfer
+    tst.b   d6
+    bne     image_timeout
+    dbra    d2,.command
+
+; Shared reader: a6 returns byte in d0 and error flag in d6.
+; d7 = source/action, a4 = validated load/entry address.
+image_load:
     lea     msg_loading,a0
     bsr     put_str
 
     ; Reject streams which do not use this monitor image format before
     ; interpreting any received value as an address or a length.
     jsr     read_32bit_word
+    tst.b   d6
+    bne     image_timeout
     cmpi.l  #IMAGE_MAGIC,d1
     bne     loa_cmd_bad_magic
 
     ; Read header start address (32 bits)
     jsr     read_32bit_word     ; Result in d1.L
+    tst.b   d6
+    bne     image_timeout
     move.l  d1,a0               ; a0 start address
+    move.l  d1,a4
     ; Read content length
     jsr     read_32bit_word     ; Result in d1.L
+    tst.b   d6
+    bne     image_timeout
                                 ; d1 content length
     move.l  d1,d5               ; Preserve length while reading CRC field.
     ; Read expected CRC-32/ISO-HDLC of the body.
     jsr     read_32bit_word
+    tst.b   d6
+    bne     image_timeout
     move.l  d1,d3
     move.l  d5,d1               ; Restore length for the receive loop.
+
+    ; Images may only target application SDRAM, not vectors, monitor RAM,
+    ; framebuffer, peripherals or ROM. Reject wraparound and odd entry PCs.
+    move.l  a4,d0
+    btst    #0,d0
+    bne     image_bad_range
+    cmpi.l  #$00010000,d0
+    blo     image_bad_range
+    tst.l   d1
+    beq     image_bad_range
+    add.l   d1,d0
+    bcs     image_bad_range
+    cmpi.l  #$00e00000,d0
+    bhi     image_bad_range
+    tst.b   d7
+    beq     .range_ok
+    cmpi.l  #FLASH_IMAGE_MAX,d1
+    bhi     image_bad_range
+.range_ok:
 
     ; CRC-32/ISO-HDLC: initial value $FFFFFFFF, reflected polynomial
     ; $EDB88320, and final XOR $FFFFFFFF.
@@ -213,7 +296,9 @@ load_cmd:
 
     ; Read content
 loa_cmd_loop:
-    jsr     get_chr             ; Read byte from UART to d0
+    jsr     (a6)
+    tst.b   d6
+    bne     image_timeout
     move.b  d0,(a0)+            ; Copy read byte to memory
     eor.b   d0,d4               ; XOR the byte into the CRC accumulator
     moveq   #7,d2
@@ -234,20 +319,90 @@ loa_cmd_crc_check:
 
     lea     msg_load_done,a0
     bsr     put_str
+    bsr     image_close
+    cmpi.b  #2,d7
+    beq     .boot
+    lea     msg_loaded_at,a0
+    bsr     put_str
+    move.l  a4,d0
+    bsr     bin_to_hex
+    lea     msg_newline,a0
+    bsr     put_str
     bra     new_cmd
+.boot:
+    jmp     (a4)
 
 loa_cmd_bad_magic:
     lea     msg_load_bad_magic,a0
-    bsr     put_str
-    bra     new_cmd
+    bra     image_error
 
 loa_cmd_bad_crc:
     lea     msg_load_bad_crc,a0
+    bra     image_error
+image_bad_range:
+    lea     msg_load_bad_range,a0
+    bra     image_error
+image_timeout:
+    lea     msg_spi_timeout,a0
+    bra     image_error
+image_flash_busy:
+    lea     msg_flash_busy,a0
+image_error:
+    bsr     image_close
     bsr     put_str
     bra     new_cmd
 
-; TODO: Load - Print the address where the program has been loaded
-;              or save it and change RUN to start from there
+image_close:
+    tst.b   d7
+    beq     .done
+    move.b  #$00,SPI_STATUS    ; Deselect both devices, release USRMCLK.
+.done:
+    rts
+
+image_uart_byte:
+    bsr     get_chr
+    moveq   #0,d6
+    rts
+image_flash_byte:
+    move.b  #$ff,d0
+    bra     flash_transfer
+
+; Returns d0 = received byte, d6 = 0 success / 1 timeout.
+; All loader registers other than d0/d6 are preserved.
+flash_transfer:
+    move.l  d2,-(sp)
+    move.b  d0,SPI_DATA
+    move.b  #$13,SPI_STATUS
+    move.w  #$ffff,d2
+.started:
+    btst    #0,SPI_STATUS
+    bne     .wait
+    dbra    d2,.started
+    moveq   #1,d6
+    bra     .done
+.wait:
+    bsr     flash_wait_ready
+    tst.b   d6
+    bne     .done
+    move.b  SPI_DATA,d0
+.done:
+    move.l  (sp)+,d2
+    rts
+
+flash_wait_ready:
+    move.l  d2,-(sp)
+    move.w  #$ffff,d2
+.wait:
+    btst    #0,SPI_STATUS
+    beq     .ready
+    dbra    d2,.wait
+    moveq   #1,d6
+    bra     .done
+.ready:
+    moveq   #0,d6
+.done:
+    move.l  (sp)+,d2
+    rts
 
 run_cmd:
     ; JUMP to the specified address
@@ -373,6 +528,18 @@ parse_load:
                                 ; d0.0 returned with result flag
 prs_loa_done:
     movem.l (sp)+,a0
+    rts
+
+; a1 = exact command name; accepts no arguments (trailing spaces allowed).
+parse_no_args:
+    move.l  a0,-(sp)
+    lea     IN_BUF,a0
+    bsr     check_cmd
+    btst    #0,d0
+    beq     .done
+    bsr     check_trail
+.done:
+    move.l  (sp)+,a0
     rts
 
 ; ------------------------------------------------------------
@@ -644,10 +811,10 @@ print_reg:
 
 
 ; -------------------------------------------------------------
-; read_32bit_word: Reads 4 bytes from UART and assembles into d1.L
+; read_32bit_word: Reads 4 bytes from the selected source into d1.L
 ; Input: None
 ; Output: d1.L = 32-bit value
-; Uses: get_chr (assumed to return 8-bit char in d0.B)
+; Output: d6 = source error flag; stops immediately on a source error.
 ; -------------------------------------------------------------
 read_32bit_word:
     movem.l d0/d2,-(sp)     ; Save d0 (used for get_chr) and d2 (used for loop counter)
@@ -656,7 +823,9 @@ read_32bit_word:
     clr.l   d1              ; d1 = Accumulator (cleared for the 32-bit result)
 
 read_loop:
-    bsr     get_chr         ; d0.B = Get one byte from the serial port
+    jsr     (a6)
+    tst.b   d6
+    bne     read_done
 
     ; 1. Shift the current result (d1) left by 8 bits (makes room for the new byte)
     lsl.l   #8,d1
@@ -666,6 +835,7 @@ read_loop:
 
     dbra    d2,read_loop    ; Loop 4 times total (d2 counts down from 3)
 
+read_done:
     movem.l (sp)+,d0/d2      ; Restore registers
     rts
 
@@ -713,6 +883,8 @@ msg_unknown     dc.b    'Error: Unknown command or syntax',CR,LF,NUL
 msg_help        dc.b    'dump  <ADDR>       - Dump from ADDR (HEX)',CR,LF
                 dc.b    'write <ADDR> <VAL> - Write to ADDR (HEX) the VALUE (HEX)',CR,LF
                 dc.b    'load               - Load from UART to memory',CR,LF
+                dc.b    'loadflash          - Load/verify flash image at $100000',CR,LF
+                dc.b    'boot               - Load/verify flash image and run',CR,LF
                 dc.b    'run   <ADDR>       - Run program at ADDR (HEX)',CR,LF
                 dc.b    'fbclr              - Clear framebuffer',CR,LF
                 dc.b    'help               - Print this list of commands',CR,LF
@@ -721,6 +893,11 @@ msg_loading     dc.b    'Loading...',CR,LF,NUL
 msg_load_done   dc.b    'Done.',CR,LF,NUL
 msg_load_bad_magic dc.b 'Error: Invalid image magic.',CR,LF,NUL
 msg_load_bad_crc dc.b   'Error: CRC mismatch.',CR,LF,NUL
+msg_load_bad_range dc.b 'Error: Invalid image address or length.',CR,LF,NUL
+msg_spi_timeout dc.b 'Error: SPI timeout.',CR,LF,NUL
+msg_flash_busy dc.b 'Error: Flash busy or not responding.',CR,LF,NUL
+msg_loaded_at dc.b 'Loaded at ',NUL
+msg_newline dc.b CR,LF,NUL
 msg_bus_err     dc.b    'Bus Error!',CR,LF,NUL
 
 ; Registers names
@@ -747,8 +924,15 @@ dump_str        dc.b    'dump',NUL
 write_str       dc.b    'write',NUL
 help_str        dc.b    'help',NUL
 load_str        dc.b    'load',NUL
+loadflash_str   dc.b    'loadflash',NUL
+boot_str        dc.b    'boot',NUL
 run_str         dc.b    'run',NUL,NUL
 fbclr_str       dc.b    'fbclr',NUL
+    even
+flash_read_command dc.b $13
+    dc.b (FLASH_IMAGE_OFFSET>>24)&$ff,(FLASH_IMAGE_OFFSET>>16)&$ff
+    dc.b (FLASH_IMAGE_OFFSET>>8)&$ff,FLASH_IMAGE_OFFSET&$ff
+    even
 
 ; ===========================
 ; RAM Data Section (bootloader mem)

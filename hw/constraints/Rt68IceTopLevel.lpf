@@ -51,6 +51,16 @@ IOBUF       PORT "sd_cs"          IO_TYPE=LVCMOS33;
 LOCATE      COMP "sd_clk"         SITE "C7";
 IOBUF       PORT "sd_clk"         IO_TYPE=LVCMOS33;
 
+// Onboard W25Q256JV flash (SPI port 1). Configuration SPI pins must be
+// released to user logic; flash SCK uses USRMCLK on the dedicated MCLK pin.
+SYSCONFIG MASTER_SPI_PORT=DISABLE SLAVE_SPI_PORT=DISABLE;
+LOCATE      COMP "flash_cs"       SITE "N8";
+IOBUF       PORT "flash_cs"       IO_TYPE=LVCMOS33 PULLMODE=UP;
+LOCATE      COMP "flash_mosi"     SITE "T8";
+IOBUF       PORT "flash_mosi"     IO_TYPE=LVCMOS33;
+LOCATE      COMP "flash_miso"     SITE "T7";
+IOBUF       PORT "flash_miso"     IO_TYPE=LVCMOS33;
+
 // LED Array
 // MSB
 LOCATE COMP "leds[15]" SITE "M12";

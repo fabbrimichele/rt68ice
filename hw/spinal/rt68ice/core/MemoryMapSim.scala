@@ -60,6 +60,13 @@ object MemoryMapSim extends App {
     driveAddress(0x00c00000L)
     assert(dut.io.sdRamSel.toBoolean, "The final 2 MiB SDRAM mapping is not mapped at $C00000")
 
+    // EmuTOS relocates to this upper SDRAM area. Keep the address from the
+    // observed game failure covered explicitly, rather than only testing the
+    // start and end of the window.
+    driveAddress(0x00d82000L)
+    assert(dut.io.sdRamSel.toBoolean, "$D82000 is not mapped to SDRAM")
+    assert(!dut.io.busErr.toBoolean, "$D82000 unexpectedly raises BERR")
+
     driveAddress(0x00dffffeL)
     assert(dut.io.sdRamSel.toBoolean, "The final SDRAM word at $DFFFFE is not mapped")
 

@@ -18,6 +18,8 @@ menu:
     beq     time_test
     cmp.b   #'4',d0
     beq     bench_test
+    cmp.b   #'5',d0
+    beq     upper_sdram_test
     cmp.b   #'e',d0
     beq     .end
     bra     menu
@@ -53,6 +55,12 @@ bench_test:
     lea     msg_newline,a0
     bsr     put_str
     bra     menu
+
+upper_sdram_test:
+    lea     msg_tst_upper,a0
+    bsr     put_str
+    bsr     run_upper_sdram_test
+    bra     handle_test_result
 
 handle_test_result:
     tst.b   d0
@@ -192,6 +200,48 @@ run_time_test:
 
 
 ; ------------------------------------------------------
+; Upper SDRAM Longword Stress Test
+; Exercises the address reported by the EmuTOS bus-error log. It is kept
+; outside the normal application area so this program can be loaded and run
+; directly from the monitor while diagnosing the SDRAM path.
+;
+; Output: d0.b -> 0 OK, 1 Error
+; ------------------------------------------------------
+run_upper_sdram_test:
+    move.l  #UPPER_SDRAM_TEST_START,a0
+    move.l  #$13579BDF,d1
+    move.w  #(UPPER_SDRAM_TEST_LONGS-1),d0
+
+.fill_loop:
+    move.l  d1,(a0)+
+    addi.l  #$11111111,d1
+    dbra    d0,.fill_loop
+
+    move.l  #UPPER_SDRAM_TEST_START,a0
+    move.l  #$13579BDF,d1
+    move.l  #SOAK_PASSES,d2
+
+.soak_loop:
+    move.w  #(UPPER_SDRAM_TEST_LONGS-1),d0
+.read_loop:
+    cmp.l   (a0)+,d1
+    bne.s   .error
+    addi.l  #$11111111,d1
+    dbra    d0,.read_loop
+
+    move.l  #UPPER_SDRAM_TEST_START,a0
+    move.l  #$13579BDF,d1
+    subq.l  #1,d2
+    bne.s   .soak_loop
+
+    moveq   #0,d0
+    rts
+
+.error:
+    moveq   #1,d0
+    rts
+
+
 ; 4. The "SDRAM Performance Benchmark" Test
 ; Performs a block memory move between SDRAM addresses
 ; to measure elapsed hardware counter ticks for SDRAM
@@ -231,6 +281,8 @@ RAM_TEST_START  equ APP_START+$10000 ; Reserve 64 KiB for this program
 RAM_TEST_WORDS  equ (RAM_END+1-RAM_TEST_START)/2
 SOAK_PASSES     equ 10
 BENCH_WORDS     equ 256              ; Number of words copied by benchmark
+UPPER_SDRAM_TEST_START equ $00D82000  ; Address from the EmuTOS BERR report
+UPPER_SDRAM_TEST_LONGS equ 256        ; 1 KiB of back-to-back longword accesses
 
 ; ===========================
 ; Include files
@@ -256,6 +308,7 @@ msg_menu:
     dc.b    "2. Row/Bank Conflict",CR,LF
     dc.b    "3. Timing Stress",CR,LF
     dc.b    "4. Benchmark",CR,LF
+    dc.b    "5. Upper SDRAM stress ($D82000)",CR,LF
     dc.b    "e. Exit",CR,LF,NUL
 
 msg_tst_data:
@@ -269,6 +322,9 @@ msg_tst_time:
 
 msg_tst_bench:
     dc.b    CR,LF,"Benchmark...",CR,LF,NUL
+
+msg_tst_upper:
+    dc.b    CR,LF,"Upper SDRAM stress...",CR,LF,NUL
 
 msg_cycles:
     dc.b    "Clock cycles: ",NUL

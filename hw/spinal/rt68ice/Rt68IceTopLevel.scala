@@ -1,7 +1,7 @@
 package rt68ice
 
 import rt68ice.core._
-import rt68ice.io.{LedArrayDevice, LedDevice, Spi, SpiMasterConfig, SpiMasterDevice, T16450Device, Usb, UsbDevice}
+import rt68ice.io.{Ecp5UsrMclk, LedArrayDevice, LedDevice, Spi, SpiFlash, SpiMasterConfig, SpiMasterDevice, T16450Device, Usb, UsbDevice}
 import rt68ice.memory.{Mem16Bit, SdRam, SdRamDevice}
 import rt68ice.timer.{Counter, Timer}
 import rt68ice.video.{Gpdi, VgaDevice}
@@ -26,6 +26,7 @@ case class Rt68IceTopLevel(romFile: String) extends Component {
     val usb3 = master(Usb())
     val usb4 = master(Usb())
     val sd = master(Spi())
+    val flash = master(SpiFlash())
   }
 
   val clockCtrl = ClockCtrl()
@@ -120,9 +121,17 @@ case class Rt68IceTopLevel(romFile: String) extends Component {
     // --------------------------------
     // SPI Device (SD card and Flash Mem)
     // --------------------------------
-    val spiMaster = SpiMasterDevice(SpiMasterConfig(portCount = 1)) // TODO: add flash
+    val spiMaster = SpiMasterDevice(SpiMasterConfig(portCount = 2))
     io.sd <> spiMaster.io.spis(0)
-    //io.flash <> spiMaster.io.spis(1)
+    val flashSpi = spiMaster.io.spis(1)
+    io.flash.mosi := flashSpi.mosi
+    io.flash.cs := flashSpi.cs
+    flashSpi.miso := io.flash.miso
+
+    val flashClock = new Ecp5UsrMclk
+    flashClock.io.USRMCLKI := flashSpi.clk
+    // Release the dedicated clock pin whenever flash CS is inactive.
+    flashClock.io.USRMCLKTS := flashSpi.cs
     bus.io.spiBus <> spiMaster.io.bus
     spiMaster.io.sel := bus.io.spiSel
   }
