@@ -57,6 +57,29 @@ get_chr:
     rts
 
 ; =============================================================================
+; Routine:    poll_chr
+; Purpose:    Checks once for serial input and reads a character if available.
+; Input:      None.
+; Output:     Z = 0: d0.B contains the received character (including NUL).
+;             Z = 1: No character available; d0 is unchanged.
+; Clobbers:   d0.B when a character is received; condition codes.
+;             All other registers and the upper 24 bits of d0 are preserved.
+; Note:       Returns immediately without waiting for input.
+;             Reading consumes the character from the UART receiver buffer.
+;             Caller may immediately use BNE for received or BEQ for no input.
+; =============================================================================
+poll_chr:
+    movem.l d1,-(sp)
+    move.b  UART_LSR,d1
+    btst    #0,d1
+    beq     .return        ; No character: Z = 1
+    move.b  UART_RBR,d0    ; Read character
+    tst.b   d1             ; Bit 0 is set, so Z = 0
+.return:
+    movem.l (sp)+,d1
+    rts
+
+; =============================================================================
 ; Routine:    uart_init
 ; Purpose:    Initializes the T16450/16550 UART hardware layout.
 ;             Configures 57600 baud rate (at 25MHz), 8N1 frame, and disables

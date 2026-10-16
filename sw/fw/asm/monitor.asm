@@ -25,6 +25,8 @@ start:
     jsr     uart_init
     lea     msg_title,a0
     bsr     put_str
+    jsr     wait_for_monitor_key
+    beq     boot_cmd        ; no character pressed start SO (EmuTOS)
 
 mon_entry:
 new_cmd:
@@ -801,6 +803,36 @@ print_reg:
     bsr     bin_to_hex        ; Call your established hex converter
     rts
 
+; =============================================================================
+; Routine:    wait_for_monitor_key
+; Purpose:    Prints the autoboot prompt and polls serial input until a character
+;             arrives or the AUTOBOOT_WAIT_COUNT iteration countdown expires.
+; Input:      None.
+; Output:     d0 = 0, Z = 1: Timeout; caller may boot the flash image.
+;             d0 = 1, Z = 0: Character received; caller may enter the monitor.
+; Clobbers:   d0, d1, a0, condition codes. Other registers are preserved.
+; Note:       Consumes and discards the received character, including NUL.
+;             Caller may immediately use BEQ for timeout or BNE for received.
+;             Countdown starts after printing the prompt. Its duration depends
+;             on CPU speed and polling overhead; calibrate AUTOBOOT_WAIT_COUNT
+;             on hardware
+;             for the intended ten-second wait.
+; =============================================================================
+wait_for_monitor_key:
+    lea     msg_wait_for_key,a0
+    bsr     put_str
+    move.l  #AUTOBOOT_WAIT_COUNT,d1
+.loop:
+    jsr     poll_chr
+    bne     .received
+    sub.l   #1,d1
+    bne     .loop
+    move.l  #0,d0
+    rts
+.received:
+    move.l  #1,d0
+    rts
+
 ; ------------------------------
 ; Libraries
 ; ------------------------------
@@ -878,27 +910,28 @@ default_colors
     dc.l    $00FFFFFF           ; 15: White
 
 ; Messages
-msg_title       dc.b    'RT68F Monitor v0.1',CR,LF,NUL
-msg_unknown     dc.b    'Error: Unknown command or syntax',CR,LF,NUL
-msg_help        dc.b    'dump  <ADDR>       - Dump from ADDR (HEX)',CR,LF
-                dc.b    'write <ADDR> <VAL> - Write to ADDR (HEX) the VALUE (HEX)',CR,LF
-                dc.b    'load               - Load from UART to memory',CR,LF
-                dc.b    'loadflash          - Load/verify flash image at $100000',CR,LF
-                dc.b    'boot               - Load/verify flash image and run',CR,LF
-                dc.b    'run   <ADDR>       - Run program at ADDR (HEX)',CR,LF
-                dc.b    'fbclr              - Clear framebuffer',CR,LF
-                dc.b    'help               - Print this list of commands',CR,LF
-                dc.b    NUL
-msg_loading     dc.b    'Loading...',CR,LF,NUL
-msg_load_done   dc.b    'Done.',CR,LF,NUL
-msg_load_bad_magic dc.b 'Error: Invalid image magic.',CR,LF,NUL
-msg_load_bad_crc dc.b   'Error: CRC mismatch.',CR,LF,NUL
-msg_load_bad_range dc.b 'Error: Invalid image address or length.',CR,LF,NUL
-msg_spi_timeout dc.b 'Error: SPI timeout.',CR,LF,NUL
-msg_flash_busy dc.b 'Error: Flash busy or not responding.',CR,LF,NUL
-msg_loaded_at dc.b 'Loaded at ',NUL
-msg_newline dc.b CR,LF,NUL
-msg_bus_err     dc.b    'Bus Error!',CR,LF,NUL
+msg_title           dc.b 'RT68F Monitor v0.1',CR,LF,NUL
+msg_unknown         dc.b 'Error: Unknown command or syntax',CR,LF,NUL
+msg_help            dc.b 'dump  <ADDR>       - Dump from ADDR (HEX)',CR,LF
+                    dc.b 'write <ADDR> <VAL> - Write to ADDR (HEX) the VALUE (HEX)',CR,LF
+                    dc.b 'load               - Load from UART to memory',CR,LF
+                    dc.b 'loadflash          - Load/verify flash image at $100000',CR,LF
+                    dc.b 'boot               - Load/verify flash image and run',CR,LF
+                    dc.b 'run   <ADDR>       - Run program at ADDR (HEX)',CR,LF
+                    dc.b 'fbclr              - Clear framebuffer',CR,LF
+                    dc.b 'help               - Print this list of commands',CR,LF
+                    dc.b NUL
+msg_loading         dc.b 'Loading...',CR,LF,NUL
+msg_load_done       dc.b 'Done.',CR,LF,NUL
+msg_load_bad_magic  dc.b 'Error: Invalid image magic.',CR,LF,NUL
+msg_load_bad_crc    dc.b 'Error: CRC mismatch.',CR,LF,NUL
+msg_load_bad_range  dc.b 'Error: Invalid image address or length.',CR,LF,NUL
+msg_spi_timeout     dc.b 'Error: SPI timeout.',CR,LF,NUL
+msg_flash_busy      dc.b 'Error: Flash busy or not responding.',CR,LF,NUL
+msg_loaded_at       dc.b 'Loaded at ',NUL
+msg_newline         dc.b CR,LF,NUL
+msg_bus_err         dc.b 'Bus Error!',CR,LF,NUL
+msg_wait_for_key    dc.b 'Press any key on serial to start monitor (10 seconds)...',CR,LF,NUL
 
 ; Registers names
 msg_d0          dc.b    'd0: ',NUL
@@ -946,4 +979,6 @@ IN_BUF_END:
 ; Constants
 ; ===========================
 ; Program Constants
-DLY_VAL         equ 1333333     ; Delay iterations, 1.33 million = 0.5 sec at 32MHz
+; Approximate 10 seconds at 25 MHz, scaled from the measured polling delay:
+; 4,166,667 iterations took about 13 seconds; 4,166,667 * 10 / 13 = 3,205,128.
+AUTOBOOT_WAIT_COUNT equ 3205128
