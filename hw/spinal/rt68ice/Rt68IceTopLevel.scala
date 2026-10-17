@@ -1,5 +1,6 @@
 package rt68ice
 
+import rt68ice.audio.{Audio, Ym2149Device}
 import rt68ice.core._
 import rt68ice.io.{Ecp5UsrMclk, LedArrayDevice, LedDevice, Spi, SpiFlash, SpiMasterConfig, SpiMasterDevice, T16450Device, Usb, UsbDevice}
 import rt68ice.memory.{Mem16Bit, SdRam, SdRamDevice}
@@ -27,6 +28,7 @@ case class Rt68IceTopLevel(romFile: String) extends Component {
     val usb4 = master(Usb())
     val sd = master(Spi())
     val flash = master(SpiFlash())
+    val audio = Audio()
   }
 
   val clockCtrl = ClockCtrl()
@@ -134,6 +136,15 @@ case class Rt68IceTopLevel(romFile: String) extends Component {
     flashClock.io.USRMCLKTS := flashSpi.cs
     bus.io.spiBus <> spiMaster.io.bus
     spiMaster.io.sel := bus.io.spiSel
+
+    // --------------------------------
+    // PSG (Ym2149) devices
+    // --------------------------------
+    val psg = Ym2149Device()
+    io.audio.left := psg.io.pwmAudio
+    io.audio.right := psg.io.pwmAudio
+    bus.io.psgBus <> psg.io.bus
+    psg.io.sel := bus.io.psgSel
   }
 
   // Remove io_ prefix

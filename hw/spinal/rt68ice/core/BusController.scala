@@ -30,6 +30,7 @@ case class BusController() extends Component {
     val usbBus      = master(M68KBus())
     val timerBus    = master(M68KBus())
     val spiBus      = master(M68KBus())
+    val psgBus      = master(M68KBus())
 
     // Slave select signals (to peripherals)
     val romSel      = out Bool()
@@ -45,6 +46,7 @@ case class BusController() extends Component {
     val usbSel      = out Bool()
     val timerSel    = out Bool()
     val spiSel      = out Bool()
+    val psgSel      = out Bool()
 
     // Interrupts
     val uartInt     = in Bool()
@@ -153,6 +155,7 @@ case class BusController() extends Component {
   val usbMapping      = SizeMapping(0x00F18000L, 16 KiB)  // $F18000 - $F1BFFF
   val timerMapping    = SizeMapping(0x00F1C000L, 16 KiB)  // $F1C000 - $F1FFFF
   val spiMapping      = SizeMapping(0x00F20000L, 16 KiB)  // $F20000 - $F23FFF
+  val psgMapping      = SizeMapping(0x00F24000L, 16 KiB)  // $F24000 - $F27FFF
   val romMapping      = SizeMapping(0x00FC0000L, 16 KiB)  // $FC0000 - $FC3FFF
 
   saveMemoryLayout(
@@ -172,6 +175,7 @@ case class BusController() extends Component {
     "USB HID HOST" -> usbMapping,
     "TIMER" -> timerMapping,
     "SPI" -> spiMapping,
+    "PSG" -> psgMapping,
     "MAIN ROM" -> romMapping,
   )
 
@@ -207,6 +211,8 @@ case class BusController() extends Component {
     io.timerSel := True
   } elsewhen spiMapping.hit(address) {
     io.spiSel := True
+  } elsewhen psgMapping.hit(address) {
+    io.psgSel := True
   } otherwise {
     io.busErr := cpuTransferActive // Out-of-bounds active transfer
   }
@@ -218,7 +224,7 @@ case class BusController() extends Component {
   val buses = List(
     io.romBus, io.ramBus, io.ledBus, io.uartBus,
     io.videoBus, io.counterBus, io.ledsBus, io.usbBus,
-    io.timerBus, io.spiBus
+    io.timerBus, io.spiBus, io.psgBus
   )
 
   for (bus <- buses) {
@@ -259,5 +265,7 @@ case class BusController() extends Component {
     io.cpuBus.dataIn := io.timerBus.dataIn
   } elsewhen io.spiSel {
     io.cpuBus.dataIn := io.spiBus.dataIn
+  } elsewhen io.psgSel {
+    io.cpuBus.dataIn := io.psgBus.dataIn
   }
 }
