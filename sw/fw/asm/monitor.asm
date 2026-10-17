@@ -30,6 +30,7 @@ start:
 
 mon_entry:
 new_cmd:
+monitor_prompt:
     lea     IN_BUF,a5       ; a5 = current buffer position
     move.b  #CR,d0
     bsr     put_chr
@@ -350,9 +351,10 @@ image_timeout:
 image_flash_busy:
     lea     msg_flash_busy,a0
 image_error:
+    move.b  #1,LED          ; Red: image load/boot error, returning to monitor
     bsr     image_close
     bsr     put_str
-    bra     new_cmd
+    bra     monitor_prompt ; Preserve red while presenting the recovery prompt
 
 image_close:
     tst.b   d7
@@ -805,18 +807,18 @@ print_reg:
 
 ; =============================================================================
 ; Routine:    wait_for_monitor_key
-; Purpose:    Prints the autoboot prompt and polls serial input until a character
+; Purpose:    Prints the autoboot prompt and polls serial input until ESC
 ;             arrives or the AUTOBOOT_WAIT_COUNT iteration countdown expires.
 ; Input:      None.
 ; Output:     d0 = 0, Z = 1: Timeout; caller may boot the flash image.
-;             d0 = 1, Z = 0: Character received; caller may enter the monitor.
+;             d0 = 1, Z = 0: ESC received; caller may enter the monitor.
 ; Clobbers:   d0, d1, a0, condition codes. Other registers are preserved.
-; Note:       Consumes and discards the received character, including NUL.
+; Note:       Consumes received characters; only ESC cancels autoboot.
+;             Other characters are ignored without restarting the countdown.
 ;             Caller may immediately use BEQ for timeout or BNE for received.
 ;             Countdown starts after printing the prompt. Its duration depends
 ;             on CPU speed and polling overhead; calibrate AUTOBOOT_WAIT_COUNT
-;             on hardware
-;             for the intended ten-second wait.
+;             on hardware for the intended ten-second wait.
 ; =============================================================================
 wait_for_monitor_key:
     lea     msg_wait_for_key,a0
@@ -824,7 +826,10 @@ wait_for_monitor_key:
     move.l  #AUTOBOOT_WAIT_COUNT,d1
 .loop:
     jsr     poll_chr
-    bne     .received
+    beq     .countdown
+    cmpi.b  #ESC,d0
+    beq     .received
+.countdown:
     sub.l   #1,d1
     bne     .loop
     move.l  #0,d0
@@ -837,6 +842,7 @@ wait_for_monitor_key:
 ; Libraries
 ; ------------------------------
     include '../../lib/asm/mem_map_video.asm'
+    include '../../lib/asm/mem_map_led.asm'
     include '../../lib/asm/console_io_uart.asm'
     include '../../lib/asm/conv_hex.asm'
     include '../../lib/asm/isr_vector.asm'
@@ -931,7 +937,7 @@ msg_flash_busy      dc.b 'Error: Flash busy or not responding.',CR,LF,NUL
 msg_loaded_at       dc.b 'Loaded at ',NUL
 msg_newline         dc.b CR,LF,NUL
 msg_bus_err         dc.b 'Bus Error!',CR,LF,NUL
-msg_wait_for_key    dc.b 'Press any key on serial to start monitor (10 seconds)...',CR,LF,NUL
+msg_wait_for_key    dc.b 'Press ESC on serial to start monitor (10 seconds)...',CR,LF,NUL
 
 ; Registers names
 msg_d0          dc.b    'd0: ',NUL

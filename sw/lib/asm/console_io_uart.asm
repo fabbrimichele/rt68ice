@@ -74,7 +74,7 @@ poll_chr:
     btst    #0,d1
     beq     .return        ; No character: Z = 1
     move.b  UART_RBR,d0    ; Read character
-    tst.b   d1             ; Bit 0 is set, so Z = 0
+    tst.b   d1             ; Bit 0 is set, so Z = 0 even for a NUL character
 .return:
     movem.l (sp)+,d1
     rts
