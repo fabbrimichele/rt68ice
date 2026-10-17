@@ -1,5 +1,6 @@
 package rt68ice
 
+import rt68ice.audio.{Audio, Ym2149Device}
 import rt68ice.core._
 import rt68ice.io.{Ecp5UsrMclk, LedArrayDevice, LedDevice, Spi, SpiFlash, SpiMasterConfig, SpiMasterDevice, T16450Device, Usb, UsbDevice}
 import rt68ice.memory.{Mem16Bit, SdRam, SdRamDevice}
@@ -27,6 +28,7 @@ case class Rt68IceTopLevel(romFile: String) extends Component {
     val usb4 = master(Usb())
     val sd = master(Spi())
     val flash = master(SpiFlash())
+    val audio = Audio()
   }
 
   val clockCtrl = ClockCtrl()
@@ -41,8 +43,17 @@ case class Rt68IceTopLevel(romFile: String) extends Component {
     sdRamDevice.io.sel := bus.io.sdRamSel
     bus.io.sdRamBus <> sdRamDevice.io.bus
 
+    // --------------------------------
+    // PSG (Ym2149) devices
+    // --------------------------------
+    val psg = Ym2149Device()
+    io.audio.left := psg.io.pwmAudio
+    io.audio.right := psg.io.pwmAudio
+    bus.io.psgBus <> psg.io.bus
+    psg.io.sel := bus.io.psgSel
+
     // CPU
-    val cpuClockEn = sdRamDevice.io.cpuClkEn && bus.io.clockEn
+    val cpuClockEn = sdRamDevice.io.cpuClkEn && bus.io.clockEn && psg.io.cpuClkEn
     val cpu = new M68K
     cpu.io.ipl := bus.io.ipl
     cpu.io.clockEn := cpuClockEn
