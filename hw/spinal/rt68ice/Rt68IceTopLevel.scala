@@ -43,8 +43,17 @@ case class Rt68IceTopLevel(romFile: String) extends Component {
     sdRamDevice.io.sel := bus.io.sdRamSel
     bus.io.sdRamBus <> sdRamDevice.io.bus
 
+    // --------------------------------
+    // PSG (Ym2149) devices
+    // --------------------------------
+    val psg = Ym2149Device()
+    io.audio.left := psg.io.pwmAudio
+    io.audio.right := psg.io.pwmAudio
+    bus.io.psgBus <> psg.io.bus
+    psg.io.sel := bus.io.psgSel
+
     // CPU
-    val cpuClockEn = sdRamDevice.io.cpuClkEn && bus.io.clockEn
+    val cpuClockEn = sdRamDevice.io.cpuClkEn && bus.io.clockEn && psg.io.cpuClkEn
     val cpu = new M68K
     cpu.io.ipl := bus.io.ipl
     cpu.io.clockEn := cpuClockEn
@@ -136,15 +145,6 @@ case class Rt68IceTopLevel(romFile: String) extends Component {
     flashClock.io.USRMCLKTS := flashSpi.cs
     bus.io.spiBus <> spiMaster.io.bus
     spiMaster.io.sel := bus.io.spiSel
-
-    // --------------------------------
-    // PSG (Ym2149) devices
-    // --------------------------------
-    val psg = Ym2149Device()
-    io.audio.left := psg.io.pwmAudio
-    io.audio.right := psg.io.pwmAudio
-    bus.io.psgBus <> psg.io.bus
-    psg.io.sel := bus.io.psgSel
   }
 
   // Remove io_ prefix

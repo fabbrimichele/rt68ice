@@ -129,6 +129,7 @@ case class BusController() extends Component {
   io.usbSel     := False
   io.timerSel   := False
   io.spiSel     := False
+  io.psgSel     := False
   io.vidFbSel   := False
   io.sdRamSel   := False
   io.busErr     := False
@@ -224,7 +225,7 @@ case class BusController() extends Component {
   val buses = List(
     io.romBus, io.ramBus, io.ledBus, io.uartBus,
     io.videoBus, io.counterBus, io.ledsBus, io.usbBus,
-    io.timerBus, io.spiBus, io.psgBus
+    io.timerBus, io.spiBus
   )
 
   for (bus <- buses) {
@@ -235,12 +236,15 @@ case class BusController() extends Component {
     bus.wr := gatedWrite
   }
 
-  // Give the SDRAM Controller raw, un-gated write signals instantly on Cycle 1
-  io.sdRamBus.address := io.cpuBus.address
-  io.sdRamBus.dataOut := io.cpuBus.dataOut
-  io.sdRamBus.lds     := io.cpuBus.lds
-  io.sdRamBus.uds     := io.cpuBus.uds
-  io.sdRamBus.wr      := io.cpuBus.wr
+  // SDRAM and PSG manage their own extended waits and need the original
+  // write direction throughout the access, rather than a one-cycle pulse.
+  for (bus <- List(io.sdRamBus, io.psgBus)) {
+    bus.address := io.cpuBus.address
+    bus.dataOut := io.cpuBus.dataOut
+    bus.lds := io.cpuBus.lds
+    bus.uds := io.cpuBus.uds
+    bus.wr := io.cpuBus.wr
+  }
 
   io.cpuBus.dataIn := 0
   when(io.romSel) {
