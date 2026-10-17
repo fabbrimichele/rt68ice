@@ -55,6 +55,7 @@ $(TARGET).json: $(VERILOG_SOURCES) $(MERGED_VHDL)
 	yosys -m ghdl -p "ghdl -C --std=08 -C -fsynopsys -C --latches $(MERGED_VHDL) -e TG68KdotC_Kernel; \
 		ghdl -C --std=08 -C -fsynopsys -C --latches $(MERGED_VHDL) -e T16450; \
 		ghdl -C --std=08 -C -fsynopsys -C --latches $(MERGED_VHDL) -e spi_master; \
+		ghdl -C --std=08 -C -fsynopsys -C --latches $(MERGED_VHDL) -e ym2149_audio; \
 		read_verilog $(VERILOG_SOURCES) $(MERGED_VERILOG); \
 		synth_ecp5 -top $(TOP) -json $@"
 
