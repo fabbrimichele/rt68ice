@@ -9,8 +9,8 @@ import spinal.lib.{master, slave}
 case class Ds1302Device() extends Component {
   val io = new Bundle {
     val bus = slave(M68KBus())
-    val sel = in Bool() // chip select from decoder
-    val busy = out Bool() // TODO: this should be enable, see Ym2149Device
+    val sel = in Bool()
+    val cpuClkEn = out Bool()
     val ds1302 = master(Ds1302())
   }
 
@@ -28,6 +28,7 @@ case class Ds1302Device() extends Component {
   ds1302.io.nCE := !io.sel
   ds1302.io.nRD := io.bus.wr
   ds1302.io.nWR := !io.bus.wr
+  io.cpuClkEn := !ds1302.io.BUSY
   ds1302.io.A := io.bus.address.resized
   // Data bus mapping (access by byte, i.e. move.b)
   ds1302.io.DI := io.bus.dataOut(15 downto 8)
