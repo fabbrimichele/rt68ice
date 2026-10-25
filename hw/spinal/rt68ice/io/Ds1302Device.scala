@@ -1,7 +1,7 @@
 package rt68ice.io
 
 import rt68ice.core.M68KBus
-import spinal.core.{Bool, Bundle, Component, IntToBuilder, in, out}
+import spinal.core._
 import spinal.lib.{master, slave}
 
 //noinspection TypeAnnotation
@@ -25,11 +25,11 @@ case class Ds1302Device() extends Component {
   io.ds1302.io <> ds1302.io.IO
 
   // 68000 bus interface
-  ds1302.io.nCE := !io.sel
+  ds1302.io.nCE := !(io.sel && io.bus.uds)
   ds1302.io.nRD := io.bus.wr
   ds1302.io.nWR := !io.bus.wr
   io.cpuClkEn := !ds1302.io.BUSY
-  ds1302.io.A := io.bus.address.resized
+  ds1302.io.A := io.bus.address(6 downto 1)
   // Data bus mapping (access by byte, i.e. move.b)
   ds1302.io.DI := io.bus.dataOut(15 downto 8)
   io.bus.dataIn(15 downto 8) := ds1302.io.DO
