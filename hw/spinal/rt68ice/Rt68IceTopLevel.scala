@@ -52,7 +52,6 @@ case class Rt68IceTopLevel(romFile: String) extends Component {
     psg.io.sel := bus.io.psgSel
 
     // DS1302
-    // TODO: do I need a specific clock for this? I guess so
     val ds1302 = Ds1302Device()
     io.ds1302 <> ds1302.io.ds1302
     bus.io.ds1302Bus <> ds1302.io.bus

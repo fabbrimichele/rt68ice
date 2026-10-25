@@ -2,7 +2,9 @@ package rt68ice.io
 
 import rt68ice.core.M68KBus
 import spinal.core._
-import spinal.lib.{master, slave}
+import spinal.lib.{CounterFreeRun, master, slave}
+
+import scala.language.postfixOps
 
 //noinspection TypeAnnotation
 //noinspection ScalaWeakerAccess
@@ -14,10 +16,26 @@ case class Ds1302Device() extends Component {
     val ds1302 = master(Ds1302())
   }
 
-  // TODO:
-  //  - sue busy signal, convert it to cpuEnable?
-  //    or should it just busy also in the other peripherals?
-  val ds1302 = new Ds1302BB()
+  // New divided clock (250 KHz for 25 MHz clock)
+  val divider = CounterFreeRun(50)
+  val rtcClock = Reg(Bool()) init False
+  when (divider.willOverflow) {
+    rtcClock := !rtcClock
+  }
+
+  val rtcCd = ClockDomain(
+    clock = rtcClock,
+    reset = ClockDomain.current.readResetWire,
+    config = ClockDomainConfig(
+      resetKind = ASYNC,
+      resetActiveLevel = HIGH
+    ),
+    frequency = FixedFrequency(250 kHz)
+  )
+
+  val ds1302 = rtcCd {
+    new Ds1302BB()
+  }
 
   // External interface
   io.ds1302.ce := ds1302.io.CE
