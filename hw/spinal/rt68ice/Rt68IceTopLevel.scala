@@ -2,7 +2,7 @@ package rt68ice
 
 import rt68ice.audio.{Audio, Ym2149Device}
 import rt68ice.core._
-import rt68ice.io.{Ecp5UsrMclk, LedArrayDevice, LedDevice, Spi, SpiFlash, SpiMasterConfig, SpiMasterDevice, T16450Device, Usb, UsbDevice}
+import rt68ice.io._
 import rt68ice.memory.{Mem16Bit, SdRam, SdRamDevice}
 import rt68ice.timer.{Counter, Timer}
 import rt68ice.video.{Gpdi, VgaDevice}
@@ -29,6 +29,7 @@ case class Rt68IceTopLevel(romFile: String) extends Component {
     val sd = master(Spi())
     val flash = master(SpiFlash())
     val audio = Audio()
+    val ds1302 = master(Ds1302())
   }
 
   val clockCtrl = ClockCtrl()
@@ -129,9 +130,7 @@ case class Rt68IceTopLevel(romFile: String) extends Component {
     bus.io.usbBus <> usbDevice.io.bus
     bus.io.usbInt := usbDevice.io.int
 
-    // --------------------------------
     // SPI Device (SD card and Flash Mem)
-    // --------------------------------
     val spiMaster = SpiMasterDevice(SpiMasterConfig(portCount = 2))
     io.sd <> spiMaster.io.spis(0)
     val flashSpi = spiMaster.io.spis(1)
@@ -145,6 +144,13 @@ case class Rt68IceTopLevel(romFile: String) extends Component {
     flashClock.io.USRMCLKTS := flashSpi.cs
     bus.io.spiBus <> spiMaster.io.bus
     spiMaster.io.sel := bus.io.spiSel
+
+    // DS1302
+    // TODO: do I need a specific clock for this? I guess so
+    val ds1302 = Ds1302Device()
+    io.ds1302 <> ds1302.io.ds1302
+    bus.io.ds1302Bus <> ds1302.io.bus
+    ds1302.io.sel := bus.io.ds1302Sel
   }
 
   // Remove io_ prefix
