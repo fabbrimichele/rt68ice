@@ -44,6 +44,14 @@ IOBUF       PORT "audio_right"    IO_TYPE=LVCMOS33;
 LOCATE      COMP "audio_left"     SITE "E4";
 IOBUF       PORT "audio_left"     IO_TYPE=LVCMOS33;
 
+// DS1302
+LOCATE      COMP "ds1302_sclk"    SITE "K1";
+IOBUF       PORT "ds1302_sclk"    IO_TYPE=LVCMOS33;
+LOCATE      COMP "ds1302_io"      SITE "M1";
+IOBUF       PORT "ds1302_io"      IO_TYPE=LVCMOS33;
+LOCATE      COMP "ds1302_ce"      SITE "N1";
+IOBUF       PORT "ds1302_ce"      IO_TYPE=LVCMOS33;
+
 // SPI - PMOD SD card in the left P5 position.
 // The PMOD's far connector row maps to P5's far connector row:
 // DAT0/D0 (MISO) -> D7, CMD (MOSI) -> D8, DAT3/D3 (CS) -> C8,
