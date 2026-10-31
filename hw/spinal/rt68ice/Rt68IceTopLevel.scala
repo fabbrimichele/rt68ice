@@ -55,7 +55,9 @@ case class Rt68IceTopLevel(romFile: String) extends Component {
     val ds1302 = Ds1302Device()
     io.ds1302 <> ds1302.io.ds1302
     bus.io.ds1302Bus <> ds1302.io.bus
-    ds1302.io.sel := bus.io.ds1302Sel
+    // Address calculations and idle CPU cycles must not start RTC transfers.
+    ds1302.io.sel := bus.io.ds1302Sel &&
+      ((bus.io.busState === B"10") || (bus.io.busState === B"11"))
 
     // CPU
     val cpuClockEn = sdRamDevice.io.cpuClkEn && bus.io.clockEn && psg.io.cpuClkEn && ds1302.io.cpuClkEn

@@ -5,8 +5,6 @@
 start:
     move.w  sr,-(sp)
     ori.w   #$0700,sr
-    lea     msg_reading,a0
-    bsr     put_str
     lea     datetime,a1
     bsr     rtc_read_datetime
     tst.l   d0
@@ -31,8 +29,6 @@ start:
     include '../../lib/asm/rtc_datetime.asm'
     include '../../lib/asm/console_io_uart.asm'
 
-msg_reading:
-    dc.b    'RTC: reading registers...',CR,LF,NUL
 msg_halted:
     dc.b    'Clock halted (CH=1). Run rtc_set to start it.',CR,LF,NUL
 msg_invalid:

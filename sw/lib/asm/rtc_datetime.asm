@@ -14,26 +14,42 @@ DT_SIZE         equ     7
 ; On success D5=1 if halted (seconds normalized), otherwise D5=0.
 ; Clobbers D0-D5/A0; preserves A1. No RTC writes.
 rtc_read_datetime:
-    moveq   #7,d4
+    movem.l d6-d7,-(sp)
+    moveq   #7,d7
 .retry:
     ; Load a constant without calculating a peripheral effective address.
     movea.l #RTC_SECONDS,a0
-    moveq   #0,d1
-    moveq   #0,d2
-.read:
-    ; Match the monitor's word read, then extract the upper-byte RTC value.
-    move.w  0(a0,d2.w),d0
+    ; Match the working probe: collect all registers with straight-line reads,
+    ; before accessing the RAM snapshot. No indexed peripheral accesses.
+    move.w  (a0)+,d0
+    move.w  (a0)+,d1
+    move.w  (a0)+,d2
+    move.w  (a0)+,d3
+    move.w  (a0)+,d4
+    move.w  (a0)+,d5
+    move.w  (a0)+,d6
+    ; RTC word values are in the upper byte. Store with fixed RAM offsets.
     lsr.w   #8,d0
-    move.b  d0,0(a1,d1.w)
-    addq.w  #2,d2
-    addq.w  #1,d1
-    cmpi.w  #DT_SIZE,d1
-    bne     .read
-    move.w  RTC_SECONDS,d0
+    move.b  d0,DT_SECONDS(a1)
+    lsr.w   #8,d1
+    move.b  d1,DT_MINUTES(a1)
+    lsr.w   #8,d2
+    move.b  d2,DT_HOURS(a1)
+    lsr.w   #8,d3
+    move.b  d3,DT_DATE(a1)
+    lsr.w   #8,d4
+    move.b  d4,DT_MONTH(a1)
+    lsr.w   #8,d5
+    move.b  d5,DT_WEEKDAY(a1)
+    lsr.w   #8,d6
+    move.b  d6,DT_YEAR(a1)
+    movea.l #RTC_SECONDS,a0
+    move.w  (a0),d0
     lsr.w   #8,d0
     cmp.b   DT_SECONDS(a1),d0
     beq     .stable
-    dbra    d4,.retry
+    dbra    d7,.retry
+    movem.l (sp)+,d6-d7
     moveq   #2,d0
     rts
 .stable:
@@ -45,11 +61,14 @@ rtc_read_datetime:
     ; Native $80-$99 becomes binary 80-99, encoding CH plus seconds 0-19.
     subi.b  #80,DT_SECONDS(a1)
     moveq   #1,d5
-.validate:
-    bra     rtc_validate_datetime
+    bra     .validate
 .invalid:
+    movem.l (sp)+,d6-d7
     moveq   #1,d0
     rts
+.validate:
+    movem.l (sp)+,d6-d7
+    ; Fall through: no branch between the snapshot reader and validation.
 
 ; Validate a binary 24-hour date/time in years 2000-2099, including leap days.
 ; Weekday is not checked: the setter computes it, and the reader prints dates.
