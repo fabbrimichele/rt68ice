@@ -31,6 +31,7 @@ case class BusController() extends Component {
     val timerBus    = master(M68KBus())
     val spiBus      = master(M68KBus())
     val psgBus      = master(M68KBus())
+    val ds1302Bus   = master(M68KBus())
 
     // Slave select signals (to peripherals)
     val romSel      = out Bool()
@@ -47,6 +48,7 @@ case class BusController() extends Component {
     val timerSel    = out Bool()
     val spiSel      = out Bool()
     val psgSel      = out Bool()
+    val ds1302Sel   = out Bool()
 
     // Interrupts
     val uartInt     = in Bool()
@@ -130,6 +132,7 @@ case class BusController() extends Component {
   io.timerSel   := False
   io.spiSel     := False
   io.psgSel     := False
+  io.ds1302Sel  := False
   io.vidFbSel   := False
   io.sdRamSel   := False
   io.busErr     := False
@@ -157,6 +160,7 @@ case class BusController() extends Component {
   val timerMapping    = SizeMapping(0x00F1C000L, 16 KiB)  // $F1C000 - $F1FFFF
   val spiMapping      = SizeMapping(0x00F20000L, 16 KiB)  // $F20000 - $F23FFF
   val psgMapping      = SizeMapping(0x00F24000L, 16 KiB)  // $F24000 - $F27FFF
+  val ds1302Mapping   = SizeMapping(0x00F28000L, 16 KiB)  // $F28000 - $F2BFFF
   val romMapping      = SizeMapping(0x00FC0000L, 16 KiB)  // $FC0000 - $FC3FFF
 
   saveMemoryLayout(
@@ -214,6 +218,8 @@ case class BusController() extends Component {
     io.spiSel := True
   } elsewhen psgMapping.hit(address) {
     io.psgSel := True
+  } elsewhen ds1302Mapping.hit(address) {
+    io.ds1302Sel := True
   } otherwise {
     io.busErr := cpuTransferActive // Out-of-bounds active transfer
   }
@@ -236,9 +242,9 @@ case class BusController() extends Component {
     bus.wr := gatedWrite
   }
 
-  // SDRAM and PSG manage their own extended waits and need the original
+  // SDRAM, PSG and DS1302 manage their own extended waits and need the original
   // write direction throughout the access, rather than a one-cycle pulse.
-  for (bus <- List(io.sdRamBus, io.psgBus)) {
+  for (bus <- List(io.sdRamBus, io.psgBus, io.ds1302Bus)) {
     bus.address := io.cpuBus.address
     bus.dataOut := io.cpuBus.dataOut
     bus.lds := io.cpuBus.lds
@@ -271,5 +277,7 @@ case class BusController() extends Component {
     io.cpuBus.dataIn := io.spiBus.dataIn
   } elsewhen io.psgSel {
     io.cpuBus.dataIn := io.psgBus.dataIn
+  } elsewhen io.ds1302Sel {
+    io.cpuBus.dataIn := io.ds1302Bus.dataIn
   }
 }
