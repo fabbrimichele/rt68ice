@@ -1,6 +1,6 @@
 package rt68ice.io
 
-import rt68ice.core.M68KBus
+import rt68ice.core.M68KDeviceBus
 import spinal.core._
 import spinal.lib.com.uart.Uart
 import spinal.lib._
@@ -9,17 +9,18 @@ import spinal.lib._
 //noinspection ScalaWeakerAccess
 case class T16450Device() extends Component {
   val io = new Bundle {
-    val bus = slave(M68KBus())
-    val sel = in Bool() // chip select from decoder
-    val int = out Bool() // UART interrupt
+    val bus = slave(M68KDeviceBus())
     val uart = master(Uart())
   }
+
+  // Fixed bus wait states are handled by BusController.
+  io.bus.ready := True
 
   val uart = new T16450BB()
 
   // Default Settings (Copied from MG68)
   uart.io.RClk := uart.io.BaudOut
-  uart.io.CS_n := !io.sel
+  uart.io.CS_n := !io.bus.sel
   uart.io.Rd_n := io.bus.wr
   uart.io.Wr_n := !io.bus.wr
   uart.io.A := io.bus.address(3 downto 1)
@@ -29,7 +30,7 @@ case class T16450Device() extends Component {
   uart.io.RI_n := False
   uart.io.DCD_n := False
   io.uart.txd := uart.io.SOut
-  io.int := uart.io.Intr
+  io.bus.irq := uart.io.Intr
 
   // Data bus mapping (access by byte, i.e. move.b)
   uart.io.D_In := io.bus.dataOut(15 downto 8)

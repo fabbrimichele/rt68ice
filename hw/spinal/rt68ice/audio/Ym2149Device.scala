@@ -1,6 +1,6 @@
 package rt68ice.audio
 
-import rt68ice.core.M68KBus
+import rt68ice.core.M68KDeviceBus
 import spinal.core._
 import spinal.lib._
 
@@ -8,11 +8,12 @@ import scala.language.postfixOps
 
 case class Ym2149Device() extends Component {
   val io = new Bundle {
-    val bus = slave(M68KBus())
-    val sel = in Bool() // chip select from decoder
-    val cpuClkEn = out Bool() // Hold the CPU until the PSG access completes.
+    val bus = slave(M68KDeviceBus())
     val pwmAudio = out Bool() // PWM sound
   }
+
+  // This device does not generate interrupt requests.
+  io.bus.irq := False
 
   private val enable4Mhz = new Area {
     // Fractional divider: four ticks per 25 cycles of the 25 MHz system clock.
@@ -46,7 +47,7 @@ case class Ym2149Device() extends Component {
     - reading from A1=1 usually results in an inactive bus.
   */
   // Qualify the address decode with a byte strobe, as on the SPI peripheral.
-  private val psgSel = io.sel && (io.bus.uds || io.bus.lds)
+  private val psgSel = io.bus.sel && (io.bus.uds || io.bus.lds)
   private object AccessState extends SpinalEnum {
     val IDLE, LATCH, SETUP, WAIT_TICK, CAPTURE, DONE = newElement()
   }
@@ -58,7 +59,7 @@ case class Ym2149Device() extends Component {
 
   // Detect consecutive word phases even if the CPU keeps its strobes asserted.
   private val newPhase = io.bus.address =/= address || io.bus.wr =/= write
-  io.cpuClkEn := !psgSel || (state === AccessState.DONE && !newPhase)
+  io.bus.ready := !psgSel || (state === AccessState.DONE && !newPhase)
   io.bus.dataIn := readData.resized
 
   private val commandActive = state === AccessState.SETUP || state === AccessState.WAIT_TICK

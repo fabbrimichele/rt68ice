@@ -1,6 +1,6 @@
 package rt68ice.memory
 
-import rt68ice.core.M68KBus
+import rt68ice.core.M68KDeviceBus
 import rt68ice.core.M68KBus.DATA_WIDTH
 import spinal.core._
 import spinal.lib._
@@ -13,9 +13,14 @@ import scala.util.Using
 //noinspection ScalaWeakerAccess
 case class Mem16Bit(sizeInWords: Int, initFile: Option[String] = None, readOnly: Boolean = false) extends Component {
   val io = new Bundle {
-    val bus     = slave(M68KBus())
-    val sel     = in Bool()
+    val bus     = slave(M68KDeviceBus())
   }
+
+  // Fixed bus wait states are handled by BusController.
+  io.bus.ready := True
+
+  // This device does not generate interrupt requests.
+  io.bus.irq := False
 
   val mem = Mem(Bits(DATA_WIDTH bits), sizeInWords)
   initFile.foreach { filename => mem.init(readContentFromFile(filename)) }
@@ -23,7 +28,7 @@ case class Mem16Bit(sizeInWords: Int, initFile: Option[String] = None, readOnly:
   io.bus.dataIn := mem.readWriteSync(
     address = io.bus.address(log2Up(sizeInWords) downto 1).asUInt,
     data = io.bus.dataOut,
-    enable = io.sel,
+    enable = io.bus.sel,
     write = io.bus.wr && !Bool(readOnly),
     mask = io.bus.uds ## io.bus.lds,
   )

@@ -38,83 +38,64 @@ case class Rt68IceTopLevel(romFile: String) extends Component {
     // Bus Controller
     val bus = new BusController
 
-    // SDRAM
-    val sdRamDevice = SdRamDevice(clockCtrl.sdRamCd)
-    sdRamDevice.io.sdRam <> io.sdram
-    sdRamDevice.io.sel := bus.io.sdRamSel
-    bus.io.sdRamBus <> sdRamDevice.io.bus
-
-    // PSG (Ym2149) devices
-    val psg = Ym2149Device()
-    io.audio.left := psg.io.pwmAudio
-    io.audio.right := psg.io.pwmAudio
-    bus.io.psgBus <> psg.io.bus
-    psg.io.sel := bus.io.psgSel
-
-    // DS1302
-    val ds1302 = Ds1302Device()
-    io.ds1302 <> ds1302.io.ds1302
-    bus.io.ds1302Bus <> ds1302.io.bus
-    // Address calculations and idle CPU cycles must not start RTC transfers.
-    ds1302.io.sel := bus.io.ds1302Sel &&
-      ((bus.io.busState === B"10") || (bus.io.busState === B"11"))
-
     // CPU
-    val cpuClockEn = sdRamDevice.io.cpuClkEn && bus.io.clockEn && psg.io.cpuClkEn && ds1302.io.cpuClkEn
     val cpu = new M68K
     cpu.io.ipl := bus.io.ipl
-    cpu.io.clockEn := cpuClockEn
+    cpu.io.clockEn := bus.io.clockEn
     cpu.io.busErr := bus.io.busErr
     bus.io.busState := cpu.io.busState
     bus.io.cpuBus <> cpu.io.bus
 
     // ROM
     val rom = Mem16Bit(sizeInWords = 2048, initFile = Some(romFile), readOnly = true)
-    rom.io.sel := bus.io.romSel
     bus.io.romBus <> rom.io.bus
 
     // RAM
     val ram = Mem16Bit(sizeInWords = 512)
-    ram.io.sel := bus.io.ramSel
     bus.io.ramBus <> ram.io.bus
+
+    // SDRAM
+    val sdRamDevice = SdRamDevice(clockCtrl.sdRamCd)
+    sdRamDevice.io.sdRam <> io.sdram
+    bus.io.sdRamBus <> sdRamDevice.io.bus
 
     // Counter
     val counter = Counter()
-    counter.io.sel := bus.io.counterSel
     bus.io.counterBus <> counter.io.bus
 
     // Programmable timer
     val timer = Timer()
-    timer.io.sel := bus.io.timerSel
     bus.io.timerBus <> timer.io.bus
-    bus.io.timerInt := timer.io.int
+
+    // PSG (Ym2149) devices
+    val psg = Ym2149Device()
+    io.audio.left := psg.io.pwmAudio
+    io.audio.right := psg.io.pwmAudio
+    bus.io.psgBus <> psg.io.bus
+
+    // DS1302
+    val ds1302 = Ds1302Device()
+    io.ds1302 <> ds1302.io.ds1302
+    bus.io.ds1302Bus <> ds1302.io.bus
 
     // LED Device
     val ledDevice = LedDevice()
-    ledDevice.io.sel := bus.io.ledSel
     io.led := ledDevice.io.led
     bus.io.ledBus <> ledDevice.io.bus
 
     // LED Array Device
     val ledsDevice = LedArrayDevice()
-    ledsDevice.io.sel := bus.io.ledsSel
     io.leds := ledsDevice.io.leds
     bus.io.ledsBus <> ledsDevice.io.bus
 
     // UART Device
     val uartDevice = T16450Device()
     uartDevice.io.uart <> io.uart
-    uartDevice.io.sel := bus.io.uartSel
     bus.io.uartBus <> uartDevice.io.bus
-    bus.io.uartInt := uartDevice.io.int
 
     // Video Device
     val vgaDevice = VgaDevice(vgaCd = clockCtrl.vgaCd)
-    vgaDevice.io.fbSel := bus.io.vidFbSel
-    vgaDevice.io.palSel := bus.io.vidPalSel
-    vgaDevice.io.ctrlSel := bus.io.vidCtrlSel
     vgaDevice.io.bus <> bus.io.videoBus
-    bus.io.videoInt := vgaDevice.io.int
 
     // VGA-HDMI Bridge
     val hdmiBridge = VgaToHdmiEcp5(vgaCd = clockCtrl.vgaCd, hdmiCd = clockCtrl.hdmiCd)
@@ -132,9 +113,7 @@ case class Rt68IceTopLevel(romFile: String) extends Component {
     usbDevice.io.usb2 <> io.usb2
     usbDevice.io.usb3 <> io.usb3
     usbDevice.io.usb4 <> io.usb4
-    usbDevice.io.sel := bus.io.usbSel
     bus.io.usbBus <> usbDevice.io.bus
-    bus.io.usbInt := usbDevice.io.int
 
     // SPI Device (SD card and Flash Mem)
     val spiMaster = SpiMasterDevice(SpiMasterConfig(portCount = 2))
@@ -149,7 +128,6 @@ case class Rt68IceTopLevel(romFile: String) extends Component {
     // Release the dedicated clock pin whenever flash CS is inactive.
     flashClock.io.USRMCLKTS := flashSpi.cs
     bus.io.spiBus <> spiMaster.io.bus
-    spiMaster.io.sel := bus.io.spiSel
   }
 
   // Remove io_ prefix

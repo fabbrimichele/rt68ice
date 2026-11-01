@@ -1,6 +1,6 @@
 package rt68ice.io
 
-import rt68ice.core.M68KBus
+import rt68ice.core.M68KDeviceBus
 import spinal.core._
 import spinal.lib._
 
@@ -10,17 +10,22 @@ import scala.language.postfixOps
 //noinspection ScalaWeakerAccess
 case class LedArrayDevice() extends Component {
   val io = new Bundle {
-    val bus = slave(M68KBus())
-    val sel = in Bool()
+    val bus = slave(M68KDeviceBus())
     val leds = out Bits (16 bits)
   }
+
+  // Fixed bus wait states are handled by BusController.
+  io.bus.ready := True
+
+  // This device does not generate interrupt requests.
+  io.bus.irq := False
 
   val ledsReg = Reg(Bits(16 bits)) init 0
   io.leds := ~ledsReg
 
   io.bus.dataIn := 0
 
-  when(io.sel) {
+  when(io.bus.sel) {
     when(io.bus.wr) {
       // Write
       when (io.bus.lds) { ledsReg(7 downto 0) := io.bus.dataOut(7 downto 0) }

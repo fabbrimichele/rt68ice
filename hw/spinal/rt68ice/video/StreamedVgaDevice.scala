@@ -1,6 +1,6 @@
 package rt68ice.video
 
-import rt68ice.core.M68KBus
+import rt68ice.core.M68KDeviceBus
 import rt68ice.video.StreamedVgaDevice.rgbConfig
 import spinal.core._
 import spinal.lib._
@@ -18,10 +18,15 @@ object StreamedVgaDevice {
 //noinspection ScalaWeakerAccess
 case class StreamedVgaDevice(vgaCd : ClockDomain) extends Component {
   val io = new Bundle {
-    val bus   = slave(M68KBus())
-    val sel   = in Bool()
+    val bus   = slave(M68KDeviceBus())
     val vga = master(Vga(StreamedVgaDevice.rgbConfig))
   }
+
+  // Fixed bus wait states are handled by BusController.
+  io.bus.ready := True
+
+  // This device does not generate interrupt requests.
+  io.bus.irq := False
 
   val framebuffer = Mem(Bits(16 bits), 32768) // 64 KB
 
@@ -29,7 +34,7 @@ case class StreamedVgaDevice(vgaCd : ClockDomain) extends Component {
   io.bus.dataIn := framebuffer.readWriteSync(
     address = io.bus.address(15 downto 1).asUInt,
     data = io.bus.dataOut,
-    enable = io.sel,
+    enable = io.bus.sel,
     write = io.bus.wr,
     mask = io.bus.uds ## io.bus.lds,
     clockCrossing = true,

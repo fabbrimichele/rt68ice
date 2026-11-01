@@ -19,42 +19,19 @@ case class BusController() extends Component {
     val ipl       = out Bits(3 bits)
 
     // Slave buses
-    val romBus      = master(M68KBus())
-    val ramBus      = master(M68KBus())
-    val ledBus      = master(M68KBus())
-    val uartBus     = master(M68KBus())
-    val videoBus    = master(M68KBus())
-    val sdRamBus    = master(M68KBus())
-    val counterBus  = master(M68KBus())
-    val ledsBus     = master(M68KBus())
-    val usbBus      = master(M68KBus())
-    val timerBus    = master(M68KBus())
-    val spiBus      = master(M68KBus())
-    val psgBus      = master(M68KBus())
-    val ds1302Bus   = master(M68KBus())
-
-    // Slave select signals (to peripherals)
-    val romSel      = out Bool()
-    val ledSel      = out Bool()
-    val ramSel      = out Bool()
-    val uartSel     = out Bool()
-    val vidPalSel   = out Bool()
-    val vidCtrlSel  = out Bool()
-    val vidFbSel    = out Bool()
-    val sdRamSel    = out Bool()
-    val counterSel  = out Bool()
-    val ledsSel     = out Bool()
-    val usbSel      = out Bool()
-    val timerSel    = out Bool()
-    val spiSel      = out Bool()
-    val psgSel      = out Bool()
-    val ds1302Sel   = out Bool()
-
-    // Interrupts
-    val uartInt     = in Bool()
-    val usbInt      = in Bool()
-    val timerInt    = in Bool()
-    val videoInt    = in Bool()
+    val romBus      = master(M68KDeviceBus())
+    val ramBus      = master(M68KDeviceBus())
+    val ledBus      = master(M68KDeviceBus())
+    val uartBus     = master(M68KDeviceBus())
+    val videoBus    = master(M68KVideoBus())
+    val sdRamBus    = master(M68KDeviceBus())
+    val counterBus  = master(M68KDeviceBus())
+    val ledsBus     = master(M68KDeviceBus())
+    val usbBus      = master(M68KDeviceBus())
+    val timerBus    = master(M68KDeviceBus())
+    val spiBus      = master(M68KDeviceBus())
+    val psgBus      = master(M68KDeviceBus())
+    val ds1302Bus   = master(M68KDeviceBus())
   }
 
   // ---------------------------
@@ -78,23 +55,25 @@ case class BusController() extends Component {
   val memoryCycle = io.busState === B"00" ||
     io.busState === B"10" ||
     io.busState === B"11"
-  val busActive = memoryCycle && !io.sdRamSel
+  val busActive = memoryCycle && !io.sdRamBus.sel
 
   // TG68K keeps driving its address output between transfers and may expose
   // a post-incremented address before the next transfer begins. BERR is only
   // meaningful while at least one data strobe qualifies a real bus transfer.
   val cpuTransferActive = memoryCycle && (io.cpuBus.uds || io.cpuBus.lds)
 
+  val standardCycleReady = Bool()
+
   // The Handshake Logic
   when(busActive && !isWaiting) {
     // A bus cycle just started.
     // Pull the brake (clkEnable = Low) and set the flag.
-    io.clockEn := False
+    standardCycleReady := False
     isWaiting := True
   } otherwise {
     // Either the bus is idle (01), or we already finished our 1-cycle wait.
     // Release the brake.
-    io.clockEn := True
+    standardCycleReady := True
     isWaiting := False
   }
 
@@ -103,13 +82,13 @@ case class BusController() extends Component {
   // ------------------------
   // Only autovectors are used for interrupts
   // IPL is active low
-  when(io.usbInt) {
+  when(io.usbBus.irq) {
     io.ipl := B"001"        // bitwise not 6
-  } elsewhen io.timerInt {
+  } elsewhen io.timerBus.irq {
     io.ipl := B"010"        // bitwise not 5
-  } elsewhen io.videoInt {
+  } elsewhen io.videoBus.irq {
     io.ipl := B"011"        // bitwise not 4
-  } elsewhen io.uartInt {
+  } elsewhen io.uartBus.irq {
     io.ipl := B"100"        // bitwise not 3
   } otherwise {
     io.ipl := B"111"        // bitwise not 0
@@ -119,22 +98,27 @@ case class BusController() extends Component {
   // ------------------------
   //    Address Decoding
   // ------------------------
+  // Preserve RTC data-cycle qualification formerly wired in the top level.
+  val ds1302AddressSelected = Bool()
+  io.ds1302Bus.sel := ds1302AddressSelected &&
+    ((io.busState === B"10") || (io.busState === B"11"))
+
   // Default assignments
-  io.ramSel     := False
-  io.romSel     := False
-  io.ledSel     := False
-  io.uartSel    := False
-  io.vidPalSel  := False
-  io.vidCtrlSel := False
-  io.counterSel := False
-  io.ledsSel    := False
-  io.usbSel     := False
-  io.timerSel   := False
-  io.spiSel     := False
-  io.psgSel     := False
-  io.ds1302Sel  := False
-  io.vidFbSel   := False
-  io.sdRamSel   := False
+  io.ramBus.sel := False
+  io.romBus.sel := False
+  io.ledBus.sel := False
+  io.uartBus.sel := False
+  io.videoBus.palSel := False
+  io.videoBus.ctrlSel := False
+  io.counterBus.sel := False
+  io.ledsBus.sel := False
+  io.usbBus.sel := False
+  io.timerBus.sel := False
+  io.spiBus.sel := False
+  io.psgBus.sel := False
+  ds1302AddressSelected := False
+  io.videoBus.fbSel := False
+  io.sdRamBus.sel := False
   io.busErr     := False
 
   // Address Bitmask Definitions
@@ -189,37 +173,37 @@ case class BusController() extends Component {
   when(interruptAckMapping.hit(address)) {
     io.busErr := False
   } elsewhen bootMapping.hit(address) {
-    io.romSel := True
+    io.romBus.sel := True
   } elsewhen ramMapping.hit(address) {
-    io.ramSel := True
+    io.ramBus.sel := True
   } elsewhen (sdRamMapping1.hit(address) || sdRamMapping2.hit(address) || sdRamMapping3.hit(address)) {
-    io.sdRamSel := True
+    io.sdRamBus.sel := True
   } elsewhen romMapping.hit(address) {
-    io.romSel := True
+    io.romBus.sel := True
   } elsewhen ledMapping.hit(address) {
-    io.ledSel := True
+    io.ledBus.sel := True
   } elsewhen uartMapping.hit(address) {
-    io.uartSel := True
+    io.uartBus.sel := True
   } elsewhen vidPalMapping .hit(address) {
-    io.vidPalSel := True
+    io.videoBus.palSel := True
   } elsewhen vidCtrlMapping .hit(address) {
-    io.vidCtrlSel := True
+    io.videoBus.ctrlSel := True
   } elsewhen vidFbMapping.hit(address) {
-    io.vidFbSel := True
+    io.videoBus.fbSel := True
   } elsewhen counterMapping.hit(address) {
-    io.counterSel := True
+    io.counterBus.sel := True
   } elsewhen ledsMapping.hit(address) {
-    io.ledsSel := True
+    io.ledsBus.sel := True
   } elsewhen usbMapping.hit(address) {
-    io.usbSel := True
+    io.usbBus.sel := True
   } elsewhen timerMapping.hit(address) {
-    io.timerSel := True
+    io.timerBus.sel := True
   } elsewhen spiMapping.hit(address) {
-    io.spiSel := True
+    io.spiBus.sel := True
   } elsewhen psgMapping.hit(address) {
-    io.psgSel := True
+    io.psgBus.sel := True
   } elsewhen ds1302Mapping.hit(address) {
-    io.ds1302Sel := True
+    ds1302AddressSelected := True
   } otherwise {
     io.busErr := cpuTransferActive // Out-of-bounds active transfer
   }
@@ -244,7 +228,8 @@ case class BusController() extends Component {
 
   // SDRAM, PSG and DS1302 manage their own extended waits and need the original
   // write direction throughout the access, rather than a one-cycle pulse.
-  for (bus <- List(io.sdRamBus, io.psgBus, io.ds1302Bus)) {
+  val selfTimedBuses = List(io.sdRamBus, io.psgBus, io.ds1302Bus)
+  for (bus <- selfTimedBuses) {
     bus.address := io.cpuBus.address
     bus.dataOut := io.cpuBus.dataOut
     bus.lds := io.cpuBus.lds
@@ -252,32 +237,36 @@ case class BusController() extends Component {
     bus.wr := io.cpuBus.wr
   }
 
+  // Every peripheral participates; devices without extended waits drive True.
+  val deviceBuses = buses ++ selfTimedBuses
+  io.clockEn := standardCycleReady && deviceBuses.map(_.ready).reduce(_ && _)
+
   io.cpuBus.dataIn := 0
-  when(io.romSel) {
+  when(io.romBus.sel) {
     io.cpuBus.dataIn := io.romBus.dataIn
-  } elsewhen io.ramSel {
+  } elsewhen io.ramBus.sel {
     io.cpuBus.dataIn := io.ramBus.dataIn
-  } elsewhen io.ledSel {
+  } elsewhen io.ledBus.sel {
     io.cpuBus.dataIn := io.ledBus.dataIn
-  } elsewhen io.uartSel {
+  } elsewhen io.uartBus.sel {
     io.cpuBus.dataIn := io.uartBus.dataIn
-  } elsewhen (io.vidPalSel || io.vidCtrlSel || io.vidFbSel) {
+  } elsewhen (io.videoBus.palSel || io.videoBus.ctrlSel || io.videoBus.fbSel) {
     io.cpuBus.dataIn := io.videoBus.dataIn
-  } elsewhen io.sdRamSel {
+  } elsewhen io.sdRamBus.sel {
     io.cpuBus.dataIn := io.sdRamBus.dataIn
-  } elsewhen io.counterSel {
+  } elsewhen io.counterBus.sel {
     io.cpuBus.dataIn := io.counterBus.dataIn
-  } elsewhen io.ledsSel {
+  } elsewhen io.ledsBus.sel {
     io.cpuBus.dataIn := io.ledsBus.dataIn
-  } elsewhen io.usbSel {
+  } elsewhen io.usbBus.sel {
     io.cpuBus.dataIn := io.usbBus.dataIn
-  } elsewhen io.timerSel {
+  } elsewhen io.timerBus.sel {
     io.cpuBus.dataIn := io.timerBus.dataIn
-  } elsewhen io.spiSel {
+  } elsewhen io.spiBus.sel {
     io.cpuBus.dataIn := io.spiBus.dataIn
-  } elsewhen io.psgSel {
+  } elsewhen io.psgBus.sel {
     io.cpuBus.dataIn := io.psgBus.dataIn
-  } elsewhen io.ds1302Sel {
+  } elsewhen ds1302AddressSelected {
     io.cpuBus.dataIn := io.ds1302Bus.dataIn
   }
 }

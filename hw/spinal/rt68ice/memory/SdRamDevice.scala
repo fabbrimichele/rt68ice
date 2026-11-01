@@ -1,6 +1,6 @@
 package rt68ice.memory
 
-import rt68ice.core.M68KBus
+import rt68ice.core.M68KDeviceBus
 import spinal.core._
 import spinal.lib._
 
@@ -10,11 +10,12 @@ import scala.language.postfixOps
 //noinspection ScalaWeakerAccess
 case class SdRamDevice(sdRamCd: ClockDomain) extends Component {
   val io = new Bundle {
-    val bus       = slave(M68KBus())
-    val sel       = in Bool()
-    val cpuClkEn  = out Bool()
+    val bus       = slave(M68KDeviceBus())
     val sdRam     = master(SdRam())
   }
+
+  // This device does not generate interrupt requests.
+  io.bus.irq := False
 
   sdRamCd {
     val sdRam = SdRamCtrl(SdRamCtrlConfig(clockSpeedMhz = sdRamCd.frequency.getValue.toDouble / 1_000_000))
@@ -44,8 +45,8 @@ case class SdRamDevice(sdRamCd: ClockDomain) extends Component {
     val validDataPhase = io.bus.uds || io.bus.lds
 
     // An active cycle is when the chip is selected AND the CPU has asserted strobes.
-    // In a 32-bit move.l, io.sel stays High continuously, but validDataPhase will toggle.
-    val activeCycle = io.sel && validDataPhase
+    // In a 32-bit move.l, io.bus.sel stays High continuously, but validDataPhase will toggle.
+    val activeCycle = io.bus.sel && validDataPhase
 
     // Detect if the CPU seamlessly moves to the second half of a 32-bit transfer.
     // The TG68K does not negate UDS/LDS between the two 16-bit halves;
@@ -83,6 +84,6 @@ case class SdRamDevice(sdRamCd: ClockDomain) extends Component {
 
     // Stall the CPU until the full 32-bit transaction is complete.
     // We allow the CPU to run if the cycle is finished OR if the CPU is currently idle.
-    io.cpuClkEn := !activeCycle || (fullCycleDone && !newPhase)
+    io.bus.ready := !activeCycle || (fullCycleDone && !newPhase)
   }
 }

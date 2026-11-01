@@ -35,9 +35,9 @@ object VgaDeviceSim extends App {
     // ------------------------------------------------------------
     // 3. Initialize Inputs to Safe Default States
     // ------------------------------------------------------------
-    dut.io.fbSel #= false
-    dut.io.palSel #= false
-    dut.io.ctrlSel #= false
+    dut.io.bus.fbSel #= false
+    dut.io.bus.palSel #= false
+    dut.io.bus.ctrlSel #= false
     dut.io.bus.wr #= false
     dut.io.bus.address #= 0
     dut.io.bus.dataOut #= 0
@@ -61,12 +61,12 @@ object VgaDeviceSim extends App {
       dut.io.bus.wr #= true
       dut.io.bus.uds #= true
       dut.io.bus.lds #= true
-      dut.io.fbSel #= true
+      dut.io.bus.fbSel #= true
 
       dut.clockDomain.waitRisingEdge()
 
       // Deassert control wires
-      dut.io.fbSel #= false
+      dut.io.bus.fbSel #= false
       dut.io.bus.wr #= false
     }
 
@@ -86,43 +86,43 @@ object VgaDeviceSim extends App {
       dut.io.bus.wr #= true
       dut.io.bus.uds #= true
       dut.io.bus.lds #= true
-      dut.io.ctrlSel #= true
+      dut.io.bus.ctrlSel #= true
 
       dut.clockDomain.waitRisingEdge()
 
-      dut.io.ctrlSel #= false
+      dut.io.bus.ctrlSel #= false
       dut.io.bus.wr #= false
       dut.io.bus.uds #= false
       dut.io.bus.lds #= false
     }
 
     writeControlRegister(byteOffset = 4, data16Bit = 1)
-    assert(!dut.io.int.toBoolean, "VBL interrupt was active before vertical blank")
+    assert(!dut.io.bus.irq.toBoolean, "VBL interrupt was active before vertical blank")
 
     var pixelClocks = 0
-    while(!dut.io.int.toBoolean && pixelClocks < 430_000) {
+    while(!dut.io.bus.irq.toBoolean && pixelClocks < 430_000) {
       dut.vgaCd.waitRisingEdge()
       pixelClocks += 1
     }
-    assert(dut.io.int.toBoolean, "VBL did not raise an interrupt within one frame")
+    assert(dut.io.bus.irq.toBoolean, "VBL did not raise an interrupt within one frame")
 
     dut.clockDomain.waitRisingEdge(4)
-    assert(dut.io.int.toBoolean, "VBL interrupt was not held pending")
+    assert(dut.io.bus.irq.toBoolean, "VBL interrupt was not held pending")
 
     dut.io.bus.address #= 2
     dut.io.bus.wr #= false
     dut.io.bus.uds #= true
     dut.io.bus.lds #= true
-    dut.io.ctrlSel #= true
+    dut.io.bus.ctrlSel #= true
     sleep(1)
     assert((dut.io.bus.dataIn.toInt & 1) == 1, "IRQ_STATUS did not report VBL pending")
 
     dut.clockDomain.waitRisingEdge()
     sleep(1)
-    dut.io.ctrlSel #= false
+    dut.io.bus.ctrlSel #= false
     dut.io.bus.uds #= false
     dut.io.bus.lds #= false
-    assert(!dut.io.int.toBoolean, "Reading IRQ_STATUS did not clear the VBL interrupt")
+    assert(!dut.io.bus.irq.toBoolean, "Reading IRQ_STATUS did not clear the VBL interrupt")
 
     println(s"[SIM] VBL interrupt asserted after $pixelClocks pixel clocks and cleared on status read")
 

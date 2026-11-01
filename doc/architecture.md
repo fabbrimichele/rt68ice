@@ -1,5 +1,25 @@
 # 68k-FPGA Homebrew Computer
 
+## Internal bus bundles
+
+`M68KBusSignals` defines the common address, data, direction, and byte-strobe
+signals. `M68KBus` is the CPU-facing interface. `M68KDeviceBusSignals` adds the common
+interrupt response for peripheral bundles. Decoded peripherals use
+`M68KDeviceBus`, which adds `sel`, an active-high device-to-controller `irq`, and `ready`,
+so data, selection, interrupt requests, and wait handling connect together
+with `<>`. Video uses `M68KVideoBus`, containing the same common signals plus
+`fbSel`, `palSel`, and `ctrlSel` for its three address regions, plus `irq` and `ready`.
+Devices without interrupts explicitly drive `irq` low. Interrupt requests are
+independent of selection; masking, acknowledgement, and clock-domain crossing
+remain within the existing device logic. Interrupt priority remains centralized
+in `BusController` (USB 6, timer 5, video 4, UART 3).
+
+The address map and decoding priority remain centralized in `BusController`.
+It also preserves the separate gated-write and held-direction wiring groups.
+RTC selection includes CPU data-cycle qualification before it reaches the
+device. Bundling these signals does not add registers or change the device
+handshakes.
+
 ## Project Goals
 Design and implement a high-performance Motorola 680x0-compatible System-on-a-Chip (SoC) using SpinalHDL, targeting the iCESugar Pro (Lattice ECP5-25F).
 * **EmuTOS:** Boot a fully functional GUI for classic Atari-style productivity.
@@ -23,3 +43,10 @@ Design and implement a high-performance Motorola 680x0-compatible System-on-a-Ch
     * **Chunky:** Linear 8-bit framebuffer for optimized DOOM rendering and uClinux console.
 * **No MMU:**
     * Memory Management Unit omitted due to the current lack of a verified 68851 or 68030-compatible MMU softcore.
+
+Device `ready` signals are high while idle or when a transfer can complete.
+Devices with no extended waits drive `ready` high; SDRAM, PSG, and RTC use
+their existing completion logic. `BusController` ANDs every device's `ready`
+with its own fixed-wait condition to produce the final CPU `clockEn`. The top
+level connects that result directly to the CPU. Peripheral state machines keep
+running while CPU advancement is held.

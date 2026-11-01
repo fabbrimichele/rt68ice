@@ -22,7 +22,7 @@ object SdRamDeviceSim extends App {
       dut.clockDomain.forkStimulus(period = 10)
 
       // 2. Initialize the M68K bus signals to an idle state
-      dut.io.sel #= false
+      dut.io.bus.sel #= false
       dut.io.bus.wr #= false
       dut.io.bus.uds #= false
       dut.io.bus.lds #= false
@@ -42,22 +42,22 @@ object SdRamDeviceSim extends App {
         dut.clockDomain.waitSampling(1)
 
         // Phase 2: Assert Address Strobe (sel)
-        dut.io.sel #= true
+        dut.io.bus.sel #= true
         dut.clockDomain.waitSampling(1)
 
         // Phase 3: Assert Data Strobes (Triggers your wrTrigger)
         dut.io.bus.uds #= uds
         dut.io.bus.lds #= lds
 
-        // Phase 4: Wait for the SDRAM controller to acknowledge via cpuClkEn
-        // cpuClkEn will drop low while waiting, then go high when p0_ready is asserted
-        while (!dut.io.cpuClkEn.toBoolean) {
+        // Phase 4: Wait for the SDRAM controller to acknowledge via bus.ready
+        // bus.ready will drop low while waiting, then go high when p0_ready is asserted
+        while (!dut.io.bus.ready.toBoolean) {
           dut.clockDomain.waitSampling(1)
         }
 
         // Hold for one clock to complete the handshake, then deassert
         dut.clockDomain.waitSampling(1)
-        dut.io.sel #= false
+        dut.io.bus.sel #= false
         dut.io.bus.uds #= false
         dut.io.bus.lds #= false
         dut.clockDomain.waitSampling(2) // Bus idle cycles
@@ -70,7 +70,7 @@ object SdRamDeviceSim extends App {
         dut.clockDomain.waitSampling(1)
 
         // Phase 2: Assert Address Strobe and Data Strobes
-        dut.io.sel #= true
+        dut.io.bus.sel #= true
         dut.io.bus.uds #= uds
         dut.io.bus.lds #= lds
 
@@ -86,16 +86,16 @@ object SdRamDeviceSim extends App {
         dut.io.sdRam.dq #= mockSdramData
 
         // Phase 3: Wait for acknowledgment from your controller
-        while (!dut.io.cpuClkEn.toBoolean) {
+        while (!dut.io.bus.ready.toBoolean) {
           dut.clockDomain.waitSampling(1)
         }
 
-        // Capture data right when cpuClkEn goes high
+        // Capture data right when bus.ready goes high
         val capturedData = dut.io.bus.dataIn.toInt
 
         // Handshake complete, deassert
         dut.clockDomain.waitSampling(1)
-        dut.io.sel #= false
+        dut.io.bus.sel #= false
         dut.io.bus.uds #= false
         dut.io.bus.lds #= false
 
@@ -113,12 +113,12 @@ object SdRamDeviceSim extends App {
         dut.io.bus.dataOut #= ((data >> 16) & 0xFFFF).toInt
         dut.clockDomain.waitSampling(1)
 
-        dut.io.sel #= true
+        dut.io.bus.sel #= true
         dut.clockDomain.waitSampling(1)
         dut.io.bus.uds #= uds
         dut.io.bus.lds #= lds
 
-        while (!dut.io.cpuClkEn.toBoolean) dut.clockDomain.waitSampling(1)
+        while (!dut.io.bus.ready.toBoolean) dut.clockDomain.waitSampling(1)
         dut.clockDomain.waitSampling(1) // End of Phase 1
 
         // Phase 2: Low Word - Increment address, hold strobes
@@ -128,10 +128,10 @@ object SdRamDeviceSim extends App {
         // Wait for the address change to be evaluated by the DUT's logic
         dut.clockDomain.waitSampling(1)
 
-        while (!dut.io.cpuClkEn.toBoolean) dut.clockDomain.waitSampling(1)
+        while (!dut.io.bus.ready.toBoolean) dut.clockDomain.waitSampling(1)
         dut.clockDomain.waitSampling(1) // End of Phase 2
 
-        dut.io.sel #= false
+        dut.io.bus.sel #= false
         dut.io.bus.uds #= false
         dut.io.bus.lds #= false
         dut.clockDomain.waitSampling(2)
@@ -143,14 +143,14 @@ object SdRamDeviceSim extends App {
         dut.io.bus.wr #= false
         dut.clockDomain.waitSampling(1)
 
-        dut.io.sel #= true
+        dut.io.bus.sel #= true
         dut.io.bus.uds #= uds
         dut.io.bus.lds #= lds
 
         dut.clockDomain.waitSampling(5)
         dut.io.sdRam.dq #= mockHigh
 
-        while (!dut.io.cpuClkEn.toBoolean) dut.clockDomain.waitSampling(1)
+        while (!dut.io.bus.ready.toBoolean) dut.clockDomain.waitSampling(1)
         val capturedHigh = dut.io.bus.dataIn.toInt
         dut.clockDomain.waitSampling(1) // End of Phase 1
 
@@ -163,11 +163,11 @@ object SdRamDeviceSim extends App {
         dut.clockDomain.waitSampling(4) // Wait for CAS latency of the second access
         dut.io.sdRam.dq #= mockLow
 
-        while (!dut.io.cpuClkEn.toBoolean) dut.clockDomain.waitSampling(1)
+        while (!dut.io.bus.ready.toBoolean) dut.clockDomain.waitSampling(1)
         val capturedLow = dut.io.bus.dataIn.toInt
         dut.clockDomain.waitSampling(1) // End of Phase 2
 
-        dut.io.sel #= false
+        dut.io.bus.sel #= false
         dut.io.bus.uds #= false
         dut.io.bus.lds #= false
         dut.io.sdRam.dq #= 0
