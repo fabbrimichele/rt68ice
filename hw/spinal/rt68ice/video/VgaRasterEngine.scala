@@ -10,19 +10,22 @@ import scala.language.postfixOps
 //noinspection ScalaWeakerAccess
 object VgaRasterEngine {
   val rgbConfig = RgbConfig(8, 8, 8)
-  val MODE_320X240_4BPP = 0
-  val MODE_640X240_2BPP = 1
-  val MODE_640X480_1BPP = 2
-  val MODE_320X240_8BPP = 3
-  val MODE_640X240_4BPP = 4
-  val MODE_640X480_2BPP = 5
+  val MODE_320X200_4BPP = 0
+  val MODE_640X200_2BPP = 1
+  val MODE_640X400_1BPP = 2
+  val MODE_320X240_4BPP = 3
+  val MODE_640X240_2BPP = 4
+  val MODE_640X480_1BPP = 5
+  val MODE_320X240_8BPP = 6
+  val MODE_640X240_4BPP = 7
+  val MODE_640X480_2BPP = 8
 }
 
 //noinspection TypeAnnotation
 //noinspection ScalaWeakerAccess
 case class VgaRasterEngine() extends Component {
   val io = new Bundle {
-    val resolution  = in Bits(3 bits)
+    val resolution  = in Bits(4 bits)
 
     // Interface to the top-level memory blocks
     val memAddress = out UInt(16 bits)
@@ -35,11 +38,27 @@ case class VgaRasterEngine() extends Component {
     val vSync   = out Bool()
     val hSync   = out Bool()
     val colorEn = out Bool()
+    // Image mask is separate from the physical 640x480 active-video window.
+    val imageEn = out Bool()
     val vBlankStart = out Bool()
   }
 
   val vgaCounter = VgaCounter(rgbConfig)
   vgaCounter.io.timings.setAs_h640_v480_r60
+
+  // Reuse the existing pixel formats; only the logical height/window differs.
+  val formatMode = Bits(4 bits)
+  formatMode := B(MODE_640X480_1BPP, 4 bits)
+  when((io.resolution.asUInt >= 3) && (io.resolution.asUInt <= 8)) {
+    formatMode := io.resolution
+  }
+  switch(io.resolution) {
+    is(MODE_320X200_4BPP) { formatMode := MODE_320X240_4BPP }
+    is(MODE_640X200_2BPP) { formatMode := MODE_640X240_2BPP }
+    is(MODE_640X400_1BPP) { formatMode := MODE_640X480_1BPP }
+  }
+  val letterboxed = (io.resolution === MODE_320X200_4BPP) ||
+    (io.resolution === MODE_640X200_2BPP) || (io.resolution === MODE_640X400_1BPP)
 
   val videoPipeline = new Area {
     val timings = vgaCounter.io.timings
@@ -50,16 +69,25 @@ case class VgaRasterEngine() extends Component {
     val pixelX = isActiveX ? (hCounter - timings.h.colorStart) | U(0)
     val pixelY = (vCounter > timings.v.colorStart) ? (vCounter - timings.v.colorStart) | U(0)
 
-    val virtualY = io.resolution.mux(
-      MODE_320X240_4BPP -> (pixelY >> 1).resized,
-      MODE_640X240_2BPP -> (pixelY >> 1).resized,
-      MODE_320X240_8BPP -> (pixelY >> 1).resized,
-      MODE_640X240_4BPP -> (pixelY >> 1).resized,
-      default -> pixelY
+    val insideImage = !letterboxed || ((pixelY >= 40) && (pixelY < 440))
+    // Clamp before subtracting so top/bottom bands never address negative rows.
+    val imageY = UInt(pixelY.getWidth bits)
+    imageY := pixelY
+    when(letterboxed) {
+      imageY := 0
+      when(insideImage) { imageY := pixelY - 40 }
+    }
+
+    val virtualY = formatMode.mux(
+      MODE_320X240_4BPP -> (imageY >> 1).resized,
+      MODE_640X240_2BPP -> (imageY >> 1).resized,
+      MODE_320X240_8BPP -> (imageY >> 1).resized,
+      MODE_640X240_4BPP -> (imageY >> 1).resized,
+      default -> imageY
     )
 
     // 320-pixel modes duplicate each virtual pixel horizontally.
-    val virtualX = io.resolution.mux(
+    val virtualX = formatMode.mux(
       MODE_320X240_4BPP -> (pixelX >> 1).resized,
       MODE_320X240_8BPP -> (pixelX >> 1).resized,
       default -> pixelX
@@ -67,20 +95,20 @@ case class VgaRasterEngine() extends Component {
 
     // THE FIX: Stretch the internal pipeline counter to match the physical clock scaling
     // In low-res, the pipeline takes 2 physical clock cycles to advance 1 step.
-    val cycleCounter = io.resolution.mux(
+    val cycleCounter = formatMode.mux(
       MODE_320X240_4BPP -> pixelX(4 downto 1), // 16 steps spanning 32 physical cycles
       MODE_320X240_8BPP -> pixelX(4 downto 1),
       default -> pixelX(3 downto 0)  // 16 steps spanning 16 physical cycles
     )
 
     // The block latch trigger needs to hit at the very end of the physical block width
-    val isEndOfBlock = io.resolution.mux(
+    val isEndOfBlock = formatMode.mux(
       MODE_320X240_4BPP -> (pixelX(4 downto 0) === 31),
       MODE_320X240_8BPP -> (pixelX(4 downto 0) === 31),
       default -> (pixelX(3 downto 0) === 15)
     )
 
-    val planeStride = io.resolution.mux(
+    val planeStride = formatMode.mux(
       MODE_320X240_4BPP -> U(4, 4 bits),
       MODE_640X240_2BPP -> U(2, 4 bits),
       MODE_320X240_8BPP -> U(8, 4 bits),
@@ -90,7 +118,7 @@ case class VgaRasterEngine() extends Component {
     )
 
     // Address offset pointer steps evenly across words
-    val planeFetchOffset = io.resolution.mux(
+    val planeFetchOffset = formatMode.mux(
       MODE_320X240_4BPP -> cycleCounter(1 downto 0).resized,
       MODE_640X240_2BPP -> (B"2'0" ## cycleCounter(0)).asUInt,
       MODE_320X240_8BPP -> cycleCounter(2 downto 0),
@@ -100,7 +128,7 @@ case class VgaRasterEngine() extends Component {
     )
 
     // Calculate vertical line baseline offset based on the line width
-    val lineBaseAddress = io.resolution.mux(
+    val lineBaseAddress = formatMode.mux(
       MODE_320X240_4BPP -> ((virtualY << 6) + (virtualY << 4)).resized, // Y * 80
       MODE_640X240_2BPP -> ((virtualY << 6) + (virtualY << 4)).resized, // Y * 80
       MODE_320X240_8BPP -> ((virtualY << 7) + (virtualY << 5)),         // Y * 160
@@ -120,11 +148,14 @@ case class VgaRasterEngine() extends Component {
     // Address generation is gated safely to prevent look-ahead address leaking out of bounds
     val currentPlaneAddress = lineBaseAddress + (fetchGroupIdx * planeStride) + planeFetchOffset
     io.memAddress := currentPlaneAddress.resized
+    when(letterboxed && (!insideImage || (pixelX >= 640))) {
+      io.memAddress := 0
+    }
 
     // The Fetch Team: Updates sequentially, one cycle at a time
     val fetchEnable = Vec(Bool(), 8)
     for(i <- 0 until 8) {
-      fetchEnable(i) := io.resolution.mux(
+      fetchEnable(i) := (!letterboxed || (insideImage && (pixelX < 640))) && formatMode.mux(
         MODE_320X240_4BPP -> (if (i < 4) pixelX(4 downto 0) === (i * 2 + 1) else False),
         MODE_640X240_2BPP -> (if (i < 2) pixelX(3 downto 0) === (i + 1) else False),
         MODE_320X240_8BPP -> (pixelX(4 downto 0) === (i * 2 + 1)),
@@ -165,7 +196,7 @@ case class VgaRasterEngine() extends Component {
     val shiftIndexLow = Delay(virtualX(3 downto 0), lowResDelay)
     val shiftIndexMed = Delay(virtualX(3 downto 0), medHighResDelay)
 
-    val outVirtualX = io.resolution.mux(
+    val outVirtualX = formatMode.mux(
       MODE_320X240_4BPP -> shiftIndexLow,
       MODE_320X240_8BPP -> shiftIndexLow,
       default -> shiftIndexMed
@@ -184,7 +215,7 @@ case class VgaRasterEngine() extends Component {
   }
 
   // Combine planes into color index
-  io.colorIndex := io.resolution.mux(
+  io.colorIndex := formatMode.mux(
     MODE_320X240_4BPP -> (B"4'0" ## videoPipeline.plane3Bit ## videoPipeline.plane2Bit ## videoPipeline.plane1Bit ## videoPipeline.plane0Bit),
     MODE_640X240_2BPP -> (B"6'0" ## videoPipeline.plane1Bit ## videoPipeline.plane0Bit),
     MODE_320X240_8BPP -> (videoPipeline.plane7Bit ## videoPipeline.plane6Bit ## videoPipeline.plane5Bit ## videoPipeline.plane4Bit
@@ -201,19 +232,21 @@ case class VgaRasterEngine() extends Component {
     (vgaCounter.io.vCounter === vgaCounter.io.timings.v.colorEnd) &&
       (vgaCounter.io.hCounter === vgaCounter.io.timings.h.colorEnd)
 
-  io.vBlankStart := io.resolution.mux(
+  io.vBlankStart := formatMode.mux(
     MODE_320X240_4BPP -> Delay(rawVBlankStart, videoPipeline.lowResDelay),
     MODE_320X240_8BPP -> Delay(rawVBlankStart, videoPipeline.lowResDelay),
     default -> Delay(rawVBlankStart, videoPipeline.medHighResDelay)
   )
 
-  when((io.resolution === MODE_320X240_4BPP) || (io.resolution === MODE_320X240_8BPP)) {
+  when((formatMode === MODE_320X240_4BPP) || (formatMode === MODE_320X240_8BPP)) {
     io.hSync   := Delay(vgaCounter.io.hSync, videoPipeline.lowResDelay)
     io.vSync   := Delay(vgaCounter.io.vSync, videoPipeline.lowResDelay)
     io.colorEn := Delay(vgaCounter.io.colorEn, videoPipeline.lowResDelay)
+    io.imageEn := Delay(videoPipeline.insideImage, videoPipeline.lowResDelay)
   } otherwise {
     io.hSync   := Delay(vgaCounter.io.hSync, videoPipeline.medHighResDelay)
     io.vSync   := Delay(vgaCounter.io.vSync, videoPipeline.medHighResDelay)
     io.colorEn := Delay(vgaCounter.io.colorEn, videoPipeline.medHighResDelay)
+    io.imageEn := Delay(videoPipeline.insideImage, videoPipeline.medHighResDelay)
   }
 }

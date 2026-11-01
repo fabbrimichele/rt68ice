@@ -10,15 +10,17 @@ object VgaScreenModesSim extends App {
   case class Mode(mode: Int, width: Int, height: Int, planes: Int, wordsPerLine: Int)
 
   val modes = Seq(
-    Mode(0, 320, 240, 4, 80),
-    Mode(1, 640, 240, 2, 80),
-    Mode(2, 640, 480, 1, 40),
-    Mode(3, 320, 240, 8, 160),
-    Mode(4, 640, 240, 4, 160),
-    Mode(5, 640, 480, 2, 80),
-    Mode(6, 640, 480, 1, 40),
-    Mode(7, 640, 480, 1, 40)
-  )
+    Mode(0, 320, 200, 4, 80),
+    Mode(1, 640, 200, 2, 80),
+    Mode(2, 640, 400, 1, 40),
+    Mode(3, 320, 240, 4, 80),
+    Mode(4, 640, 240, 2, 80),
+    Mode(5, 640, 480, 1, 40),
+    Mode(6, 320, 240, 8, 160),
+    Mode(7, 640, 240, 4, 160),
+    Mode(8, 640, 480, 2, 80)
+  ) ++ (9 to 15).map(id => Mode(id, 640, 480, 1, 40))
+
 
   val simConfig = SimConfig.withConfig(
     SpinalConfig(defaultConfigForClockDomains = ClockDomainConfig(resetKind = SYNC, resetActiveLevel = HIGH))
@@ -27,6 +29,7 @@ object VgaScreenModesSim extends App {
   simConfig.compile {
     val rasterEngine = VgaRasterEngine()
     rasterEngine.videoPipeline.pixelX.simPublic()
+    rasterEngine.videoPipeline.pixelY.simPublic()
     rasterEngine.videoPipeline.virtualY.simPublic()
     rasterEngine.videoPipeline.lineBaseAddress.simPublic()
     rasterEngine
@@ -52,6 +55,15 @@ object VgaScreenModesSim extends App {
       assert(clocks < 500000, s"Timed out waiting for virtual pixel ($x,$y)")
     }
 
+    def waitForPhysicalPosition(y: Int, x: Int): Unit = {
+      var clocks = 0
+      while ((dut.videoPipeline.pixelY.toInt != y || dut.videoPipeline.pixelX.toInt != x) && clocks < 500000) {
+        dut.clockDomain.waitRisingEdge()
+        clocks += 1
+      }
+      assert(clocks < 500000, s"Timed out waiting for physical pixel ($x,$y)")
+    }
+
     for (mode <- modes) {
       dut.io.resolution #= mode.mode
 
@@ -68,6 +80,17 @@ object VgaScreenModesSim extends App {
       val physicalPixelStep = if (mode.width == 320) 2 else 1
       val groupCount = mode.width / 16
       val expectedColor = (1 << mode.planes) - 1
+
+      val letterboxed = mode.mode >= 0 && mode.mode <= 2
+      if (letterboxed) {
+        waitForPhysicalPosition(y = 39, x = physicalBlockWidth)
+        assert(!dut.io.imageEn.toBoolean, s"Mode ${mode.mode}: top band enabled image")
+        assert(dut.io.colorEn.toBoolean, "Black band must remain physical active video")
+        assert(dut.io.memAddress.toInt == 0, "Border must clamp framebuffer address")
+        waitForPhysicalPosition(y = 40, x = physicalBlockWidth)
+        assert(dut.videoPipeline.lineBaseAddress.toInt == 0, "First image line must start at framebuffer zero")
+        assert(dut.io.imageEn.toBoolean, "First image line must enable image")
+      }
 
       // The first group's words all have bit 15 set, so its first output
       // pixel must combine every active plane into the maximum color index.
@@ -94,6 +117,19 @@ object VgaScreenModesSim extends App {
       waitForPosition(y = 2, x = 1)
       assert(dut.videoPipeline.lineBaseAddress.toInt == 2 * mode.wordsPerLine,
         s"Mode ${mode.mode}: next line base was ${dut.videoPipeline.lineBaseAddress.toInt}, expected ${2 * mode.wordsPerLine}")
+
+      if (letterboxed) {
+        waitForPhysicalPosition(y = 439, x = lastGroupX)
+        val lastLineBase = (mode.height - 1) * mode.wordsPerLine
+        assert(dut.videoPipeline.lineBaseAddress.toInt == lastLineBase, "Wrong last source line")
+        assert(dut.io.memAddress.toInt == lastLineBase + (groupCount - 1) * mode.planes,
+          "Wrong last pixel-group address")
+        assert(dut.io.imageEn.toBoolean, "Last image line must remain enabled")
+        waitForPhysicalPosition(y = 440, x = physicalBlockWidth)
+        assert(!dut.io.imageEn.toBoolean, "Bottom band must disable image")
+        assert(dut.io.colorEn.toBoolean, "Bottom band must remain physical active video")
+        assert(dut.io.memAddress.toInt == 0, "Bottom band must clamp framebuffer address")
+      }
 
       println(s"[SIM] Mode ${mode.mode}: ${mode.width}x${mode.height} ${mode.planes}bpp passed")
     }
