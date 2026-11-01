@@ -13,6 +13,9 @@ case class Counter() extends Component {
     val bus = slave(M68KDeviceBus())
   }
 
+  // Fixed bus wait states are handled by BusController.
+  io.bus.ready := True
+
   // This device does not generate interrupt requests.
   io.bus.irq := False
 

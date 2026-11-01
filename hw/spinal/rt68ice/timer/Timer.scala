@@ -39,6 +39,9 @@ case class Timer() extends Component {
     val bus = slave(M68KDeviceBus())
   }
 
+  // Fixed bus wait states are handled by BusController.
+  io.bus.ready := True
+
   val enabled = RegInit(False)
   val autoReload = RegInit(False)
   val interruptEnable = RegInit(False)

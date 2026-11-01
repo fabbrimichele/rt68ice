@@ -17,6 +17,9 @@ case class UsbDevice(usbCd: ClockDomain) extends Component {
     val usb4  = master(Usb())
   }
 
+  // Fixed bus wait states are handled by BusController.
+  io.bus.ready := True
+
   class UsbHostSync(usbHost: UsbHidHostBB, clearInterrupt: Bool) extends Area {
     // Capture a complete report in the USB domain and keep it stable while it
     // crosses into the system domain. Status changes also update the mailbox,

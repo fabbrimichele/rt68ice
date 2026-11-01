@@ -13,6 +13,9 @@ case class T16450Device() extends Component {
     val uart = master(Uart())
   }
 
+  // Fixed bus wait states are handled by BusController.
+  io.bus.ready := True
+
   val uart = new T16450BB()
 
   // Default Settings (Copied from MG68)

@@ -62,16 +62,18 @@ case class BusController() extends Component {
   // meaningful while at least one data strobe qualifies a real bus transfer.
   val cpuTransferActive = memoryCycle && (io.cpuBus.uds || io.cpuBus.lds)
 
+  val standardCycleReady = Bool()
+
   // The Handshake Logic
   when(busActive && !isWaiting) {
     // A bus cycle just started.
     // Pull the brake (clkEnable = Low) and set the flag.
-    io.clockEn := False
+    standardCycleReady := False
     isWaiting := True
   } otherwise {
     // Either the bus is idle (01), or we already finished our 1-cycle wait.
     // Release the brake.
-    io.clockEn := True
+    standardCycleReady := True
     isWaiting := False
   }
 
@@ -226,13 +228,18 @@ case class BusController() extends Component {
 
   // SDRAM, PSG and DS1302 manage their own extended waits and need the original
   // write direction throughout the access, rather than a one-cycle pulse.
-  for (bus <- List(io.sdRamBus, io.psgBus, io.ds1302Bus)) {
+  val selfTimedBuses = List(io.sdRamBus, io.psgBus, io.ds1302Bus)
+  for (bus <- selfTimedBuses) {
     bus.address := io.cpuBus.address
     bus.dataOut := io.cpuBus.dataOut
     bus.lds := io.cpuBus.lds
     bus.uds := io.cpuBus.uds
     bus.wr := io.cpuBus.wr
   }
+
+  // Every peripheral participates; devices without extended waits drive True.
+  val deviceBuses = buses ++ selfTimedBuses
+  io.clockEn := standardCycleReady && deviceBuses.map(_.ready).reduce(_ && _)
 
   io.cpuBus.dataIn := 0
   when(io.romBus.sel) {

@@ -27,6 +27,7 @@ object MemoryMapSim extends App {
     ).foreach { port =>
       port.dataIn #= 0
       port.irq #= false
+      port.ready #= true
     }
 
     dut.clockDomain.waitSampling(2)

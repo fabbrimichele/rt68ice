@@ -11,7 +11,6 @@ import scala.language.postfixOps
 case class SdRamDevice(sdRamCd: ClockDomain) extends Component {
   val io = new Bundle {
     val bus       = slave(M68KDeviceBus())
-    val cpuClkEn  = out Bool()
     val sdRam     = master(SdRam())
   }
 
@@ -85,6 +84,6 @@ case class SdRamDevice(sdRamCd: ClockDomain) extends Component {
 
     // Stall the CPU until the full 32-bit transaction is complete.
     // We allow the CPU to run if the cycle is finished OR if the CPU is currently idle.
-    io.cpuClkEn := !activeCycle || (fullCycleDone && !newPhase)
+    io.bus.ready := !activeCycle || (fullCycleDone && !newPhase)
   }
 }

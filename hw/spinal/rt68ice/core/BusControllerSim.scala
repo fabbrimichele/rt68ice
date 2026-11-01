@@ -13,7 +13,7 @@ object BusControllerSim extends App {
     dut.io.cpuBus.lds #= false
     dut.io.busState #= 1 // No memory access
 
-    Seq(
+    val devicePorts = Seq(
       dut.io.romBus,
       dut.io.ramBus,
       dut.io.ledBus,
@@ -25,12 +25,25 @@ object BusControllerSim extends App {
       dut.io.usbBus,
       dut.io.timerBus,
       dut.io.spiBus, dut.io.psgBus, dut.io.ds1302Bus
-    ).foreach { port =>
+    )
+    devicePorts.foreach { port =>
       port.dataIn #= 0
       port.irq #= false
+      port.ready #= true
     }
 
     dut.clockDomain.waitSampling(2)
+
+    // With no CPU access, each bundled READY must still participate in the
+    // final enable. Devices are responsible for reporting ready while idle.
+    for (port <- devicePorts) {
+      port.ready #= false
+      sleep(1)
+      assert(!dut.io.clockEn.toBoolean, "A device READY low did not hold the CPU")
+      port.ready #= true
+      sleep(1)
+      assert(dut.io.clockEn.toBoolean, "CPU remained held with all devices ready")
+    }
 
     def driveTransfer(address: Long, busState: Int, uds: Boolean, lds: Boolean): Unit = {
       dut.io.cpuBus.address #= address

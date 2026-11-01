@@ -22,6 +22,9 @@ case class StreamedVgaDevice(vgaCd : ClockDomain) extends Component {
     val vga = master(Vga(StreamedVgaDevice.rgbConfig))
   }
 
+  // Fixed bus wait states are handled by BusController.
+  io.bus.ready := True
+
   // This device does not generate interrupt requests.
   io.bus.irq := False
 

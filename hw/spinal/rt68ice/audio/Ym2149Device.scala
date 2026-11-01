@@ -9,7 +9,6 @@ import scala.language.postfixOps
 case class Ym2149Device() extends Component {
   val io = new Bundle {
     val bus = slave(M68KDeviceBus())
-    val cpuClkEn = out Bool() // Hold the CPU until the PSG access completes.
     val pwmAudio = out Bool() // PWM sound
   }
 
@@ -60,7 +59,7 @@ case class Ym2149Device() extends Component {
 
   // Detect consecutive word phases even if the CPU keeps its strobes asserted.
   private val newPhase = io.bus.address =/= address || io.bus.wr =/= write
-  io.cpuClkEn := !psgSel || (state === AccessState.DONE && !newPhase)
+  io.bus.ready := !psgSel || (state === AccessState.DONE && !newPhase)
   io.bus.dataIn := readData.resized
 
   private val commandActive = state === AccessState.SETUP || state === AccessState.WAIT_TICK

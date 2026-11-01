@@ -14,6 +14,9 @@ case class LedDevice() extends Component {
     val led = out Bits (3 bits)
   }
 
+  // Fixed bus wait states are handled by BusController.
+  io.bus.ready := True
+
   // This device does not generate interrupt requests.
   io.bus.irq := False
 

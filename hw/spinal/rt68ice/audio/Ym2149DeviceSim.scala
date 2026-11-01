@@ -19,16 +19,20 @@ case class Ym2149BusHarness() extends Component {
   controller.io.busState := io.busState
   Seq(
     controller.io.romBus, controller.io.ramBus, controller.io.ledBus,
-    controller.io.uartBus, controller.io.videoBus, controller.io.sdRamBus,
+    controller.io.uartBus, controller.io.videoBus,
     controller.io.counterBus, controller.io.ledsBus, controller.io.usbBus,
     controller.io.timerBus, controller.io.spiBus, controller.io.ds1302Bus
   ).foreach { port =>
     port.dataIn := 0
     port.irq := False
+    port.ready := True
   }
+  controller.io.sdRamBus.dataIn := 0
+  controller.io.sdRamBus.irq := False
+  controller.io.sdRamBus.ready := io.sdRamClkEn
   psg.io.bus <> controller.io.psgBus
 
-  io.cpuClkEn := io.sdRamClkEn && controller.io.clockEn && psg.io.cpuClkEn
+  io.cpuClkEn := controller.io.clockEn
 }
 
 object Ym2149DeviceSim extends App {
@@ -38,7 +42,7 @@ object Ym2149DeviceSim extends App {
     core.io.en_clk_psg_i.simPublic()
     core.io.bdir_i.simPublic()
     core.io.bc_i.simPublic()
-    dut.psg.io.cpuClkEn.simPublic()
+    dut.psg.io.bus.ready.simPublic()
     dut
   }.doSim { dut =>
     val core = dut.psg.children.collectFirst { case bb: Ym2149BB => bb }.get
@@ -87,7 +91,7 @@ object Ym2149DeviceSim extends App {
       dut.io.bus.lds #= true
       dut.io.busState #= (if (write) 3 else 2)
       sleep(1)
-      assert(!dut.psg.io.cpuClkEn.toBoolean, "PSG failed to stall a new access")
+      assert(!dut.psg.io.bus.ready.toBoolean, "PSG failed to stall a new access")
       var waited = 0
       while (!dut.io.cpuClkEn.toBoolean && waited < 30) {
         step()

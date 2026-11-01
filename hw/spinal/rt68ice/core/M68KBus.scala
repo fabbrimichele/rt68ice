@@ -33,10 +33,12 @@ case class M68KBus() extends M68KBusSignals
 /** Common device responses; active-high IRQ is independent of selection. */
 abstract class M68KDeviceBusSignals extends M68KBusSignals {
   val irq = Bool()
+  // High when idle or when the device transfer can complete.
+  val ready = Bool()
 
   override def asMaster(): Unit = {
     super.asMaster()
-    in(irq)
+    in(irq, ready)
   }
 }
 

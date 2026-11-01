@@ -11,7 +11,6 @@ import scala.language.postfixOps
 case class Ds1302Device() extends Component {
   val io = new Bundle {
     val bus = slave(M68KDeviceBus())
-    val cpuClkEn = out Bool()
     val ds1302 = master(Ds1302())
   }
 
@@ -71,7 +70,7 @@ case class Ds1302Device() extends Component {
 
   // Stall only the selected CPU transfer. A completed result remains valid
   // until the CPU leaves the access, including any other bus wait states.
-  io.cpuClkEn := !selected || (state === AccessState.DONE && !newPhase)
+  io.bus.ready := !selected || (state === AccessState.DONE && !newPhase)
   io.bus.dataIn(15 downto 8) := readData
   io.bus.dataIn(7 downto 0) := 0
 

@@ -5,10 +5,10 @@
 `M68KBusSignals` defines the common address, data, direction, and byte-strobe
 signals. `M68KBus` is the CPU-facing interface. `M68KDeviceBusSignals` adds the common
 interrupt response for peripheral bundles. Decoded peripherals use
-`M68KDeviceBus`, which adds `sel` and an active-high device-to-controller `irq`,
-so data, selection, and interrupt requests connect together
+`M68KDeviceBus`, which adds `sel`, an active-high device-to-controller `irq`, and `ready`,
+so data, selection, interrupt requests, and wait handling connect together
 with `<>`. Video uses `M68KVideoBus`, containing the same common signals plus
-`fbSel`, `palSel`, and `ctrlSel` for its three address regions, plus `irq`.
+`fbSel`, `palSel`, and `ctrlSel` for its three address regions, plus `irq` and `ready`.
 Devices without interrupts explicitly drive `irq` low. Interrupt requests are
 independent of selection; masking, acknowledgement, and clock-domain crossing
 remain within the existing device logic. Interrupt priority remains centralized
@@ -43,3 +43,10 @@ Design and implement a high-performance Motorola 680x0-compatible System-on-a-Ch
     * **Chunky:** Linear 8-bit framebuffer for optimized DOOM rendering and uClinux console.
 * **No MMU:**
     * Memory Management Unit omitted due to the current lack of a verified 68851 or 68030-compatible MMU softcore.
+
+Device `ready` signals are high while idle or when a transfer can complete.
+Devices with no extended waits drive `ready` high; SDRAM, PSG, and RTC use
+their existing completion logic. `BusController` ANDs every device's `ready`
+with its own fixed-wait condition to produce the final CPU `clockEn`. The top
+level connects that result directly to the CPU. Peripheral state machines keep
+running while CPU advancement is held.

@@ -14,6 +14,9 @@ case class SpiMasterDevice(config: SpiMasterConfig) extends Component {
     val spis = Vec(master(Spi()), config.portCount)
   }
 
+  // Fixed bus wait states are handled by BusController.
+  io.bus.ready := True
+
   // This device does not generate interrupt requests.
   io.bus.irq := False
 

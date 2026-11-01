@@ -16,6 +16,9 @@ case class Mem16Bit(sizeInWords: Int, initFile: Option[String] = None, readOnly:
     val bus     = slave(M68KDeviceBus())
   }
 
+  // Fixed bus wait states are handled by BusController.
+  io.bus.ready := True
+
   // This device does not generate interrupt requests.
   io.bus.irq := False
 
