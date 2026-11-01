@@ -38,22 +38,6 @@ case class Rt68IceTopLevel(romFile: String) extends Component {
     // Bus Controller
     val bus = new BusController
 
-    // SDRAM
-    val sdRamDevice = SdRamDevice(clockCtrl.sdRamCd)
-    sdRamDevice.io.sdRam <> io.sdram
-    bus.io.sdRamBus <> sdRamDevice.io.bus
-
-    // PSG (Ym2149) devices
-    val psg = Ym2149Device()
-    io.audio.left := psg.io.pwmAudio
-    io.audio.right := psg.io.pwmAudio
-    bus.io.psgBus <> psg.io.bus
-
-    // DS1302
-    val ds1302 = Ds1302Device()
-    io.ds1302 <> ds1302.io.ds1302
-    bus.io.ds1302Bus <> ds1302.io.bus
-
     // CPU
     val cpu = new M68K
     cpu.io.ipl := bus.io.ipl
@@ -70,6 +54,11 @@ case class Rt68IceTopLevel(romFile: String) extends Component {
     val ram = Mem16Bit(sizeInWords = 512)
     bus.io.ramBus <> ram.io.bus
 
+    // SDRAM
+    val sdRamDevice = SdRamDevice(clockCtrl.sdRamCd)
+    sdRamDevice.io.sdRam <> io.sdram
+    bus.io.sdRamBus <> sdRamDevice.io.bus
+
     // Counter
     val counter = Counter()
     bus.io.counterBus <> counter.io.bus
@@ -77,6 +66,17 @@ case class Rt68IceTopLevel(romFile: String) extends Component {
     // Programmable timer
     val timer = Timer()
     bus.io.timerBus <> timer.io.bus
+
+    // PSG (Ym2149) devices
+    val psg = Ym2149Device()
+    io.audio.left := psg.io.pwmAudio
+    io.audio.right := psg.io.pwmAudio
+    bus.io.psgBus <> psg.io.bus
+
+    // DS1302
+    val ds1302 = Ds1302Device()
+    io.ds1302 <> ds1302.io.ds1302
+    bus.io.ds1302Bus <> ds1302.io.bus
 
     // LED Device
     val ledDevice = LedDevice()
