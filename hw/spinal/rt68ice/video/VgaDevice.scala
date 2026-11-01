@@ -44,10 +44,10 @@ case class VgaDevice(vgaCd: ClockDomain) extends Component {
   palette.io.dataOut := io.bus.dataOut
   palette.io.sel := io.palSel
 
-  // Control register: bits 2-0 select the screen mode. Modes 6 and 7 fall
+  // Control register: bits 3-0 select the screen mode. Values 9-15 fall
   // back to 640x480 1bpp; see VgaRasterEngine for the complete mode table.
   val ctrlReg = Reg(Bits(16 bits)) init 0
-  val resolution = ctrlReg(2 downto 0)
+  val resolution = ctrlReg(3 downto 0)
   val interruptEnable = RegInit(False)
   val interruptPending = RegInit(False)
 
@@ -137,6 +137,15 @@ case class VgaDevice(vgaCd: ClockDomain) extends Component {
     io.vga.color.r := palette.io.pixelColor(23 downto 16).asUInt
     io.vga.color.g := palette.io.pixelColor(15 downto 8).asUInt
     io.vga.color.b := palette.io.pixelColor(7 downto 0).asUInt
+
+    // Match the synchronous palette's one-clock latency. Force RGB to black
+    // independently of palette entry zero, preserving physical active video.
+    val imageEn = RegNext(rasterEngine.io.imageEn) init False
+    when(!imageEn) {
+      io.vga.color.r := 0
+      io.vga.color.g := 0
+      io.vga.color.b := 0
+    }
 
     io.vga.hSync := rasterEngine.io.hSync
     io.vga.vSync := rasterEngine.io.vSync
