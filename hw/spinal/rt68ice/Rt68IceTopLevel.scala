@@ -78,7 +78,6 @@ case class Rt68IceTopLevel(romFile: String) extends Component {
     // Programmable timer
     val timer = Timer()
     bus.io.timerBus <> timer.io.bus
-    bus.io.timerInt := timer.io.int
 
     // LED Device
     val ledDevice = LedDevice()
@@ -94,12 +93,10 @@ case class Rt68IceTopLevel(romFile: String) extends Component {
     val uartDevice = T16450Device()
     uartDevice.io.uart <> io.uart
     bus.io.uartBus <> uartDevice.io.bus
-    bus.io.uartInt := uartDevice.io.int
 
     // Video Device
     val vgaDevice = VgaDevice(vgaCd = clockCtrl.vgaCd)
     vgaDevice.io.bus <> bus.io.videoBus
-    bus.io.videoInt := vgaDevice.io.int
 
     // VGA-HDMI Bridge
     val hdmiBridge = VgaToHdmiEcp5(vgaCd = clockCtrl.vgaCd, hdmiCd = clockCtrl.hdmiCd)
@@ -118,7 +115,6 @@ case class Rt68IceTopLevel(romFile: String) extends Component {
     usbDevice.io.usb3 <> io.usb3
     usbDevice.io.usb4 <> io.usb4
     bus.io.usbBus <> usbDevice.io.bus
-    bus.io.usbInt := usbDevice.io.int
 
     // SPI Device (SD card and Flash Mem)
     val spiMaster = SpiMasterDevice(SpiMasterConfig(portCount = 2))

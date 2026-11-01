@@ -12,10 +12,6 @@ object BusControllerSim extends App {
     dut.io.cpuBus.uds #= false
     dut.io.cpuBus.lds #= false
     dut.io.busState #= 1 // No memory access
-    dut.io.uartInt #= false
-    dut.io.usbInt #= false
-    dut.io.timerInt #= false
-    dut.io.videoInt #= false
 
     Seq(
       dut.io.romBus,
@@ -27,8 +23,12 @@ object BusControllerSim extends App {
       dut.io.counterBus,
       dut.io.ledsBus,
       dut.io.usbBus,
-      dut.io.timerBus
-    ).foreach(_.dataIn #= 0)
+      dut.io.timerBus,
+      dut.io.spiBus, dut.io.psgBus, dut.io.ds1302Bus
+    ).foreach { port =>
+      port.dataIn #= 0
+      port.irq #= false
+    }
 
     dut.clockDomain.waitSampling(2)
 
@@ -79,25 +79,25 @@ object BusControllerSim extends App {
     assert(!dut.io.busErr.toBoolean, "An interrupt-acknowledge cycle raised BERR")
 
     // Interrupt priorities descend from USB 6 through UART 3.
-    dut.io.timerInt #= true
+    dut.io.timerBus.irq #= true
     sleep(1)
     assert(dut.io.ipl.toInt == 2, "The timer did not request interrupt level 5")
 
-    dut.io.videoInt #= true
+    dut.io.videoBus.irq #= true
     sleep(1)
     assert(dut.io.ipl.toInt == 2, "Video incorrectly took priority over the timer")
 
-    dut.io.usbInt #= true
+    dut.io.usbBus.irq #= true
     sleep(1)
     assert(dut.io.ipl.toInt == 1, "USB did not take priority over the timer")
 
-    dut.io.usbInt #= false
-    dut.io.timerInt #= false
+    dut.io.usbBus.irq #= false
+    dut.io.timerBus.irq #= false
     sleep(1)
     assert(dut.io.ipl.toInt == 3, "Video did not request interrupt level 4")
 
-    dut.io.videoInt #= false
-    dut.io.uartInt #= true
+    dut.io.videoBus.irq #= false
+    dut.io.uartBus.irq #= true
     sleep(1)
     assert(dut.io.ipl.toInt == 4, "UART did not request interrupt level 3")
   }

@@ -11,10 +11,6 @@ object MemoryMapSim extends App {
     dut.io.cpuBus.uds #= true
     dut.io.cpuBus.lds #= true
     dut.io.busState #= 2 // Data read
-    dut.io.uartInt #= false
-    dut.io.usbInt #= false
-    dut.io.timerInt #= false
-    dut.io.videoInt #= false
 
     Seq(
       dut.io.romBus,
@@ -26,8 +22,12 @@ object MemoryMapSim extends App {
       dut.io.counterBus,
       dut.io.ledsBus,
       dut.io.usbBus,
-      dut.io.timerBus
-    ).foreach(_.dataIn #= 0)
+      dut.io.timerBus,
+      dut.io.spiBus, dut.io.psgBus, dut.io.ds1302Bus
+    ).foreach { port =>
+      port.dataIn #= 0
+      port.irq #= false
+    }
 
     dut.clockDomain.waitSampling(2)
 

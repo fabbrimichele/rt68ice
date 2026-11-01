@@ -10,7 +10,6 @@ import spinal.lib._
 case class T16450Device() extends Component {
   val io = new Bundle {
     val bus = slave(M68KDeviceBus())
-    val int = out Bool() // UART interrupt
     val uart = master(Uart())
   }
 
@@ -28,7 +27,7 @@ case class T16450Device() extends Component {
   uart.io.RI_n := False
   uart.io.DCD_n := False
   io.uart.txd := uart.io.SOut
-  io.int := uart.io.Intr
+  io.bus.irq := uart.io.Intr
 
   // Data bus mapping (access by byte, i.e. move.b)
   uart.io.D_In := io.bus.dataOut(15 downto 8)

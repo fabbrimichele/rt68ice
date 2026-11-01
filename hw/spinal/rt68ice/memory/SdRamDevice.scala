@@ -15,6 +15,9 @@ case class SdRamDevice(sdRamCd: ClockDomain) extends Component {
     val sdRam     = master(SdRam())
   }
 
+  // This device does not generate interrupt requests.
+  io.bus.irq := False
+
   sdRamCd {
     val sdRam = SdRamCtrl(SdRamCtrlConfig(clockSpeedMhz = sdRamCd.frequency.getValue.toDouble / 1_000_000))
     io.sdRam.clock    := sdRam.io.sdRam.clock

@@ -22,6 +22,9 @@ case class StreamedVgaDevice(vgaCd : ClockDomain) extends Component {
     val vga = master(Vga(StreamedVgaDevice.rgbConfig))
   }
 
+  // This device does not generate interrupt requests.
+  io.bus.irq := False
+
   val framebuffer = Mem(Bits(16 bits), 32768) // 64 KB
 
   // --- 68000 bus side ---

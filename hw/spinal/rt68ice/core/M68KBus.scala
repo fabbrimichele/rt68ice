@@ -30,8 +30,18 @@ abstract class M68KBusSignals extends Bundle with IMasterSlave {
 /** CPU-facing bus: selection is supplied by the address decoder. */
 case class M68KBus() extends M68KBusSignals
 
+/** Common device responses; active-high IRQ is independent of selection. */
+abstract class M68KDeviceBusSignals extends M68KBusSignals {
+  val irq = Bool()
+
+  override def asMaster(): Unit = {
+    super.asMaster()
+    in(irq)
+  }
+}
+
 /** Decoded device port. SEL retains the device's existing qualification rules. */
-case class M68KDeviceBus() extends M68KBusSignals {
+case class M68KDeviceBus() extends M68KDeviceBusSignals {
   val sel = Bool()
 
   override def asMaster(): Unit = {
@@ -41,7 +51,7 @@ case class M68KDeviceBus() extends M68KBusSignals {
 }
 
 /** Video shares data/address signals across three separately decoded regions. */
-case class M68KVideoBus() extends M68KBusSignals {
+case class M68KVideoBus() extends M68KDeviceBusSignals {
   val fbSel = Bool()
   val palSel = Bool()
   val ctrlSel = Bool()

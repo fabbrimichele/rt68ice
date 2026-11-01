@@ -13,6 +13,9 @@ case class Counter() extends Component {
     val bus = slave(M68KDeviceBus())
   }
 
+  // This device does not generate interrupt requests.
+  io.bus.irq := False
+
   // Free running 32-bit counter
   val counter = Reg(UInt(32 bits)) init 0
   counter := counter + 1

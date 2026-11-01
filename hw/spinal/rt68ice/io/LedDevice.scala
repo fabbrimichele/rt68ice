@@ -14,6 +14,9 @@ case class LedDevice() extends Component {
     val led = out Bits (3 bits)
   }
 
+  // This device does not generate interrupt requests.
+  io.bus.irq := False
+
   val ledReg = Reg(Bits(3 bits)) init 0
   io.led := ledReg
 

@@ -11,7 +11,6 @@ import scala.language.postfixOps
 case class UsbDevice(usbCd: ClockDomain) extends Component {
   val io = new Bundle {
     val bus   = slave(M68KDeviceBus())
-    val int   = out Bool()
     val usb1  = master(Usb())
     val usb2  = master(Usb())
     val usb3  = master(Usb())
@@ -180,7 +179,7 @@ case class UsbDevice(usbCd: ClockDomain) extends Component {
     irqEnable := io.bus.dataOut(3 downto 0)
   }
 
-  io.int :=
+  io.bus.irq :=
     (host1.int && irqEnable(0)) ||
     (host2.int && irqEnable(1)) ||
     (host3.int && irqEnable(2)) ||

@@ -15,6 +15,9 @@ case class Ds1302Device() extends Component {
     val ds1302 = master(Ds1302())
   }
 
+  // This device does not generate interrupt requests.
+  io.bus.irq := False
+
   // New divided clock (250 KHz for 25 MHz clock)
   val divider = CounterFreeRun(50)
   val rtcClock = Reg(Bool()) init False

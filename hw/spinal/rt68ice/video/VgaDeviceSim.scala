@@ -97,17 +97,17 @@ object VgaDeviceSim extends App {
     }
 
     writeControlRegister(byteOffset = 4, data16Bit = 1)
-    assert(!dut.io.int.toBoolean, "VBL interrupt was active before vertical blank")
+    assert(!dut.io.bus.irq.toBoolean, "VBL interrupt was active before vertical blank")
 
     var pixelClocks = 0
-    while(!dut.io.int.toBoolean && pixelClocks < 430_000) {
+    while(!dut.io.bus.irq.toBoolean && pixelClocks < 430_000) {
       dut.vgaCd.waitRisingEdge()
       pixelClocks += 1
     }
-    assert(dut.io.int.toBoolean, "VBL did not raise an interrupt within one frame")
+    assert(dut.io.bus.irq.toBoolean, "VBL did not raise an interrupt within one frame")
 
     dut.clockDomain.waitRisingEdge(4)
-    assert(dut.io.int.toBoolean, "VBL interrupt was not held pending")
+    assert(dut.io.bus.irq.toBoolean, "VBL interrupt was not held pending")
 
     dut.io.bus.address #= 2
     dut.io.bus.wr #= false
@@ -122,7 +122,7 @@ object VgaDeviceSim extends App {
     dut.io.bus.ctrlSel #= false
     dut.io.bus.uds #= false
     dut.io.bus.lds #= false
-    assert(!dut.io.int.toBoolean, "Reading IRQ_STATUS did not clear the VBL interrupt")
+    assert(!dut.io.bus.irq.toBoolean, "Reading IRQ_STATUS did not clear the VBL interrupt")
 
     println(s"[SIM] VBL interrupt asserted after $pixelClocks pixel clocks and cleared on status read")
 

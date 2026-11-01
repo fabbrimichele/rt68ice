@@ -16,6 +16,9 @@ case class Mem16Bit(sizeInWords: Int, initFile: Option[String] = None, readOnly:
     val bus     = slave(M68KDeviceBus())
   }
 
+  // This device does not generate interrupt requests.
+  io.bus.irq := False
+
   val mem = Mem(Bits(DATA_WIDTH bits), sizeInWords)
   initFile.foreach { filename => mem.init(readContentFromFile(filename)) }
 

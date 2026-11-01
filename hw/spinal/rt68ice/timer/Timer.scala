@@ -37,7 +37,6 @@ case class Timer() extends Component {
 
   val io = new Bundle {
     val bus = slave(M68KDeviceBus())
-    val int = out Bool()
   }
 
   val enabled = RegInit(False)
@@ -54,7 +53,7 @@ case class Timer() extends Component {
   // producing a torn 32-bit VALUE read on the 68000's 16-bit data bus.
   val valueLowLatch = Reg(Bits(16 bits)) init 0
 
-  io.int := interruptPending && interruptEnable
+  io.bus.irq := interruptPending && interruptEnable
 
   val wordAddress = io.bus.address(3 downto 1).asUInt
   val registerRead = io.bus.sel && !io.bus.wr && (io.bus.uds || io.bus.lds)

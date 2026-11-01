@@ -14,6 +14,9 @@ case class SpiMasterDevice(config: SpiMasterConfig) extends Component {
     val spis = Vec(master(Spi()), config.portCount)
   }
 
+  // This device does not generate interrupt requests.
+  io.bus.irq := False
+
   val spiMaster = new SpiMasterBB
   // The address decoder remains selected while the CPU holds an SPI address
   // between transactions.  Qualify it with a byte-lane strobe so the VHDL

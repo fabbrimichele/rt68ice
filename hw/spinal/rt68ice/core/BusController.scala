@@ -32,12 +32,6 @@ case class BusController() extends Component {
     val spiBus      = master(M68KDeviceBus())
     val psgBus      = master(M68KDeviceBus())
     val ds1302Bus   = master(M68KDeviceBus())
-
-    // Interrupts
-    val uartInt     = in Bool()
-    val usbInt      = in Bool()
-    val timerInt    = in Bool()
-    val videoInt    = in Bool()
   }
 
   // ---------------------------
@@ -86,13 +80,13 @@ case class BusController() extends Component {
   // ------------------------
   // Only autovectors are used for interrupts
   // IPL is active low
-  when(io.usbInt) {
+  when(io.usbBus.irq) {
     io.ipl := B"001"        // bitwise not 6
-  } elsewhen io.timerInt {
+  } elsewhen io.timerBus.irq {
     io.ipl := B"010"        // bitwise not 5
-  } elsewhen io.videoInt {
+  } elsewhen io.videoBus.irq {
     io.ipl := B"011"        // bitwise not 4
-  } elsewhen io.uartInt {
+  } elsewhen io.uartBus.irq {
     io.ipl := B"100"        // bitwise not 3
   } otherwise {
     io.ipl := B"111"        // bitwise not 0

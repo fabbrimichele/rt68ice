@@ -14,6 +14,9 @@ case class LedArrayDevice() extends Component {
     val leds = out Bits (16 bits)
   }
 
+  // This device does not generate interrupt requests.
+  io.bus.irq := False
+
   val ledsReg = Reg(Bits(16 bits)) init 0
   io.leds := ~ledsReg
 

@@ -3,10 +3,16 @@
 ## Internal bus bundles
 
 `M68KBusSignals` defines the common address, data, direction, and byte-strobe
-signals. `M68KBus` is the CPU-facing interface. Decoded peripherals use
-`M68KDeviceBus`, which adds `sel`, so the bus and its selection connect together
+signals. `M68KBus` is the CPU-facing interface. `M68KDeviceBusSignals` adds the common
+interrupt response for peripheral bundles. Decoded peripherals use
+`M68KDeviceBus`, which adds `sel` and an active-high device-to-controller `irq`,
+so data, selection, and interrupt requests connect together
 with `<>`. Video uses `M68KVideoBus`, containing the same common signals plus
-`fbSel`, `palSel`, and `ctrlSel` for its three address regions.
+`fbSel`, `palSel`, and `ctrlSel` for its three address regions, plus `irq`.
+Devices without interrupts explicitly drive `irq` low. Interrupt requests are
+independent of selection; masking, acknowledgement, and clock-domain crossing
+remain within the existing device logic. Interrupt priority remains centralized
+in `BusController` (USB 6, timer 5, video 4, UART 3).
 
 The address map and decoding priority remain centralized in `BusController`.
 It also preserves the separate gated-write and held-direction wiring groups.

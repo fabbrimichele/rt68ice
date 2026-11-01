@@ -22,7 +22,6 @@ case class VgaDevice(vgaCd: ClockDomain) extends Component {
 
   val io = new Bundle {
     val bus     = slave(M68KVideoBus())
-    val int     = out Bool()
     val vga     = master(Vga(rgbConfig))
   }
 
@@ -72,7 +71,7 @@ case class VgaDevice(vgaCd: ClockDomain) extends Component {
     interruptPending := False
   }
 
-  io.int := interruptPending && interruptEnable
+  io.bus.irq := interruptPending && interruptEnable
 
   // ------------------------------------------------------------------
   // 68000 bus side: Framebuffer (Interleaved) + Device data out

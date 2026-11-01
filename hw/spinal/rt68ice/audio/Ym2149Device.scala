@@ -13,6 +13,9 @@ case class Ym2149Device() extends Component {
     val pwmAudio = out Bool() // PWM sound
   }
 
+  // This device does not generate interrupt requests.
+  io.bus.irq := False
+
   private val enable4Mhz = new Area {
     // Fractional divider: four ticks per 25 cycles of the 25 MHz system clock.
     // Tick intervals are six or seven cycles (4 MHz on average).

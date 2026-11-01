@@ -17,16 +17,15 @@ case class Ym2149BusHarness() extends Component {
   val psg = Ym2149Device()
   controller.io.cpuBus <> io.bus
   controller.io.busState := io.busState
-  controller.io.uartInt := False
-  controller.io.usbInt := False
-  controller.io.timerInt := False
-  controller.io.videoInt := False
   Seq(
     controller.io.romBus, controller.io.ramBus, controller.io.ledBus,
     controller.io.uartBus, controller.io.videoBus, controller.io.sdRamBus,
     controller.io.counterBus, controller.io.ledsBus, controller.io.usbBus,
-    controller.io.timerBus, controller.io.spiBus
-  ).foreach(_.dataIn := 0)
+    controller.io.timerBus, controller.io.spiBus, controller.io.ds1302Bus
+  ).foreach { port =>
+    port.dataIn := 0
+    port.irq := False
+  }
   psg.io.bus <> controller.io.psgBus
 
   io.cpuClkEn := io.sdRamClkEn && controller.io.clockEn && psg.io.cpuClkEn
