@@ -1,6 +1,6 @@
 package rt68ice.io
 
-import rt68ice.core.M68KBus
+import rt68ice.core.M68KDeviceBus
 import spinal.core._
 import spinal.lib.com.uart.Uart
 import spinal.lib._
@@ -9,8 +9,7 @@ import spinal.lib._
 //noinspection ScalaWeakerAccess
 case class T16450Device() extends Component {
   val io = new Bundle {
-    val bus = slave(M68KBus())
-    val sel = in Bool() // chip select from decoder
+    val bus = slave(M68KDeviceBus())
     val int = out Bool() // UART interrupt
     val uart = master(Uart())
   }
@@ -19,7 +18,7 @@ case class T16450Device() extends Component {
 
   // Default Settings (Copied from MG68)
   uart.io.RClk := uart.io.BaudOut
-  uart.io.CS_n := !io.sel
+  uart.io.CS_n := !io.bus.sel
   uart.io.Rd_n := io.bus.wr
   uart.io.Wr_n := !io.bus.wr
   uart.io.A := io.bus.address(3 downto 1)

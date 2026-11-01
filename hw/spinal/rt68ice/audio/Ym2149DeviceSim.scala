@@ -28,7 +28,7 @@ case class Ym2149BusHarness() extends Component {
     controller.io.timerBus, controller.io.spiBus
   ).foreach(_.dataIn := 0)
   psg.io.bus <> controller.io.psgBus
-  psg.io.sel := controller.io.psgSel
+
   io.cpuClkEn := io.sdRamClkEn && controller.io.clockEn && psg.io.cpuClkEn
 }
 

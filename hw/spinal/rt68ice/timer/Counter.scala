@@ -1,6 +1,6 @@
 package rt68ice.timer
 
-import rt68ice.core.M68KBus
+import rt68ice.core.M68KDeviceBus
 import spinal.core._
 import spinal.lib._
 
@@ -10,8 +10,7 @@ import scala.language.postfixOps
 //noinspection ScalaWeakerAccess
 case class Counter() extends Component {
   val io = new Bundle {
-    val bus = slave(M68KBus())
-    val sel = in Bool()
+    val bus = slave(M68KDeviceBus())
   }
 
   // Free running 32-bit counter
@@ -23,7 +22,7 @@ case class Counter() extends Component {
 
   io.bus.dataIn := 0
 
-  when(io.sel && !io.bus.wr) {
+  when(io.bus.sel && !io.bus.wr) {
     val addrWord = io.bus.address(2 downto 1) // We only care about word alignment
 
     switch(addrWord) {

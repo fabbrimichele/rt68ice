@@ -1,6 +1,6 @@
 package rt68ice.io
 
-import rt68ice.core.M68KBus
+import rt68ice.core.M68KDeviceBus
 import spinal.core._
 import spinal.lib.{BufferCC, CounterFreeRun, master, slave}
 
@@ -10,8 +10,7 @@ import scala.language.postfixOps
 //noinspection ScalaWeakerAccess
 case class Ds1302Device() extends Component {
   val io = new Bundle {
-    val bus = slave(M68KBus())
-    val sel = in Bool()
+    val bus = slave(M68KDeviceBus())
     val cpuClkEn = out Bool()
     val ds1302 = master(Ds1302())
   }
@@ -54,7 +53,7 @@ case class Ds1302Device() extends Component {
   private val writeData = Reg(Bits(8 bits)) init 0
   private val readData = Reg(Bits(8 bits)) init 0
   private val requestActive = Reg(Bool()) init False
-  private val selected = io.sel && io.bus.uds
+  private val selected = io.bus.sel && io.bus.uds
   private val newPhase = io.bus.address =/= address || io.bus.wr =/= write
   private val busy = BufferCC(ds1302.io.BUSY, init = False)
   // The serial result settles before BUSY falls. Capture these synchronized

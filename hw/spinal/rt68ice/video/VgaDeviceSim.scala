@@ -35,9 +35,9 @@ object VgaDeviceSim extends App {
     // ------------------------------------------------------------
     // 3. Initialize Inputs to Safe Default States
     // ------------------------------------------------------------
-    dut.io.fbSel #= false
-    dut.io.palSel #= false
-    dut.io.ctrlSel #= false
+    dut.io.bus.fbSel #= false
+    dut.io.bus.palSel #= false
+    dut.io.bus.ctrlSel #= false
     dut.io.bus.wr #= false
     dut.io.bus.address #= 0
     dut.io.bus.dataOut #= 0
@@ -61,12 +61,12 @@ object VgaDeviceSim extends App {
       dut.io.bus.wr #= true
       dut.io.bus.uds #= true
       dut.io.bus.lds #= true
-      dut.io.fbSel #= true
+      dut.io.bus.fbSel #= true
 
       dut.clockDomain.waitRisingEdge()
 
       // Deassert control wires
-      dut.io.fbSel #= false
+      dut.io.bus.fbSel #= false
       dut.io.bus.wr #= false
     }
 
@@ -86,11 +86,11 @@ object VgaDeviceSim extends App {
       dut.io.bus.wr #= true
       dut.io.bus.uds #= true
       dut.io.bus.lds #= true
-      dut.io.ctrlSel #= true
+      dut.io.bus.ctrlSel #= true
 
       dut.clockDomain.waitRisingEdge()
 
-      dut.io.ctrlSel #= false
+      dut.io.bus.ctrlSel #= false
       dut.io.bus.wr #= false
       dut.io.bus.uds #= false
       dut.io.bus.lds #= false
@@ -113,13 +113,13 @@ object VgaDeviceSim extends App {
     dut.io.bus.wr #= false
     dut.io.bus.uds #= true
     dut.io.bus.lds #= true
-    dut.io.ctrlSel #= true
+    dut.io.bus.ctrlSel #= true
     sleep(1)
     assert((dut.io.bus.dataIn.toInt & 1) == 1, "IRQ_STATUS did not report VBL pending")
 
     dut.clockDomain.waitRisingEdge()
     sleep(1)
-    dut.io.ctrlSel #= false
+    dut.io.bus.ctrlSel #= false
     dut.io.bus.uds #= false
     dut.io.bus.lds #= false
     assert(!dut.io.int.toBoolean, "Reading IRQ_STATUS did not clear the VBL interrupt")

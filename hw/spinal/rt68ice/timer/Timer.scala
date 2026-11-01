@@ -1,6 +1,6 @@
 package rt68ice.timer
 
-import rt68ice.core.M68KBus
+import rt68ice.core.M68KDeviceBus
 import spinal.core._
 import spinal.lib._
 
@@ -36,8 +36,7 @@ case class Timer() extends Component {
   import Timer._
 
   val io = new Bundle {
-    val bus = slave(M68KBus())
-    val sel = in Bool()
+    val bus = slave(M68KDeviceBus())
     val int = out Bool()
   }
 
@@ -58,8 +57,8 @@ case class Timer() extends Component {
   io.int := interruptPending && interruptEnable
 
   val wordAddress = io.bus.address(3 downto 1).asUInt
-  val registerRead = io.sel && !io.bus.wr && (io.bus.uds || io.bus.lds)
-  val registerWrite = io.sel && io.bus.wr && (io.bus.uds || io.bus.lds)
+  val registerRead = io.bus.sel && !io.bus.wr && (io.bus.uds || io.bus.lds)
+  val registerWrite = io.bus.sel && io.bus.wr && (io.bus.uds || io.bus.lds)
 
   // Reading STATUS acknowledges the current expiry. Timer operation below has
   // higher priority so an expiry coincident with the read remains pending.

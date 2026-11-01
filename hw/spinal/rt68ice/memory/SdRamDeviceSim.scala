@@ -22,7 +22,7 @@ object SdRamDeviceSim extends App {
       dut.clockDomain.forkStimulus(period = 10)
 
       // 2. Initialize the M68K bus signals to an idle state
-      dut.io.sel #= false
+      dut.io.bus.sel #= false
       dut.io.bus.wr #= false
       dut.io.bus.uds #= false
       dut.io.bus.lds #= false
@@ -42,7 +42,7 @@ object SdRamDeviceSim extends App {
         dut.clockDomain.waitSampling(1)
 
         // Phase 2: Assert Address Strobe (sel)
-        dut.io.sel #= true
+        dut.io.bus.sel #= true
         dut.clockDomain.waitSampling(1)
 
         // Phase 3: Assert Data Strobes (Triggers your wrTrigger)
@@ -57,7 +57,7 @@ object SdRamDeviceSim extends App {
 
         // Hold for one clock to complete the handshake, then deassert
         dut.clockDomain.waitSampling(1)
-        dut.io.sel #= false
+        dut.io.bus.sel #= false
         dut.io.bus.uds #= false
         dut.io.bus.lds #= false
         dut.clockDomain.waitSampling(2) // Bus idle cycles
@@ -70,7 +70,7 @@ object SdRamDeviceSim extends App {
         dut.clockDomain.waitSampling(1)
 
         // Phase 2: Assert Address Strobe and Data Strobes
-        dut.io.sel #= true
+        dut.io.bus.sel #= true
         dut.io.bus.uds #= uds
         dut.io.bus.lds #= lds
 
@@ -95,7 +95,7 @@ object SdRamDeviceSim extends App {
 
         // Handshake complete, deassert
         dut.clockDomain.waitSampling(1)
-        dut.io.sel #= false
+        dut.io.bus.sel #= false
         dut.io.bus.uds #= false
         dut.io.bus.lds #= false
 
@@ -113,7 +113,7 @@ object SdRamDeviceSim extends App {
         dut.io.bus.dataOut #= ((data >> 16) & 0xFFFF).toInt
         dut.clockDomain.waitSampling(1)
 
-        dut.io.sel #= true
+        dut.io.bus.sel #= true
         dut.clockDomain.waitSampling(1)
         dut.io.bus.uds #= uds
         dut.io.bus.lds #= lds
@@ -131,7 +131,7 @@ object SdRamDeviceSim extends App {
         while (!dut.io.cpuClkEn.toBoolean) dut.clockDomain.waitSampling(1)
         dut.clockDomain.waitSampling(1) // End of Phase 2
 
-        dut.io.sel #= false
+        dut.io.bus.sel #= false
         dut.io.bus.uds #= false
         dut.io.bus.lds #= false
         dut.clockDomain.waitSampling(2)
@@ -143,7 +143,7 @@ object SdRamDeviceSim extends App {
         dut.io.bus.wr #= false
         dut.clockDomain.waitSampling(1)
 
-        dut.io.sel #= true
+        dut.io.bus.sel #= true
         dut.io.bus.uds #= uds
         dut.io.bus.lds #= lds
 
@@ -167,7 +167,7 @@ object SdRamDeviceSim extends App {
         val capturedLow = dut.io.bus.dataIn.toInt
         dut.clockDomain.waitSampling(1) // End of Phase 2
 
-        dut.io.sel #= false
+        dut.io.bus.sel #= false
         dut.io.bus.uds #= false
         dut.io.bus.lds #= false
         dut.io.sdRam.dq #= 0

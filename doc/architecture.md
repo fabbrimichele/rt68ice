@@ -1,5 +1,19 @@
 # 68k-FPGA Homebrew Computer
 
+## Internal bus bundles
+
+`M68KBusSignals` defines the common address, data, direction, and byte-strobe
+signals. `M68KBus` is the CPU-facing interface. Decoded peripherals use
+`M68KDeviceBus`, which adds `sel`, so the bus and its selection connect together
+with `<>`. Video uses `M68KVideoBus`, containing the same common signals plus
+`fbSel`, `palSel`, and `ctrlSel` for its three address regions.
+
+The address map and decoding priority remain centralized in `BusController`.
+It also preserves the separate gated-write and held-direction wiring groups.
+RTC selection includes CPU data-cycle qualification before it reaches the
+device. Bundling these signals does not add registers or change the device
+handshakes.
+
 ## Project Goals
 Design and implement a high-performance Motorola 680x0-compatible System-on-a-Chip (SoC) using SpinalHDL, targeting the iCESugar Pro (Lattice ECP5-25F).
 * **EmuTOS:** Boot a fully functional GUI for classic Atari-style productivity.

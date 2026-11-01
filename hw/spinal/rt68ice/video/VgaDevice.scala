@@ -1,6 +1,6 @@
 package rt68ice.video
 
-import rt68ice.core.M68KBus
+import rt68ice.core.M68KVideoBus
 import rt68ice.video.VgaRasterEngine.rgbConfig
 import spinal.core._
 import spinal.lib._
@@ -21,10 +21,7 @@ case class VgaDevice(vgaCd: ClockDomain) extends Component {
   import VgaDevice._
 
   val io = new Bundle {
-    val bus     = slave(M68KBus())
-    val fbSel   = in Bool()
-    val palSel  = in Bool()
-    val ctrlSel = in Bool()
+    val bus     = slave(M68KVideoBus())
     val int     = out Bool()
     val vga     = master(Vga(rgbConfig))
   }
@@ -42,7 +39,7 @@ case class VgaDevice(vgaCd: ClockDomain) extends Component {
   palette.io.uds := io.bus.uds
   palette.io.wr := io.bus.wr
   palette.io.dataOut := io.bus.dataOut
-  palette.io.sel := io.palSel
+  palette.io.sel := io.bus.palSel
 
   // Control register: bits 3-0 select the screen mode. Values 9-15 fall
   // back to 640x480 1bpp; see VgaRasterEngine for the complete mode table.
@@ -52,8 +49,8 @@ case class VgaDevice(vgaCd: ClockDomain) extends Component {
   val interruptPending = RegInit(False)
 
   val wordAddress = io.bus.address(2 downto 1).asUInt
-  val registerRead = io.ctrlSel && !io.bus.wr && (io.bus.uds || io.bus.lds)
-  val registerWrite = io.ctrlSel && io.bus.wr && (io.bus.uds || io.bus.lds)
+  val registerRead = io.bus.ctrlSel && !io.bus.wr && (io.bus.uds || io.bus.lds)
+  val registerWrite = io.bus.ctrlSel && io.bus.wr && (io.bus.uds || io.bus.lds)
 
   when(registerWrite) {
     switch(wordAddress) {
@@ -85,7 +82,7 @@ case class VgaDevice(vgaCd: ClockDomain) extends Component {
   val cpuRamData = framebuffer.readWriteSync(
     address = ramAddress,
     data    = io.bus.dataOut,
-    enable  = io.fbSel,
+    enable  = io.bus.fbSel,
     write   = io.bus.wr,
     mask    = io.bus.uds ## io.bus.lds,
     clockCrossing = true
@@ -99,11 +96,11 @@ case class VgaDevice(vgaCd: ClockDomain) extends Component {
   interruptEnableRead(VerticalBlankInterruptBit) := interruptEnable
 
   io.bus.dataIn := 0
-  when (io.fbSel) {
+  when (io.bus.fbSel) {
     io.bus.dataIn := cpuRamData
-  } elsewhen io.palSel {
+  } elsewhen io.bus.palSel {
     io.bus.dataIn := palette.io.dataIn
-  } elsewhen io.ctrlSel {
+  } elsewhen io.bus.ctrlSel {
     io.bus.dataIn := wordAddress.mux(
       ControlAddress -> ctrlReg,
       InterruptStatusAddress -> interruptStatusRead,

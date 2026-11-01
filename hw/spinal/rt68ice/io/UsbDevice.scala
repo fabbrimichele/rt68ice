@@ -1,6 +1,6 @@
 package rt68ice.io
 
-import rt68ice.core.M68KBus
+import rt68ice.core.M68KDeviceBus
 import spinal.core._
 import spinal.lib._
 
@@ -10,8 +10,7 @@ import scala.language.postfixOps
 //noinspection ScalaWeakerAccess
 case class UsbDevice(usbCd: ClockDomain) extends Component {
   val io = new Bundle {
-    val bus   = slave(M68KBus())
-    val sel   = in Bool()
+    val bus   = slave(M68KDeviceBus())
     val int   = out Bool()
     val usb1  = master(Usb())
     val usb2  = master(Usb())
@@ -155,10 +154,10 @@ case class UsbDevice(usbCd: ClockDomain) extends Component {
   // The USB map uses 16-bit registers.  Keep the global interrupt registers
   // at word offsets 0-1 and reserve a 16-word block for each host.
   val wordAddress = io.bus.address(7 downto 1)
-  val registerRead = io.sel &&
+  val registerRead = io.bus.sel &&
     !io.bus.wr &&
     (io.bus.uds || io.bus.lds)
-  val registerWrite = io.sel &&
+  val registerWrite = io.bus.sel &&
     io.bus.wr &&
     (io.bus.uds || io.bus.lds)
 
@@ -189,7 +188,7 @@ case class UsbDevice(usbCd: ClockDomain) extends Component {
   val interruptStatus = (host4.int ## host3.int ## host2.int ## host1.int).resize(16)
 
   io.bus.dataIn := 0
-  when(io.sel) {
+  when(io.bus.sel) {
     when(!io.bus.wr) {
       // Read
       io.bus.dataIn := wordAddress.mux(

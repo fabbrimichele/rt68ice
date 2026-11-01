@@ -1,6 +1,6 @@
 package rt68ice.audio
 
-import rt68ice.core.M68KBus
+import rt68ice.core.M68KDeviceBus
 import spinal.core._
 import spinal.lib._
 
@@ -8,8 +8,7 @@ import scala.language.postfixOps
 
 case class Ym2149Device() extends Component {
   val io = new Bundle {
-    val bus = slave(M68KBus())
-    val sel = in Bool() // chip select from decoder
+    val bus = slave(M68KDeviceBus())
     val cpuClkEn = out Bool() // Hold the CPU until the PSG access completes.
     val pwmAudio = out Bool() // PWM sound
   }
@@ -46,7 +45,7 @@ case class Ym2149Device() extends Component {
     - reading from A1=1 usually results in an inactive bus.
   */
   // Qualify the address decode with a byte strobe, as on the SPI peripheral.
-  private val psgSel = io.sel && (io.bus.uds || io.bus.lds)
+  private val psgSel = io.bus.sel && (io.bus.uds || io.bus.lds)
   private object AccessState extends SpinalEnum {
     val IDLE, LATCH, SETUP, WAIT_TICK, CAPTURE, DONE = newElement()
   }

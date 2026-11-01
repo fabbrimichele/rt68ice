@@ -1,6 +1,6 @@
 package rt68ice.io
 
-import rt68ice.core.M68KBus
+import rt68ice.core.M68KDeviceBus
 import spinal.core._
 import spinal.lib._
 
@@ -10,8 +10,7 @@ case class SpiMasterConfig(portCount: Int)
 
 case class SpiMasterDevice(config: SpiMasterConfig) extends Component {
   val io = new Bundle {
-    val bus = slave(M68KBus())
-    val sel = in Bool() // chip select from decoder
+    val bus = slave(M68KDeviceBus())
     val spis = Vec(master(Spi()), config.portCount)
   }
 
@@ -19,7 +18,7 @@ case class SpiMasterDevice(config: SpiMasterConfig) extends Component {
   // The address decoder remains selected while the CPU holds an SPI address
   // between transactions.  Qualify it with a byte-lane strobe so the VHDL
   // core only sees an actual 68000 bus access, as it did in rt68f via !AS.
-  val spiAccess = io.sel && (io.bus.uds || io.bus.lds)
+  val spiAccess = io.bus.sel && (io.bus.uds || io.bus.lds)
 
   // 68000 bus
   spiMaster.io.addr := io.bus.address(2 downto 1).asBits

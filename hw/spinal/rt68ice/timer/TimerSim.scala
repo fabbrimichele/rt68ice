@@ -7,7 +7,7 @@ object TimerSim extends App {
   Config.sim.compile(Timer()).doSim { dut =>
     dut.clockDomain.forkStimulus(period = 10)
 
-    dut.io.sel #= false
+    dut.io.bus.sel #= false
     dut.io.bus.address #= 0
     dut.io.bus.dataOut #= 0
     dut.io.bus.wr #= false
@@ -21,9 +21,9 @@ object TimerSim extends App {
       dut.io.bus.uds #= uds
       dut.io.bus.lds #= lds
       dut.io.bus.wr #= true
-      dut.io.sel #= true
+      dut.io.bus.sel #= true
       dut.clockDomain.waitSampling()
-      dut.io.sel #= false
+      dut.io.bus.sel #= false
       dut.io.bus.wr #= false
       sleep(1)
     }
@@ -33,11 +33,11 @@ object TimerSim extends App {
       dut.io.bus.uds #= true
       dut.io.bus.lds #= true
       dut.io.bus.wr #= false
-      dut.io.sel #= true
+      dut.io.bus.sel #= true
       sleep(1)
       val result = dut.io.bus.dataIn.toInt
       dut.clockDomain.waitSampling()
-      dut.io.sel #= false
+      dut.io.bus.sel #= false
       result
     }
 
