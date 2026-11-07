@@ -1,11 +1,11 @@
 # RT68ICE validation results
 
-Recorded: 2026-11-05.
+Recorded: 2026-11-05. Updated with SPI CPU word-access results: 2026-11-07.
 
 These results summarize tests run on the board by the user and reported during
-the EmuTOS porting session. They provide an initial CPU and memory stability
-baseline, rather than exhaustive hardware certification. Times below are those
-reported by the test programs; they were not independently measured.
+the EmuTOS porting session. They provide an initial CPU, memory and storage
+stability baseline, rather than exhaustive hardware certification. Times below
+are those reported by the test programs; they were not independently measured.
 
 ## Configuration and provenance
 
@@ -38,6 +38,8 @@ captured. The display mode used during testing was not recorded.
 | --- | --- | --- |
 | Atari CoreMark 1.0 | Five supplied runs at 7.013069 iterations/s; all validated | Repeatable CPU workload and performance baseline |
 | YAARTTT 0.2.3, ST-RAM | Ten complete passes, pass 11 at its final test; zero reported errors | Strong initial evidence for free SDRAM integrity |
+| GEMDOS filetest on SD | Three 1 MiB passes and four 4 MiB passes verified; longer run incomplete | Promising initial file-I/O integrity; persistence check pending |
+| SD sequential file I/O | Three verified 4 MiB passes per version; latest CPU word-access driver achieves 245.0 KiB/s write and 293.0 KiB/s read | 18.7% write and 29.9% read improvement over paired-byte register accesses |
 | Dhrystone 2.0, Alcyon 4.14 | Printed value checks passed; inconsistent timing figures | Correctness smoke test; performance reporting unresolved |
 | GEMBench RAM-access test | Bus-error panic | Strong evidence of unsupported Atari hardware access; no RAM score obtained |
 
@@ -124,6 +126,191 @@ tests remain useful.
 
 - [Author's description and downloads](https://www.chzsoft.de/site/hardware/diverse-kleinigkeiten-fur-den-atari-st/#ram-test-software-yaart)
 
+## SD-card file integrity: partial results
+
+Program: generic `filetest.ttp` in the `emutos-apps/filetest` directory.
+It uses GEMDOS file calls, without direct Atari peripheral access. The tested
+executable was the initial uncommitted development build; its hash was not
+captured. These runs preceded the CRLF alignment fix and the addition of
+per-phase timing, so no elapsed-time or throughput results are available.
+
+Each complete pass creates or replaces its own test file, writes a deterministic
+payload, closes the file, reopens it, verifies the header and every payload
+byte, checks the file length at EOF, then closes it again. The seed changes
+between passes. Transfer sizes vary across sector boundaries and the reader
+uses different boundaries from the writer.
+
+| Command | Requested workload | Completed and verified in supplied log | Last visible progress |
+| --- | --- | --- | --- |
+| `filetest run C:\SDTEST.DAT 1 3` | Three passes, 1 MiB payload each | All three passes; `SUCCESS` reported | Complete |
+| `filetest run C:\SDTEST2.DAT 4 25` | Twenty-five passes, 4 MiB payload each | Passes 1 through 4 | Pass 5 writing; 2,108,998 payload bytes reported written |
+
+The shorter run used seeds `0x12345678` through `0x1234567A`. The four completed
+passes of the longer run used `0x12345678` through `0x1234567B`; pass 5 began
+with `0x1234567C`.
+
+Selected output from the longer run:
+
+```text
+Pass 4 WRITE: 4194304 payload bytes, seed 0x1234567B
+  Written 4194304 bytes
+Pass 4 VERIFY: 4194304 payload bytes, seed 0x1234567B
+  Verified 4194304 bytes
+PASS: header, every payload byte and file length verified.
+Pass 5 WRITE: 4194304 payload bytes, seed 0x1234567C
+  Written 1051683 bytes
+  Written 2108998 bytes
+```
+
+This records **19 MiB of successfully written and read-back-verified payload**
+across seven completed passes (3 MiB in the first run plus 16 MiB in the
+second). Header bytes and the incomplete pass-5 write are excluded. No data
+mismatches or file-I/O failures were reported in the supplied execution logs.
+Pass 5 has no completed write or verification result, and completion of the
+requested 25-pass run has not been established.
+
+These are promising initial results for the EmuTOS filesystem, SD driver,
+FPGA SPI interface and card working together. They complement the YAARTTT
+memory results, but do not test every card sector or isolate individual
+components. Immediate readback can involve filesystem caches and does not
+establish reboot persistence or recovery from interrupted writes. A normal
+reboot followed by `filetest verify C:\SDTEST2.DAT` remains pending and requires
+the last write to have finished and closed successfully first.
+
+## SD-card sequential throughput
+
+Command: `filetest speed C:\SPEED.DAT 4 3`.
+Reported on 2026-11-06 using the development build with speed mode; the
+executable hash and card model were not captured.
+
+Each pass writes and reads a 4 MiB payload using 16 KiB blocks. Payload
+preparation and a separate full-content verification occur outside the timed
+transfers. Timings include payload file I/O and close; reads also check EOF.
+These are sequential GEMDOS file-I/O measurements, not raw SPI bus rates.
+
+| Pass | Seed | Write time (s) | Write (KiB/s) | Read time (s) | Read (KiB/s) | Untimed verification |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | `0x12345678` | 47.305 | 86.5 | 52.510 | 78.0 | Passed |
+| 2 | `0x12345679` | 47.210 | 86.7 | 52.530 | 77.9 | Passed |
+| 3 | `0x1234567A` | 47.225 | 86.7 | 52.530 | 77.9 | Passed |
+
+The program reported `SUCCESS: 3 speed passes; untimed verification passed.`
+All three passes verified the header, every payload byte and file length:
+**12 MiB of payload written, timed-read, and separately verified**. The final
+file is retained as `C:\SPEED.DAT`.
+
+Aggregate throughput (total payload divided by total transfer time) is
+**86.7 KiB/s write** and **78.0 KiB/s read**. Write durations span just 0.095 s
+and read durations 0.020 s across the three passes. This establishes a
+consistent baseline for subsequent optimizations, but does not identify
+whether filesystem, driver, CPU/register overhead or card behavior dominates.
+Reboot persistence has not been tested by this run.
+
+### 16-bit SPI payload transfers
+
+Reported on 2026-11-07 after loading the EmuTOS build from branch
+`sd-spi-16bit`. Command: `filetest speed C:\SPEED16.DAT 4 3`.
+The loaded image and benchmark hashes were not captured.
+
+This driver-only change uses the existing FPGA's 16-bit SPI mode through its
+two byte data registers. Each 512-byte payload requires 256 START/completion
+sequences instead of 512. Payload loops avoid per-byte function calls and
+redundant readiness checks. Reads also preload dummy `0xffff` once per block:
+this SPI core retains its TX buffer separately from its RX/TX shift register.
+Commands, tokens, response polling and CRC bytes remain in 8-bit mode.
+
+| Pass | Seed | Write time (s) | Write (KiB/s), printed | Read time (s) | Read (KiB/s), printed | Untimed verification |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | `0x12345678` | 19.855 | 206.2 | 18.170 | 225.4 | Passed |
+| 2 | `0x12345679` | 19.845 | 206.3 | 18.165 | 225.4 | Passed |
+| 3 | `0x1234567A` | 19.850 | 206.3 | 18.165 | 225.4 | Passed |
+
+The program reported `SUCCESS: 3 speed passes; untimed verification passed.`
+All three passes verified the header, every payload byte and file length,
+covering another **12 MiB of payload**. Write durations span 0.010 s and read
+durations span 0.005 s. The final file is retained as `C:\SPEED16.DAT`.
+
+| Operation | Original byte-mode baseline (KiB/s) | 16-bit payload mode (KiB/s) | Speedup |
+| --- | --- | --- | --- |
+| Write | 86.7 | 206.3 | 2.38x |
+| Read | 78.0 | 225.5 | 2.89x |
+
+Aggregate rates are calculated from total payload divided by summed durations;
+speedup uses those unrounded rates. The aggregate read rate rounds to 225.5,
+whereas FILETEST prints 225.4 for each individual pass.
+
+The improvement strongly supports CPU/driver overhead as a major bottleneck.
+It exceeds 2x because the change removes additional per-byte work as well as
+halving the number of START/completion sequences. Individual contributions
+have not been profiled, and these remain filesystem-level measurements.
+
+Next, run the mixed-size integrity workload on this build and verify the final
+speed file after a normal reboot with `filetest verify C:\SPEED16.DAT`.
+Reboot persistence is still pending. Profile the remaining sector-transfer and
+filesystem costs before deciding on further buffering or native four-bit SD.
+
+### CPU word-access SPI interface
+
+Reported on 2026-11-07 using FPGA branch `spi-16bit-databus` and EmuTOS
+branch `sd-spi-word-access`. Loaded bitstream, image and benchmark hashes
+were not captured. The new interface exposes word data at `$F20000`, received
+low byte at `$F20001`, byte command/status at `$F20003` and byte configuration
+at `$F20005`. SPI remains at 12.5 MHz for normal SD operation.
+
+The controller and wrapper now accept complete CPU word data accesses.
+EmuTOS uses these for payload pairs, with direct word RAM accesses for aligned
+buffers and byte packing/unpacking for unaligned buffers. Commands and tokens
+remain 8-bit SPI transfers. Byte status reads retain direct BUSY polling.
+
+Hardware/monitor checks reported before the EmuTOS file tests:
+
+- `loadflash` completed image loading and CRC validation at `$00D80000`.
+- The read-only flash example reported JEDEC ID `EF4019`, status `00`, and
+  matching results from two reads, with no writes performed.
+- The SD smoke test initialized the card and read LBA 0 with signature `$55AA`.
+
+Mixed-size integrity command: `filetest run C:\CHECKW.DAT 1 3`.
+All three write/close/reopen/verify passes succeeded, covering **3 MiB** of
+payload with seeds `0x12345678` through `0x1234567A`.
+
+| Pass | Write time (s) | Write (KiB/s), printed | Verify time (s) | Verify (KiB/s), printed |
+| --- | --- | --- | --- | --- |
+| 1 | 20.300 | 50.4 | 20.015 | 51.1 |
+| 2 | 19.695 | 51.9 | 20.200 | 50.6 |
+| 3 | 19.910 | 51.4 | 20.225 | 50.6 |
+
+These end-to-end times include pattern generation or comparison and progress
+output; they are separate from the sequential file-I/O benchmark below.
+
+Sequential command: `filetest speed C:\SPEEDW.DAT 4 3`.
+
+| Pass | Seed | Write time (s) | Write (KiB/s), printed | Read time (s) | Read (KiB/s), printed | Untimed verification |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | `0x12345678` | 16.475 | 248.6 | 13.970 | 293.1 | Passed |
+| 2 | `0x12345679` | 16.930 | 241.9 | 13.980 | 292.9 | Passed |
+| 3 | `0x1234567A` | 16.760 | 244.3 | 13.990 | 292.7 | Passed |
+
+The program reported `SUCCESS: 3 speed passes; untimed verification passed.`
+All headers, payload bytes and file lengths passed: **12 MiB** of sequential
+payload plus the 3 MiB mixed-size run above. The final speed file is retained
+as `C:\SPEEDW.DAT`. Read durations span 0.020 s; write durations span 0.455 s.
+
+| Driver/interface | Aggregate write (KiB/s) | Aggregate read (KiB/s) |
+| --- | --- | --- |
+| Original byte SPI transfers | 86.7 | 78.0 |
+| 16-bit SPI through separate data-byte registers | 206.3 | 225.5 |
+| 16-bit SPI through CPU word data accesses | 245.0 | 293.0 |
+
+Rates use total payload divided by summed durations. Relative to the previous
+16-bit SPI driver, the latest run improves writes by **18.7%** and reads by
+**29.9%**. Relative to the original driver, it is **2.83x** faster for writes and
+**3.76x** for reads. This is a filesystem-level comparison; it does not isolate
+individual CPU instructions, filesystem costs or card behavior.
+
+The tested scope is a useful stopping point before adding automatic block
+transfers or FPGA buffering. Reboot persistence for this version remains
+pending: after a normal reboot run `filetest verify C:\SPEEDW.DAT`.
+
 ## Dhrystone: timing unresolved
 
 Program identifies itself as Dhrystone 2.0, compiled with DRI/Alcyon 4.14 and
@@ -183,9 +370,12 @@ It requires adaptation before it can provide a meaningful RAM-access result.
 
 - Add byte-lane preservation and mixed byte/word/longword checks on memory
   allocated through GEMDOS.
-- Repeatedly write, close, reopen and read back test files on SD, checking
-  contents or checksums under EmuTOS.
+- Complete the longer SD filetest run (or start a new run with a new filename),
+  then reboot normally after a successful close and verify the retained file.
+  Initial repeated write/close/reopen/readback checks have passed as recorded
+  above; do not count the incomplete pass as verified.
 - Record loaded bitstream and EmuTOS image hashes for future runs.
 
 Full original logs are not stored in this report; the CoreMark output and
-selected YAART/GEMBench evidence above were transcribed from the supplied logs.
+selected YAART, SD filetest and GEMBench evidence above were transcribed from
+the supplied logs.

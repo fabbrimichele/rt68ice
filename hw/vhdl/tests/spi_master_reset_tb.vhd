@@ -10,8 +10,9 @@ architecture test of spi_master_reset_tb is
     signal cs : std_logic := '0';
     signal rw : std_logic := '1';
     signal addr : std_logic_vector(1 downto 0) := "00";
-    signal data_in : std_logic_vector(7 downto 0) := x"00";
-    signal data_out, spi_cs_n : std_logic_vector(7 downto 0);
+    signal data_in : std_logic_vector(15 downto 0) := x"0000";
+    signal data_out : std_logic_vector(15 downto 0);
+    signal spi_cs_n : std_logic_vector(7 downto 0);
     signal irq, spi_mosi, spi_clk : std_logic;
 begin
     clk <= not clk after 5 ns;
@@ -25,7 +26,7 @@ begin
         procedure command(value : std_logic_vector(7 downto 0)) is
         begin
             wait until rising_edge(clk);
-            cs <= '1'; rw <= '0'; addr <= "10"; data_in <= value;
+            cs <= '1'; rw <= '0'; addr <= "01"; data_in <= x"00" & value;
             wait until falling_edge(clk);
             wait for 1 ns;
             cs <= '0'; rw <= '1';

@@ -18,14 +18,35 @@ zero, with selection disabled. The controller shares its clock generator and
 transfer settings between devices; firmware must finish and deselect one
 device before selecting another and set the appropriate transfer configuration.
 
-The CPU accesses the controller's registers using low-byte accesses:
+The data register accepts word reads/writes (both UDS and LDS asserted),
+and low-byte reads at `$F20001`. Partial data writes are ignored.
+Command/status and configuration also accept low-byte accesses using LDS.
+The wrapper handles CPU byte lanes; the core keeps a generic 16-bit interface.
+Upper-byte-only accesses are ignored and return zero.
 
 | Address | Register |
 | --- | --- |
-| `$F20001` | Data low byte |
-| `$F20003` | Data high byte |
-| `$F20005` | Command/status |
-| `$F20007` | Transfer length and clock divider |
+| `$F20000` / read byte `$F20001` | 16-bit transmit buffer / received shift register |
+| `$F20002` / byte `$F20003` | Command/status |
+| `$F20004` / byte `$F20005` | Transfer length and clock divider |
+| `$F20006` | Reserved |
+
+Assembly definitions are shared in `sw/lib/asm/mem_map_spi.asm`, with one
+name per register: `SPI_DATA` at `$F20000`, `SPI_STATUS` at `$F20003`, and
+`SPI_CONFIG` at `$F20005`. The monitor and SPI examples use `move.w` for data
+writes, `move.b SPI_DATA+1` for received bytes,
+`move.b` for command/configuration writes, and `btst #0,SPI_STATUS` for direct
+BUSY polling. Memory `btst` performs a byte read on the 68000, so status uses
+the odd low-byte address. The wrapper still supports word control accesses at
+the even addresses shown above; the assembly definitions use byte control
+accesses consistently.
+
+The CPU register width is independent of the selected SPI transfer length.
+The monitor and examples keep 8-bit SPI transfers, using the low data byte
+without an extra receive-mask instruction. As with any `move.b` to a data
+register, the upper CPU register bits remain unchanged; callers use the low byte. This interface requires matching FPGA,
+monitor and application software. The previous split data-byte registers and
+old control addresses are no longer supported.
 
 Command bits 6:4 select the port, bit 1 asserts chip select, and bit 0 starts a
 transfer. With interrupts disabled in the SPI controller, use:

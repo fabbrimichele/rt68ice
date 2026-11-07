@@ -1,3 +1,5 @@
+; Legacy SD sector-read example adapted to the word-data spi_master interface.
+; Uses 8-bit SPI transfers at the conservative initialization clock.
 PRINT MACRO
     LEA     \1,A0
     BSR     put_str
@@ -74,10 +76,8 @@ SD_INIT:
     MOVE.B  #$FF,D0
     MOVE.B  #$FF,D1
 
-    ; Detect card
-    MOVE.B  SD_CTRL,D4      ; Check status
-    BTST    #5,D4           ; Test card detect
-    BEQ     .ERR            ; Bit 5 = 0 card no detected, err
+    ; This SPI core has no card-detect flag; initialization tests card presence.
+    move.b  #$0E,SD_CONFIG  ; 8-bit SPI, clk/128 (195.3125 kHz)
 
     ; Reset
     BSR     SD_RESET
@@ -122,14 +122,14 @@ SD_INIT:
     RTS
 
 ; -----------------------------------------
-; SD_READ_SEC: Sends CMD10 (Read block)
+; SD_READ_SEC: Sends CMD17 (Read block)
 ; Inputs: D1.L = Sector address (4 bytes)
 ;         A1   = Dest buffer (512 bytes)
 ; Output: D2   = result, if 0 OK else ERROR
 ; -----------------------------------------
 SD_READ_SEC:
     MOVEM.L D0-D1/A0-A1,-(SP)
-    MOVE.B  #$00,SD_CTRL    ; Set CS low (active)
+    BSR     SD_SELECT      ; Assert SD chip select
 
     ; CMD17 is created dinamically because of the sector address
     LEA     CMD_BUFF,A0
@@ -154,7 +154,7 @@ SD_READ_SEC:
     MOVE.B  #$FF,D0         ; Dummy write data
 .WAIT_START:
     BSR     SD_WRITE        ; Clock SPI while wait
-    MOVE.B  SD_DATA,D1      ; Wait until different from $FF
+    move.b  SD_DATA+1,D1      ; Wait until different from $FF
     CMP.B   #$FE,D1
     BNE     .WAIT_START     ; TODO: Implement timeout
 
@@ -162,30 +162,34 @@ SD_READ_SEC:
     MOVE.B  #$FF,D0         ; Dummy write data
     MOVE.W  #511,D2         ; Read 512 bytes (-1 for DBRA)
 .READ_DATA:
+    MOVE.B  #$FF,D0         ; Keep MOSI high while receiving
     BSR     SD_WRITE        ; Clock SPI while wait
-    MOVE.B  SD_DATA,D0      ; Read data
+    move.b  SD_DATA+1,D0      ; Read data
     MOVE.B  D0,(A1)+        ; Copy to buffer
     DBRA    D2,.READ_DATA
 
     ; Read CRC
+    MOVE.B  #$FF,D0
     BSR     SD_WRITE        ; Clock SPI while wait
-    MOVE.B  SD_DATA,D1      ; Read CRC (1st byte)
+    move.b  SD_DATA+1,D1      ; Read CRC (1st byte)
     BSR     SD_WRITE        ; Clock SPI while wait
-    MOVE.B  SD_DATA,D2      ; Read CRC (2nd byte)
+    move.b  SD_DATA+1,D2      ; Read CRC (2nd byte)
     ;MOVE.W  #$01,LEDS
     ; TODO: calculate CRC
     MOVE.B  #0,D1           ; Read successful
 
 .EXIT:
     MOVE.B  D1,D2
+    BSR     SD_DESELECT
     MOVEM.L (SP)+,D0-D1/A0-A1
+    RTS
 
 ; -----------------------------------------
 ; SD_RESET: Resets SD card
 ; -----------------------------------------
 SD_RESET:
     MOVEM.L D0/D1,-(SP)
-    MOVE.B  #$FF,SD_CTRL    ; Set CS high (inactive)
+    BSR     SD_DESELECT    ; Release SD chip select
     MOVE.B  #9,D1           ; Repeat 10-1 times (DBRA)
     MOVE.B  #$FF,D0
 .LOOP:
@@ -201,10 +205,10 @@ SD_RESET:
 ; -----------------------------------------
 SD_CMD:
     MOVEM.L A0,-(SP)
-    MOVE.B  #$00,SD_CTRL    ; Set CS low (active)
+    BSR     SD_SELECT      ; Assert SD chip select
     BSR     SD_SEND_CMD
     BSR     WAIT_R1
-    MOVE.B  #$FF,SD_CTRL    ; Set CS high (inactive)
+    BSR     SD_DESELECT    ; Release SD chip select
     MOVEM.L (SP)+,A0
     RTS
 
@@ -214,7 +218,7 @@ SD_CMD:
 ; -----------------------------------------
 SD_CMD8:
     MOVEM.L A0,-(SP)
-    MOVE.B  #$00,SD_CTRL    ; Set CS low (active)
+    BSR     SD_SELECT      ; Assert SD chip select
     LEA     CMD8,A0
     BSR     SD_SEND_CMD
     BSR     WAIT_R1
@@ -227,9 +231,9 @@ SD_CMD8:
     JSR     SD_WRITE
     JSR     SD_WRITE
     JSR     SD_WRITE
-    MOVE.B  SD_DATA,D0      ; Wait until different from $FF
+    move.b  SD_DATA+1,D0      ; Wait until different from $FF
 .EXIT:
-    MOVE.B  #$FF,SD_CTRL    ; Set CS high (inactive)
+    BSR     SD_DESELECT    ; Release SD chip select
     MOVEM.L (SP)+,A0
     RTS
 
@@ -257,7 +261,7 @@ WAIT_R1:
     MOVE.B  #$FF,D0         ; Dummy write data
 .WAIT:
     BSR     SD_WRITE        ; Clock SPI while wait
-    MOVE.B  SD_DATA,D1      ; Wait until different from $FF
+    move.b  SD_DATA+1,D1      ; Wait until different from $FF
     CMP.B   #$FF,D1
     BEQ     .WAIT
 .EXIT:
@@ -272,11 +276,26 @@ WAIT_R1:
 SD_WRITE:
     MOVEM.L D1,-(SP)
 .WAIT:
-    MOVE.B  SD_CTRL,D1      ; Check status
-    BTST    #6,D1           ; Test TX Ready
-    BEQ     .WAIT           ; Bit 6 = 0 wait
-    MOVE.B  D0,SD_DATA      ; Write data
+    BTST    #0,SPI_STATUS ; BUSY is the only transfer-status flag
+    BNE     .WAIT
+    MOVE.W  D0,SD_DATA      ; Only the low 8 bits are shifted in byte mode
+    MOVE.W  SD_CS_STATE,D1
+    ORI.W   #1,D1           ; START while preserving chip-select state
+    move.b  D1,SD_CTRL
+.DONE_WAIT:
+    BTST    #0,SPI_STATUS
+    BNE     .DONE_WAIT
     MOVEM.L (SP)+,D1
+    RTS
+
+SD_SELECT:
+    MOVE.W  #$02,SD_CS_STATE
+    move.b  #$02,SD_CTRL
+    RTS
+
+SD_DESELECT:
+    MOVE.W  #$00,SD_CS_STATE
+    move.b  #$00,SD_CTRL
     RTS
 
 ; ---------------------------------
@@ -323,6 +342,7 @@ MSG_CMD     DC.B 'CMD: ',NUL
 ; RAM Data Section
 ; ===========================
     section .bss
-CMD_BUFF    DS.B 5
+SD_CS_STATE DS.W 1
+CMD_BUFF    DS.B 6
     ALIGN 2
 SECT_BUFF   DS.B 512

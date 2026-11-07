@@ -2,7 +2,8 @@
 ;
 ; It initializes an SDHC/SDXC card, reads LBA 0, and checks the MBR signature
 ; ($55AA).  The controller has no card-detect or TX-ready flags: status bit 0
-; is BUSY, and every byte transfer requires a DATA_LO write followed by START.
+; is BUSY. Each byte transfer writes the DATA word (low byte transmitted),
+; then writes START to the command word.
 
     section .text, code
 
@@ -19,7 +20,7 @@ start:
     ; The rt68f driver uses /64 with a 16 MHz clock (250 kHz); /128 is the
     ; conservative equivalent on this 25 MHz system and meets SD's <=400 kHz
     ; initialization limit.
-    move.b  #SPI_CONFIG_SLOW,SPI_CONF
+    move.b  #SPI_CONFIG_SLOW,SPI_CONFIG
 
     ; Force the shared core into a known deselected state, then provide at
     ; least 80 clocks with CS high.
@@ -298,16 +299,17 @@ sd_wait_r1:
 ; ---------------------------------------------------------------------------
 spi_transfer:
     movem.l d2,-(sp)
+    moveq   #0,d2
     move.b  d0,d2
     bsr     spi_wait_ready
     tst.b   d0
     bne     .timeout
-    move.b  d2,SPI_DTLW
-    move.b  d1,SPI_CDST
+    move.w  d2,SPI_DATA
+    move.b  d1,SPI_STATUS
     bsr     spi_wait_ready
     tst.b   d0
     bne     .timeout
-    move.b  SPI_DTLW,d0
+    move.b  SPI_DATA+1,d0
     moveq   #0,d1
     bra     .done
 .timeout:
@@ -321,11 +323,11 @@ spi_transfer:
 ; Output: d0.b = 0 ready / 1 timeout.
 ; ---------------------------------------------------------------------------
 spi_wait_ready:
+    ; Status is byte-accessible, allowing direct BUSY polling.
     movem.l d1-d2,-(sp)
     move.w  #$ffff,d2
 .wait:
-    move.b  SPI_CDST,d1
-    btst    #0,d1
+    btst    #0,SPI_STATUS
     beq     .ready
     dbra    d2,.wait
     moveq   #1,d0
@@ -344,18 +346,13 @@ spi_wait_ready:
 spi_set_cs:
     tst.b   d0
     bne     .deselect
-    move.b  #SPI_SELECT_DEVICE0,SPI_CDST
+    move.b  #SPI_SELECT_DEVICE0,SPI_STATUS
     bra     spi_wait_ready
 .deselect:
-    move.b  #SPI_DESELECT_ALL,SPI_CDST
+    move.b  #SPI_DESELECT_ALL,SPI_STATUS
     bra     spi_wait_ready
 
-; Shared spi_master registers: byte accesses must use the odd address.
-SPI_BASE                 equ     $00f20000
-SPI_DTLW                 equ     SPI_BASE+$1
-SPI_DTHI                 equ     SPI_BASE+$3
-SPI_CDST                 equ     SPI_BASE+$5
-SPI_CONF                 equ     SPI_BASE+$7
+    include '../../lib/asm/mem_map_spi.asm'
 
 SPI_DESELECT_ALL         equ     $00
 SPI_SELECT_DEVICE0       equ     $02
