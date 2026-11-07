@@ -28,17 +28,23 @@
 --                   divided by 2, 4, 8 or 16.
 --
 --                   clk, reset, cs, rw, addr, data_in, data_out and irq
---                   represent the System09 bus interface.
+--                   form a generic 16-bit register interface.
 --                   spi_clk, spi_mosi, spi_miso and spi_cs_n are the
 --                   standard SPI signals meant to be routed off-chip.
 --
---                   The SPI core provides for four register addresses
---                   that the CPU can read or writen to:
+--                   addr selects one of these 16-bit registers (indices,
+--                   not CPU byte offsets):
 --
---                   Base + $00 -> DL: Data Low LSB
---                   Base + $01 -> DH: Data High MSB
---                   Base + $02 -> CS: Command/Status
---                   Base + $03 -> CO: Config
+--                   $00 -> DATA: Transmit buffer / received shift register
+--                   $01 -> CS: Command/Status
+--                   $02 -> CO: Config (write only)
+--                   $03 -> Reserved (reads zero, writes ignored)
+--
+--                   CS and CO use only the low bits described below;
+--                   upper write bits are ignored and unused read bits are zero.
+--                   SPI transfer length is independent of register width.
+--                   Sub-word transfers return received data in the low bits;
+--                   the remaining DATA bits are not guaranteed to be zero.
 --
 --                   CS: Write bits:
 --
@@ -115,8 +121,8 @@ entity spi_master is
         cs                 : in  std_logic;
         rw                 : in  std_logic;
         addr               : in  std_logic_vector(1 downto 0);
-        data_in            : in  std_logic_vector(7 downto 0);
-        data_out           : out std_logic_vector(7 downto 0);
+        data_in            : in  std_logic_vector(15 downto 0);
+        data_out           : out std_logic_vector(15 downto 0);
         irq                : out std_logic;
         --+ SPI Interface Signals
         spi_miso           : in  std_logic;
@@ -184,15 +190,13 @@ begin
             if cs = '1' and rw = '0' then
                 case addr is
                     when "00" =>
-                        spi_data_buf(7 downto 0) <= data_in;
+                        spi_data_buf(15 downto 0) <= data_in;
                     when "01" =>
-                        spi_data_buf(15 downto 8) <= data_in;
-                    when "10" =>
                         start      <= data_in(0);
                         spi_cs     <= data_in(1);
                         irq_enable <= data_in(2);
                         spi_addr   <= data_in(6 downto 4);
-                    when "11" =>
+                    when "10" =>
                         spi_clk_divide  <= data_in(2 downto 0);
                         transfer_length <= data_in(4 downto 3);
                     when others =>
@@ -208,10 +212,8 @@ begin
         data_out <= (others => '0');
         case addr is
             when "00" =>
-                data_out <= shift_reg(7 downto 0);
+                data_out <= shift_reg(15 downto 0);
             when "01" =>
-                data_out <= shift_reg(15 downto 8);
-            when "10" =>
                 if state = s_idle then
                     data_out(0) <= '0';
                 else
