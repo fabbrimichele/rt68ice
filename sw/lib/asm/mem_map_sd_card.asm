@@ -1,9 +1,5 @@
-;------------------------------------------------------------------------------------
-; SPI FLASH
-;------------------------------------------------------------------------------------
-SD_BASE      EQU $00F20000
-SD_CTRL      EQU SD_BASE+$1           ; Lower byte status and control reg
-SD_DATA      EQU SD_BASE+$3           ; Lower byte tx and rx data
-
-; SD Card commands
-FL_CMD_RD   EQU 1           ; Read command
+; Legacy SD example aliases for the shared SPI controller (word data, byte control).
+    INCLUDE '../../lib/asm/mem_map_spi.asm'
+SD_CTRL      EQU SPI_STATUS
+SD_DATA      EQU SPI_DATA
+SD_CONFIG    EQU SPI_CONFIG

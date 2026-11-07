@@ -14,8 +14,8 @@ start:
     bsr     spi_wait_ready
     tst.b   d1
     bne     fail_timeout
-    move.b  #$00,SPI_CDST          ; Deselect both devices.
-    move.b  #$0e,SPI_CONF          ; 8-bit, 25 MHz / 128 (~195 kHz).
+    move.b  #$00,SPI_STATUS        ; Deselect both devices.
+    move.b  #$0e,SPI_CONFIG        ; 8-bit, 25 MHz / 128 (~195 kHz).
 
     lea     cmd_id,a0
     moveq   #1,d2
@@ -103,7 +103,7 @@ fail_busy:
 fail_mismatch:
     PRINT   msg_mismatch
 done:
-    move.b  #$00,SPI_CDST          ; Release flash clock and both chip selects.
+    move.b  #$00,SPI_STATUS        ; Release flash clock and both chip selects.
     move.w  d7,sr
     trap    #14
 
@@ -112,7 +112,7 @@ done:
 ; CS stays low throughout, and is released even on failure.
 flash_read:
     movem.l d2-d4/a0-a1,-(sp)
-    move.b  #$12,SPI_CDST          ; Select port 1, leave SD deselected.
+    move.b  #$12,SPI_STATUS        ; Select port 1, leave SD deselected.
     move.w  d2,d4
     subq.w  #1,d4
 .command:
@@ -131,19 +131,20 @@ flash_read:
     move.b  d0,(a1)+
     dbra    d4,.read
 .done:
-    move.b  #$10,SPI_CDST
+    move.b  #$10,SPI_STATUS
     movem.l (sp)+,d2-d4/a0-a1
     rts
 
+; Word data writes, byte data reads/control; SPI transfer length stays 8 bits.
 ; d0 = outgoing byte, returns incoming byte in d0, timeout flag in d1.
 spi_transfer:
-    move.b  d0,SPI_DTLW
-    move.b  #$13,SPI_CDST          ; START must also keep port 1 selected.
+    move.w  d0,SPI_DATA
+    move.b  #$13,SPI_STATUS        ; START must also keep port 1 selected.
     ; Observe BUSY before waiting for completion (START is latched).
     move.l  d2,-(sp)
     move.w  #$ffff,d2
 .started:
-    btst    #0,SPI_CDST
+    btst    #0,SPI_STATUS
     bne     .wait
     dbra    d2,.started
     moveq   #1,d1
@@ -152,16 +153,17 @@ spi_transfer:
     bsr     spi_wait_ready
     tst.b   d1
     bne     .done
-    move.b  SPI_DTLW,d0
+    move.b  SPI_DATA+1,d0
 .done:
     move.l  (sp)+,d2
     rts
 
 spi_wait_ready:
+    ; Status is byte-accessible, allowing direct BUSY polling.
     move.l  d2,-(sp)
     move.w  #$ffff,d2
 .wait:
-    btst    #0,SPI_CDST
+    btst    #0,SPI_STATUS
     beq     .ready
     dbra    d2,.wait
     moveq   #1,d1
@@ -190,9 +192,7 @@ put_hex_byte:
 .emit:
     bra     put_chr
 
-SPI_DTLW equ $00f20001
-SPI_CDST equ $00f20005
-SPI_CONF equ $00f20007
+    include '../../lib/asm/mem_map_spi.asm'
 cmd_id:        dc.b $9f
 cmd_status:    dc.b $05
 ; Dedicated 4-byte read works regardless of the current address mode.

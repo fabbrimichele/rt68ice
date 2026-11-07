@@ -23,19 +23,28 @@ case class SpiMasterDevice(config: SpiMasterConfig) extends Component {
   io.bus.irq := False
 
   val spiMaster = new SpiMasterBB
-  // SEL may remain asserted between CPU transactions. Both active-high
-  // byte-lane strobes must be asserted to access this word-only interface.
-  // Byte accesses do not select the core; it has no byte write enables.
-  val spiAccess = io.bus.sel && io.bus.uds && io.bus.lds
+  // Keep CPU byte-lane decoding here; the core retains a generic word interface.
+  // Data writes require both lanes; low-byte reads are safe and side-effect free.
+  // Control registers only use the low byte, so LDS-only accesses are safe and
+  // allow direct memory BTST polling at base + 3. UDS-only accesses are ignored.
+  val wordAccess = io.bus.uds && io.bus.lds
+  val controlRegister = io.bus.address(2 downto 1) === B"01" ||
+    io.bus.address(2 downto 1) === B"10"
+  val dataByteRead = io.bus.address(2 downto 1) === B"00" && !io.bus.wr && io.bus.lds
+  val spiAccess = io.bus.sel && (wordAccess || (controlRegister && io.bus.lds) || dataByteRead)
 
   // Convert CPU byte addresses to the core's register indices:
   // base + 0: 16-bit data, base + 2: command/status, base + 4: configuration.
+  // Low bytes: data read at base + 1, status at +3, configuration at +5.
   // Base + 6 is reserved. SPI transfer length is configured independently.
   spiMaster.io.addr := io.bus.address(2 downto 1).asBits
   spiMaster.io.cs := spiAccess
   spiMaster.io.data_in := io.bus.dataOut
   spiMaster.io.rw := !io.bus.wr
-  io.bus.dataIn := spiMaster.io.data_out
+  io.bus.dataIn := 0
+  when(spiAccess) {
+    io.bus.dataIn := spiMaster.io.data_out
+  }
   // The core IRQ output is unused; software polls the BUSY status bit.
 
   // SPI bus

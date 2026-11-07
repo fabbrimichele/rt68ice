@@ -6,9 +6,7 @@
 IMAGE_MAGIC equ     $52543638   ; ASCII "RT68"
 FLASH_IMAGE_OFFSET equ $00100000
 FLASH_IMAGE_MAX equ $02000000-FLASH_IMAGE_OFFSET-16
-SPI_DATA equ $00F20001
-SPI_STATUS equ $00F20005
-SPI_CONFIG equ $00F20007
+    include '../../lib/asm/mem_map_spi.asm'
 
 ; ------------------------------
 ; Initial Reset sp and PC in Vector Table
@@ -371,11 +369,12 @@ image_flash_byte:
     move.b  #$ff,d0
     bra     flash_transfer
 
+; Word data writes, byte data reads/control; SPI transfer length stays 8 bits.
 ; Returns d0 = received byte, d6 = 0 success / 1 timeout.
 ; All loader registers other than d0/d6 are preserved.
 flash_transfer:
     move.l  d2,-(sp)
-    move.b  d0,SPI_DATA
+    move.w  d0,SPI_DATA
     move.b  #$13,SPI_STATUS
     move.w  #$ffff,d2
 .started:
@@ -388,12 +387,13 @@ flash_transfer:
     bsr     flash_wait_ready
     tst.b   d6
     bne     .done
-    move.b  SPI_DATA,d0
+    move.b  SPI_DATA+1,d0
 .done:
     move.l  (sp)+,d2
     rts
 
 flash_wait_ready:
+    ; Status is byte-accessible, allowing direct BUSY polling.
     move.l  d2,-(sp)
     move.w  #$ffff,d2
 .wait:
