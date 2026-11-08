@@ -4,6 +4,7 @@ import spinal.core._
 
 import scala.language.postfixOps
 
+//noinspection SpellCheckingInspection
 //noinspection TypeAnnotation
 //noinspection ScalaWeakerAccess
 class TG68KdotCBB extends BlackBox {

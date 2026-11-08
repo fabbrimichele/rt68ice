@@ -6,6 +6,7 @@ import spinal.lib._
 
 import scala.language.postfixOps
 
+//noinspection TypeAnnotation
 case class Ym2149Device() extends Component {
   val io = new Bundle {
     val bus = slave(M68KDeviceBus())

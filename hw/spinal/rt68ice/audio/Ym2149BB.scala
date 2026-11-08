@@ -11,6 +11,9 @@ import scala.language.postfixOps
  * - `pcm14s_o`: Signed 14-bit PCM summation of the channels, with each channel
  *   converted to -/+ zero-centered level or -/+ full-range level
  */
+//noinspection SpellCheckingInspection
+//noinspection TypeAnnotation
+//noinspection ScalaWeakerAccess
 class Ym2149BB extends BlackBox {
   val io = new Bundle {
     val clk_i         = in Bool() // system clock

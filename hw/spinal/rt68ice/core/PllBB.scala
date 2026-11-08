@@ -2,6 +2,7 @@ package rt68ice.core
 
 import spinal.core._
 
+//noinspection SpellCheckingInspection
 //noinspection TypeAnnotation
 //noinspection ScalaWeakerAccess
 class PllBB extends BlackBox {

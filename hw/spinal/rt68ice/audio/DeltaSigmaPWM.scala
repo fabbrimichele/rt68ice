@@ -4,6 +4,8 @@ import spinal.core._
 
 import scala.language.postfixOps
 
+//noinspection ScalaWeakerAccess
+//noinspection TypeAnnotation
 case class DeltaSigmaPWM(sampleSizeInBits: Int = 16) extends Component {
   val io = new Bundle {
     val sound = in UInt(sampleSizeInBits bits)  // Signed sample
