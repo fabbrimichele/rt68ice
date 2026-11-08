@@ -6,7 +6,7 @@ import rt68ice.io._
 import rt68ice.memory.{Mem16Bit, SdRam, SdRamDevice}
 import rt68ice.timer.{Counter, Timer}
 import rt68ice.video.{Gpdi, VgaDevice}
-import spinal.core._
+import spinal.core.{Bool, _}
 import spinal.lib.com.uart.Uart
 import spinal.lib.graphic.hdmi.VgaToHdmiEcp5
 import spinal.lib.master
@@ -19,6 +19,7 @@ case class Rt68IceTopLevel(romFile: String) extends Component {
   val io = new Bundle {
     val led = out Bits(3 bits)
     val leds = out Bits(16 bits)
+    val btn_rst = in Bool()
     val uart = master(Uart()) // Expose UART pins (txd, rxd), must be defined in the constraints file
     val gpdi = master(Gpdi())
     val sdram = master(SdRam())
@@ -33,6 +34,7 @@ case class Rt68IceTopLevel(romFile: String) extends Component {
   }
 
   val clockCtrl = ClockCtrl()
+  clockCtrl.io.resetButton := io.btn_rst
 
   clockCtrl.systemCd {
     // Bus Controller

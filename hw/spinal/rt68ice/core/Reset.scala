@@ -1,26 +1,25 @@
 package rt68ice.core
 
 import spinal.core._
+import spinal.lib.{BufferCC, Timeout}
 
 import scala.language.postfixOps
 
 //noinspection TypeAnnotation
 //noinspection ScalaWeakerAccess
-case class Reset(resetCycles: Int) extends Component {
+case class Reset(time: TimeNumber) extends Component {
   val io = new Bundle {
+    val resetButton = in Bool()
     val resetOut = out Bool()
   }
 
-  private val counter = Reg(UInt(log2Up(resetCycles + 1) bits)) init 0
-  private val resetActive = Reg(Bool()) init True
+  val timer = Timeout(time)
+  val pressedRaw = !io.resetButton
+  val pressedSync = BufferCC(pressedRaw, init = True)
 
-  when(resetActive) {
-    counter := counter + 1
-
-    when(counter === resetCycles - 1) {
-      resetActive := False
-    }
+  when (pressedSync) {
+    timer.clear()
   }
 
-  io.resetOut := resetActive
+  io.resetOut := pressedRaw || pressedSync || !timer.state
 }
