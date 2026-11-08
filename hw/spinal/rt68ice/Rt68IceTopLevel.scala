@@ -13,6 +13,7 @@ import spinal.lib.master
 
 import scala.language.postfixOps
 
+//noinspection SpellCheckingInspection
 //noinspection TypeAnnotation
 //noinspection ScalaWeakerAccess
 case class Rt68IceTopLevel(romFile: String) extends Component {
@@ -20,6 +21,7 @@ case class Rt68IceTopLevel(romFile: String) extends Component {
     val led = out Bits(3 bits)
     val leds = out Bits(16 bits)
     val btn_rst = in Bool()
+    val dip_switches = in Bits(3 bits)
     val uart = master(Uart()) // Expose UART pins (txd, rxd), must be defined in the constraints file
     val gpdi = master(Gpdi())
     val sdram = master(SdRam())
@@ -89,6 +91,11 @@ case class Rt68IceTopLevel(romFile: String) extends Component {
     val ledsDevice = LedArrayDevice()
     io.leds := ledsDevice.io.leds
     bus.io.ledsBus <> ledsDevice.io.bus
+
+    // DIP Switches Device
+    val dipSwitchesDevice = DipSwitchesDevice()
+    dipSwitchesDevice.io.switches := io.dip_switches
+    bus.io.dipSwitchesBus <> dipSwitchesDevice.io.bus
 
     // UART Device
     val uartDevice = T16450Device()

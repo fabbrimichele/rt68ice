@@ -31,6 +31,7 @@ abstract class M68KBusSignals extends Bundle with IMasterSlave {
 case class M68KBus() extends M68KBusSignals
 
 /** Common device responses; active-high IRQ is independent of selection. */
+//noinspection TypeAnnotation
 abstract class M68KDeviceBusSignals extends M68KBusSignals {
   val irq = Bool()
   // High when idle or when the device transfer can complete.
@@ -43,6 +44,7 @@ abstract class M68KDeviceBusSignals extends M68KBusSignals {
 }
 
 /** Decoded device port. SEL retains the device's existing qualification rules. */
+//noinspection TypeAnnotation
 case class M68KDeviceBus() extends M68KDeviceBusSignals {
   val sel = Bool()
 
@@ -53,6 +55,7 @@ case class M68KDeviceBus() extends M68KDeviceBusSignals {
 }
 
 /** Video shares data/address signals across three separately decoded regions. */
+//noinspection TypeAnnotation
 case class M68KVideoBus() extends M68KDeviceBusSignals {
   val fbSel = Bool()
   val palSel = Bool()

@@ -12,7 +12,7 @@ class ClockGenerator extends Component {
   }
 
   // 2-bit counter gives exactly 4 states (0 to 3)
-  val counter = Reg(UInt(2 bits)) init(0)
+  val counter = Reg(UInt(2 bits)) init 0
 
   // Increment on every 32MHz rising edge
   counter := counter + 1

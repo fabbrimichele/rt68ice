@@ -5,7 +5,11 @@ import spinal.core._
 import spinal.core.sim._
 import spinal.lib._
 
+import scala.language.postfixOps
+
 // Include the real bus controller to exercise write gating and the combined enable.
+//noinspection TypeAnnotation
+//noinspection ScalaWeakerAccess
 case class Ym2149BusHarness() extends Component {
   val io = new Bundle {
     val bus = slave(M68KBus())
@@ -21,6 +25,7 @@ case class Ym2149BusHarness() extends Component {
     controller.io.romBus, controller.io.ramBus, controller.io.ledBus,
     controller.io.uartBus, controller.io.videoBus,
     controller.io.counterBus, controller.io.ledsBus, controller.io.usbBus,
+    controller.io.dipSwitchesBus,
     controller.io.timerBus, controller.io.spiBus, controller.io.ds1302Bus
   ).foreach { port =>
     port.dataIn := 0
