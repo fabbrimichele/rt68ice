@@ -1,15 +1,21 @@
 package rt68ice.core
 
 import spinal.core._
-import spinal.lib.ResetCtrl
+import spinal.lib._
 
 import scala.language.postfixOps
 
 //noinspection TypeAnnotation
 //noinspection ScalaWeakerAccess
 case class ClockCtrl() extends Component {
+  val io = new Bundle {
+    val resetButton = in Bool()
+  }
+
   private val pll = new PllBB
-  private val reset = Reset(resetCycles = 25000) // 1 ms at 25 MHz
+
+  private val reset = Reset(20 ms)
+  reset.io.resetButton := io.resetButton
 
   val vgaCd = createClockDomain(
     name = "clkVga",
