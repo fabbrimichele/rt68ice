@@ -6,6 +6,7 @@
 IMAGE_MAGIC equ     $52543638   ; ASCII "RT68"
 FLASH_IMAGE_OFFSET equ $00100000
 FLASH_IMAGE_MAX equ $02000000-FLASH_IMAGE_OFFSET-16
+DIP_SWITCHES equ    $00F2C000   ; word read: logical switch states in bits 2..0
     include '../../lib/asm/mem_map_spi.asm'
 
 ; ------------------------------
@@ -23,8 +24,26 @@ start:
     jsr     uart_init
     lea     msg_title,a0
     bsr     put_str
+
+    ; Read boot settings once per reset. Switch 1 overrides switch 0;
+    ; switch 2 is reserved and does not affect boot selection.
+    move.w  DIP_SWITCHES,d0
+    btst    #1,d0
+    bne     delayed_boot
+    btst    #0,d0
+    bne     immediate_boot  ; switch 0 on: boot immediately
+    lea     msg_boot_monitor,a0
+    bsr     put_str
+    bra     mon_entry      ; both boot switches off: stay in monitor
+
+immediate_boot:
+    lea     msg_boot_immediate,a0
+    bsr     put_str
+    bra     boot_cmd
+
+delayed_boot:
     jsr     wait_for_monitor_key
-    beq     boot_cmd        ; no character pressed start SO (EmuTOS)
+    beq     boot_cmd        ; switch 1 on: boot unless serial ESC cancels
 
 mon_entry:
 new_cmd:
@@ -917,6 +936,8 @@ default_colors
 
 ; Messages
 msg_title           dc.b 'RT68F Monitor v0.1',CR,LF,NUL
+msg_boot_monitor    dc.b 'Boot: monitor',CR,LF,NUL
+msg_boot_immediate  dc.b 'Boot: EmuTOS immediately',CR,LF,NUL
 msg_unknown         dc.b 'Error: Unknown command or syntax',CR,LF,NUL
 msg_help            dc.b 'dump  <ADDR>       - Dump from ADDR (HEX)',CR,LF
                     dc.b 'write <ADDR> <VAL> - Write to ADDR (HEX) the VALUE (HEX)',CR,LF
@@ -926,6 +947,12 @@ msg_help            dc.b 'dump  <ADDR>       - Dump from ADDR (HEX)',CR,LF
                     dc.b 'run   <ADDR>       - Run program at ADDR (HEX)',CR,LF
                     dc.b 'fbclr              - Clear framebuffer',CR,LF
                     dc.b 'help               - Print this list of commands',CR,LF
+                    dc.b CR,LF,'Boot DIP switches (applied on reset):',CR,LF
+                    dc.b 'SW1  SW0  Boot mode',CR,LF
+                    dc.b 'OFF  OFF  Monitor',CR,LF
+                    dc.b 'OFF  ON   EmuTOS immediately',CR,LF
+                    dc.b 'ON   Any  EmuTOS after 10 seconds; serial ESC cancels',CR,LF
+                    dc.b 'SW1 overrides SW0; SW2 is reserved.',CR,LF
                     dc.b NUL
 msg_loading         dc.b 'Loading...',CR,LF,NUL
 msg_load_done       dc.b 'Done.',CR,LF,NUL
@@ -937,7 +964,7 @@ msg_flash_busy      dc.b 'Error: Flash busy or not responding.',CR,LF,NUL
 msg_loaded_at       dc.b 'Loaded at ',NUL
 msg_newline         dc.b CR,LF,NUL
 msg_bus_err         dc.b 'Bus Error!',CR,LF,NUL
-msg_wait_for_key    dc.b 'Press ESC on serial to start monitor (10 seconds)...',CR,LF,NUL
+msg_wait_for_key    dc.b 'Boot: EmuTOS in 10 seconds; ESC on serial enters monitor',CR,LF,NUL
 
 ; Registers names
 msg_d0          dc.b    'd0: ',NUL
