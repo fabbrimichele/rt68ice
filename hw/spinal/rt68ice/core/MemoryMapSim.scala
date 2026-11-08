@@ -21,6 +21,7 @@ object MemoryMapSim extends App {
       dut.io.sdRamBus,
       dut.io.counterBus,
       dut.io.ledsBus,
+      dut.io.dipSwitchesBus,
       dut.io.usbBus,
       dut.io.timerBus,
       dut.io.spiBus, dut.io.psgBus, dut.io.ds1302Bus
@@ -100,6 +101,28 @@ object MemoryMapSim extends App {
 
     driveAddress(0x00f1c000L)
     assert(dut.io.timerBus.sel.toBoolean, "The timer is not mapped at $F1C000")
+
+    dut.io.ds1302Bus.dataIn #= 0x1234
+    for (address <- Seq(0x00f28000L, 0x00f2bffeL)) {
+      driveAddress(address)
+      assert(dut.io.ds1302Bus.sel.toBoolean, "DS1302 is not selected in its address window")
+      assert(!dut.io.dipSwitchesBus.sel.toBoolean, "The DIP-switch window overlaps DS1302")
+      assert(!dut.io.busErr.toBoolean, "A DS1302 read raised BERR")
+      assert(dut.io.cpuBus.dataIn.toInt == 0x1234, "DS1302 read data did not reach the CPU")
+    }
+
+    dut.io.dipSwitchesBus.dataIn #= 5
+    for (address <- Seq(0x00f2c000L, 0x00f2fffeL)) {
+      driveAddress(address)
+      assert(dut.io.dipSwitchesBus.sel.toBoolean, "DIP switches are not selected in their address window")
+      assert(!dut.io.ds1302Bus.sel.toBoolean, "The DS1302 window overlaps DIP switches")
+      assert(!dut.io.busErr.toBoolean, "A DIP-switch read raised BERR")
+      assert(dut.io.cpuBus.dataIn.toInt == 5, "DIP-switch read data did not reach the CPU")
+    }
+
+    driveAddress(0x00f30000L)
+    assert(!dut.io.dipSwitchesBus.sel.toBoolean, "DIP switches respond beyond their address window")
+    assert(dut.io.busErr.toBoolean, "The unmapped address after DIP switches did not raise BERR")
 
     driveAddress(0x00fc0000L)
     assert(dut.io.romBus.sel.toBoolean, "The boot ROM is not mapped at $FC0000")

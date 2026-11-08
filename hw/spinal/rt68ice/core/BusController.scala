@@ -19,19 +19,20 @@ case class BusController() extends Component {
     val ipl       = out Bits(3 bits)
 
     // Slave buses
-    val romBus      = master(M68KDeviceBus())
-    val ramBus      = master(M68KDeviceBus())
-    val ledBus      = master(M68KDeviceBus())
-    val uartBus     = master(M68KDeviceBus())
-    val videoBus    = master(M68KVideoBus())
-    val sdRamBus    = master(M68KDeviceBus())
-    val counterBus  = master(M68KDeviceBus())
-    val ledsBus     = master(M68KDeviceBus())
-    val usbBus      = master(M68KDeviceBus())
-    val timerBus    = master(M68KDeviceBus())
-    val spiBus      = master(M68KDeviceBus())
-    val psgBus      = master(M68KDeviceBus())
-    val ds1302Bus   = master(M68KDeviceBus())
+    val romBus          = master(M68KDeviceBus())
+    val ramBus          = master(M68KDeviceBus())
+    val ledBus          = master(M68KDeviceBus())
+    val uartBus         = master(M68KDeviceBus())
+    val videoBus        = master(M68KVideoBus())
+    val sdRamBus        = master(M68KDeviceBus())
+    val counterBus      = master(M68KDeviceBus())
+    val ledsBus         = master(M68KDeviceBus())
+    val dipSwitchesBus  = master(M68KDeviceBus())
+    val usbBus          = master(M68KDeviceBus())
+    val timerBus        = master(M68KDeviceBus())
+    val spiBus          = master(M68KDeviceBus())
+    val psgBus          = master(M68KDeviceBus())
+    val ds1302Bus       = master(M68KDeviceBus())
   }
 
   // ---------------------------
@@ -112,6 +113,7 @@ case class BusController() extends Component {
   io.videoBus.ctrlSel := False
   io.counterBus.sel := False
   io.ledsBus.sel := False
+  io.dipSwitchesBus.sel := False
   io.usbBus.sel := False
   io.timerBus.sel := False
   io.spiBus.sel := False
@@ -119,7 +121,7 @@ case class BusController() extends Component {
   ds1302AddressSelected := False
   io.videoBus.fbSel := False
   io.sdRamBus.sel := False
-  io.busErr     := False
+  io.busErr := False
 
   // Address Bitmask Definitions
   // TG68K emits a CPU-space interrupt-acknowledge read at $FFFFFFF2-$FFFFFFFE.
@@ -145,6 +147,7 @@ case class BusController() extends Component {
   val spiMapping      = SizeMapping(0x00F20000L, 16 KiB)  // $F20000 - $F23FFF
   val psgMapping      = SizeMapping(0x00F24000L, 16 KiB)  // $F24000 - $F27FFF
   val ds1302Mapping   = SizeMapping(0x00F28000L, 16 KiB)  // $F28000 - $F2BFFF
+  val dipSwitchesMapping = SizeMapping(0x00F2C000L, 16 KiB)  // $F2C000 - $F2FFFF
   val romMapping      = SizeMapping(0x00FC0000L, 16 KiB)  // $FC0000 - $FC3FFF
 
   saveMemoryLayout(
@@ -161,10 +164,12 @@ case class BusController() extends Component {
     "VIDEO CONTROL" -> vidCtrlMapping,
     "COUNTER" -> counterMapping,
     "LED_ARRAY" -> ledsMapping,
+    "DIP SWITCHES" -> dipSwitchesMapping,
     "USB HID HOST" -> usbMapping,
     "TIMER" -> timerMapping,
     "SPI" -> spiMapping,
     "PSG" -> psgMapping,
+    "DS1302" -> ds1302Mapping,
     "MAIN ROM" -> romMapping,
   )
 
@@ -194,6 +199,8 @@ case class BusController() extends Component {
     io.counterBus.sel := True
   } elsewhen ledsMapping.hit(address) {
     io.ledsBus.sel := True
+  } elsewhen dipSwitchesMapping.hit(address) {
+    io.dipSwitchesBus.sel := True
   } elsewhen usbMapping.hit(address) {
     io.usbBus.sel := True
   } elsewhen timerMapping.hit(address) {
@@ -213,8 +220,8 @@ case class BusController() extends Component {
   // ----------------------
   // Separate standard peripherals from the smart SDRAM controller
   val buses = List(
-    io.romBus, io.ramBus, io.ledBus, io.uartBus,
-    io.videoBus, io.counterBus, io.ledsBus, io.usbBus,
+    io.romBus, io.ramBus, io.ledBus, io.uartBus, io.videoBus,
+    io.counterBus, io.ledsBus, io.dipSwitchesBus, io.usbBus,
     io.timerBus, io.spiBus
   )
 
@@ -258,6 +265,8 @@ case class BusController() extends Component {
     io.cpuBus.dataIn := io.counterBus.dataIn
   } elsewhen io.ledsBus.sel {
     io.cpuBus.dataIn := io.ledsBus.dataIn
+  } elsewhen io.dipSwitchesBus.sel {
+    io.cpuBus.dataIn := io.dipSwitchesBus.dataIn
   } elsewhen io.usbBus.sel {
     io.cpuBus.dataIn := io.usbBus.dataIn
   } elsewhen io.timerBus.sel {

@@ -52,9 +52,17 @@ IOBUF       PORT "ds1302_io"      IO_TYPE=LVCMOS33;
 LOCATE      COMP "ds1302_ce"      SITE "N1";
 IOBUF       PORT "ds1302_ce"      IO_TYPE=LVCMOS33;
 
-// BUTTONS
+// RESET BUTTON
 LOCATE      COMP "btn_rst"        SITE "G2";
 IOBUF       PORT "btn_rst"        IO_TYPE=LVCMOS33;
+
+// DIP SWITCHES
+LOCATE      COMP "dip_switches[2]" SITE "L2";
+IOBUF       PORT "dip_switches[2]" IO_TYPE=LVCMOS33;
+LOCATE      COMP "dip_switches[1]" SITE "M2";
+IOBUF       PORT "dip_switches[1]" IO_TYPE=LVCMOS33;
+LOCATE      COMP "dip_switches[0]" SITE "N3";
+IOBUF       PORT "dip_switches[0]" IO_TYPE=LVCMOS33;
 
 // SPI - PMOD SD card in the left P5 position.
 // The PMOD's far connector row maps to P5's far connector row:
