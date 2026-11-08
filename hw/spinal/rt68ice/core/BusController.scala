@@ -164,12 +164,12 @@ case class BusController() extends Component {
     "VIDEO CONTROL" -> vidCtrlMapping,
     "COUNTER" -> counterMapping,
     "LED_ARRAY" -> ledsMapping,
-    "DIP SWITCHES" -> dipSwitchesMapping,
     "USB HID HOST" -> usbMapping,
     "TIMER" -> timerMapping,
     "SPI" -> spiMapping,
     "PSG" -> psgMapping,
     "DS1302" -> ds1302Mapping,
+    "DIP SWITCHES" -> dipSwitchesMapping,
     "MAIN ROM" -> romMapping,
   )
 

@@ -26,7 +26,7 @@ case class DipSwitchesDevice() extends Component {
   when(io.bus.sel) {
     when(!io.bus.wr) {
       // Read
-      io.bus.dataIn := switchesSync.resized
+      io.bus.dataIn := (~switchesSync).resized
     }
   }
 }
