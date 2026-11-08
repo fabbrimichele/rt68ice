@@ -6,7 +6,7 @@ import rt68ice.io._
 import rt68ice.memory.{Mem16Bit, SdRam, SdRamDevice}
 import rt68ice.timer.{Counter, Timer}
 import rt68ice.video.{Gpdi, VgaDevice}
-import spinal.core.{Bool, _}
+import spinal.core._
 import spinal.lib.com.uart.Uart
 import spinal.lib.graphic.hdmi.VgaToHdmiEcp5
 import spinal.lib.master

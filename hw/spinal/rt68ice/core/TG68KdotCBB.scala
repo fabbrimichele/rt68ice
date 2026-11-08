@@ -2,7 +2,6 @@ package rt68ice.core
 
 import spinal.core._
 
-import scala.annotation.unused
 import scala.language.postfixOps
 
 //noinspection TypeAnnotation
