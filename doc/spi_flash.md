@@ -79,7 +79,22 @@ boot
 its payload to the SDRAM address in its header, and prints that address. It
 does not run the image. For EmuTOS, subsequently use `run 00D80000`.
 `boot` performs the same load and verification, then jumps to the header's
-load address only if successful. There is no automatic boot countdown.
+load address only if successful.
+
+At each reset, the monitor reads the DIP-switch register at `$F2C000` once
+and selects the boot policy below. ON means a logical set bit in the register;
+the FPGA inverts the physical switch inputs before exposing them to software.
+
+| Switch 1 | Switch 0 | Startup behavior |
+| --- | --- | --- |
+| OFF | OFF | Enter the monitor immediately. |
+| OFF | ON | Load and boot the flash image immediately (normally EmuTOS). |
+| ON | Either | Wait approximately 10 seconds, then boot; serial ESC cancels to the monitor. |
+
+Switch 1 overrides switch 0. Switch 2 is reserved and currently ignored.
+Change the switches, then press reset to apply a new selection. ESC is read
+from the serial terminal; the monitor does not poll a USB keyboard for this
+startup decision. Image loading or verification failures return to the monitor.
 
 Store the complete **`emutos-rt68ice.img`**, including its 16-byte `RT68`
 header, at this offset, not raw `emutos.img`. The serial `load` command and
