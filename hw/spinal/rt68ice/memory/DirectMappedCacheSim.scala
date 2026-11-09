@@ -2,127 +2,81 @@ package rt68ice.memory
 
 import spinal.core.sim._
 
-/** Pass-through wiring checks. No cache behavior or SDRAM timing is modeled yet. */
+/** Wiring checks only; cache behavior and RAM transactions will be tested later. */
 object DirectMappedCacheSim extends App {
   SimConfig.compile(DirectMappedCache()).doSim { dut =>
     dut.clockDomain.forkStimulus(period = 10)
+    val main = dut.io.mainBus
+    val ram = dut.io.ramBus
 
-    // Drive every input: the test acts as both the CPU and the RAM device.
-    // Start with the CPU bus idle and the RAM ready to accept a transfer.
-    dut.io.mainBus.address #= 0
-    dut.io.mainBus.dataOut #= 0
-    dut.io.mainBus.wr #= false
-    dut.io.mainBus.uds #= false
-    dut.io.mainBus.lds #= false
-    dut.io.mainBus.sel #= false
-    dut.io.ramBus.dataIn #= 0
-    dut.io.ramBus.ready #= true
-    dut.io.ramBus.irq #= false
-    dut.clockDomain.waitSampling(2)
+    def checkPassThrough(): Unit = {
+      sleep(1) // Allow the combinational connection to settle.
+      assert(ram.address.toLong == main.address.toLong, "address")
+      assert(ram.dataOut.toInt == main.dataOut.toInt, "write data")
+      assert(ram.wr.toBoolean == main.wr.toBoolean, "write direction")
+      assert(ram.uds.toBoolean == main.uds.toBoolean, "upper byte")
+      assert(ram.lds.toBoolean == main.lds.toBoolean, "lower byte")
+      assert(ram.sel.toBoolean == main.sel.toBoolean, "selection")
+      assert(main.dataIn.toInt == ram.dataIn.toInt, "read data")
+      assert(main.ready.toBoolean == ram.ready.toBoolean, "ready")
+      assert(main.irq.toBoolean == ram.irq.toBoolean, "IRQ")
+    }
 
-    assert(!dut.io.ramBus.sel.toBoolean)
-    assert(!dut.io.ramBus.uds.toBoolean)
-    assert(!dut.io.ramBus.lds.toBoolean)
-    assert(!dut.io.ramBus.wr.toBoolean)
-    assert(dut.io.mainBus.ready.toBoolean)
-    assert(!dut.io.mainBus.irq.toBoolean)
+    // Initialize every input with the CPU bus idle.
+    main.address #= 0
+    main.dataOut #= 0
+    main.wr #= false
+    main.uds #= false
+    main.lds #= false
+    main.sel #= false
+    ram.dataIn #= 0
+    ram.ready #= true
+    ram.irq #= false
+    checkPassThrough()
 
-    // Full-word write: both byte lanes are selected. Mixed data and a nonzero
-    // address make swapped or stuck-at-zero signals easier to detect.
-    dut.io.mainBus.address #= 0x00001234L
-    dut.io.mainBus.dataOut #= 0xA55A
-    dut.io.mainBus.wr #= true
-    dut.io.mainBus.uds #= true
-    dut.io.mainBus.lds #= true
-    dut.io.mainBus.sel #= true
-    dut.io.ramBus.ready #= false
-    dut.clockDomain.waitSampling(2)
+    // Full-word write, first waiting for RAM and then completing.
+    main.address #= 0x1234L
+    main.dataOut #= 0xA55A
+    main.wr #= true
+    main.uds #= true
+    main.lds #= true
+    main.sel #= true
+    ram.ready #= false
+    checkPassThrough()
+    ram.ready #= true
+    checkPassThrough()
 
-    // Requests travel from mainBus to ramBus. RAM back-pressure travels back.
-    assert(dut.io.ramBus.address.toInt == 0x00001234L)
-    assert(dut.io.ramBus.dataOut.toInt == 0xA55A)
-    assert(dut.io.ramBus.wr.toBoolean)
-    assert(dut.io.ramBus.uds.toBoolean)
-    assert(dut.io.ramBus.lds.toBoolean)
-    assert(dut.io.ramBus.sel.toBoolean)
-    assert(!dut.io.mainBus.ready.toBoolean)
+    // Upper-byte-only write, then lower-byte-only write.
+    main.address #= 0x1236L
+    main.dataOut #= 0xAB00
+    main.lds #= false
+    checkPassThrough()
+    main.address #= 0x1237L
+    main.dataOut #= 0x00CD
+    main.uds #= false
+    main.lds #= true
+    checkPassThrough()
 
-    // Finish the write while keeping the CPU request unchanged.
-    dut.io.ramBus.ready #= true
-    dut.clockDomain.waitSampling(2)
-    assert(dut.io.mainBus.ready.toBoolean)
-    assert(dut.io.ramBus.address.toInt == 0x00001234L)
-    assert(dut.io.ramBus.dataOut.toInt == 0xA55A)
+    // Read data and readiness return from RAM to the CPU.
+    main.address #= 0x1238L
+    main.wr #= false
+    main.uds #= true
+    ram.dataIn #= 0x5AA5
+    ram.ready #= false
+    checkPassThrough()
+    ram.ready #= true
+    checkPassThrough()
 
-    // Upper-byte-only write: only dataOut[15:8] is meaningful to RAM.
-    // These consecutive combinations test wiring, not a CPU transaction model.
-    dut.io.mainBus.address #= 0x00001236L
-    dut.io.mainBus.dataOut #= 0xAB00
-    dut.io.mainBus.uds #= true
-    dut.io.mainBus.lds #= false
-    dut.clockDomain.waitSampling(2)
+    // Check the generic IRQ wire, although real SDRAM does not raise IRQ.
+    ram.irq #= true
+    checkPassThrough()
+    ram.irq #= false
+    checkPassThrough()
 
-    assert(dut.io.ramBus.address.toInt == 0x00001236L)
-    assert(dut.io.ramBus.dataOut.toInt == 0xAB00)
-    assert(dut.io.ramBus.uds.toBoolean)
-    assert(!dut.io.ramBus.lds.toBoolean)
-    assert(dut.io.ramBus.sel.toBoolean)
-    assert(dut.io.ramBus.wr.toBoolean)
-
-    // Lower-byte-only write: only dataOut[7:0] is meaningful to RAM.
-    dut.io.mainBus.address #= 0x00001237L
-    dut.io.mainBus.dataOut #= 0x00CD
-    dut.io.mainBus.uds #= false
-    dut.io.mainBus.lds #= true
-    dut.clockDomain.waitSampling(2)
-
-    assert(dut.io.ramBus.address.toInt == 0x00001237L)
-    assert(dut.io.ramBus.dataOut.toInt == 0x00CD)
-    assert(!dut.io.ramBus.uds.toBoolean)
-    assert(dut.io.ramBus.lds.toBoolean)
-    assert(dut.io.ramBus.sel.toBoolean)
-    assert(dut.io.ramBus.wr.toBoolean)
-
-    // Full-word read: wr goes low and data returns through dataIn.
-    dut.io.mainBus.address #= 0x00001238L
-    dut.io.mainBus.wr #= false
-    dut.io.mainBus.uds #= true
-    dut.io.mainBus.lds #= true
-    dut.io.ramBus.dataIn #= 0x5AA5
-    dut.io.ramBus.ready #= false
-    dut.clockDomain.waitSampling(2)
-
-    assert(dut.io.ramBus.address.toInt == 0x00001238L)
-    assert(dut.io.ramBus.sel.toBoolean)
-    assert(!dut.io.ramBus.wr.toBoolean)
-    assert(dut.io.ramBus.uds.toBoolean)
-    assert(dut.io.ramBus.lds.toBoolean)
-    assert(!dut.io.mainBus.ready.toBoolean)
-
-    dut.io.ramBus.ready #= true
-    dut.clockDomain.waitSampling(2)
-    assert(dut.io.mainBus.dataIn.toInt == 0x5AA5)
-    assert(dut.io.mainBus.ready.toBoolean)
-
-    // Exercise both levels of the IRQ return wire. Real SDRAM never raises IRQ;
-    // this checks the current generic bus pass-through connection only.
-    dut.io.ramBus.irq #= true
-    dut.clockDomain.waitSampling(2)
-    assert(dut.io.mainBus.irq.toBoolean)
-    dut.io.ramBus.irq #= false
-    dut.clockDomain.waitSampling(2)
-    assert(!dut.io.mainBus.irq.toBoolean)
-
-    // Deselect the bus and remove both byte strobes after the transfer.
-    dut.io.mainBus.sel #= false
-    dut.io.mainBus.uds #= false
-    dut.io.mainBus.lds #= false
-    dut.io.mainBus.wr #= false
-    dut.clockDomain.waitSampling(2)
-
-    assert(!dut.io.ramBus.sel.toBoolean)
-    assert(!dut.io.ramBus.uds.toBoolean)
-    assert(!dut.io.ramBus.lds.toBoolean)
-    assert(!dut.io.ramBus.wr.toBoolean)
+    // Release the bus.
+    main.sel #= false
+    main.uds #= false
+    main.lds #= false
+    checkPassThrough()
   }
 }
