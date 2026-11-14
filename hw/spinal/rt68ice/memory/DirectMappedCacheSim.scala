@@ -109,5 +109,47 @@ object DirectMappedCacheSim extends App {
     finishRead()
     assert(!ram.sel.toBoolean, "RAM should remain deselected after the hit")
 
+    // ------- Conflict and replacement -------
+    // $1234 and $1A34 share slot $11A, but have different tags.
+    // Replace $1234 with $1A34, then verify that reading $1234 misses again.
+    for ((address, data) <- Seq((0x1A34L, 0xBEEF), (0x1234L, 0xA55A))) {
+      ram.ready #= false
+      ram.dataIn #= 0xDEAD
+      startRead(address)
+      assert(!main.ready.toBoolean, "Conflicting read should stall during lookup")
+      assert(!ram.sel.toBoolean, "Conflict lookup should not select RAM yet")
+
+      dut.clockDomain.waitSampling()
+      sleep(1)
+      assert(!main.ready.toBoolean, "Different tag in the same slot must cause a miss")
+      checkRamRead(address)
+
+      // Enter the RAM-wait state before supplying the replacement word.
+      dut.clockDomain.waitSampling()
+      sleep(1)
+      assert(!main.ready.toBoolean, "Conflicting read should wait for RAM")
+      checkRamRead(address)
+      respondFromRam(data)
+      assert(main.ready.toBoolean, "Replacement read should complete with RAM")
+      assert(main.dataIn.toInt == data, "Replacement read should return the RAM word")
+      finishRead()
+      assert(!ram.sel.toBoolean, "RAM should be deselected after replacement")
+
+      // The replacement must now hit, independently of RAM data and readiness.
+      ram.ready #= false
+      ram.dataIn #= 0xDEAD
+      startRead(address)
+      assert(!main.ready.toBoolean, "Replacement hit should stall during lookup")
+      assert(!ram.sel.toBoolean, "Replacement hit lookup should not select RAM")
+      dut.clockDomain.waitSampling()
+      sleep(1)
+      assert(main.ready.toBoolean, "Replacement word should now hit")
+      assert(main.dataIn.toInt == data, "Hit should return the replacement word")
+      assert(!ram.sel.toBoolean, "Replacement hit should not access RAM")
+      assert(!ram.uds.toBoolean, "Replacement hit should not assert upper RAM strobe")
+      assert(!ram.lds.toBoolean, "Replacement hit should not assert lower RAM strobe")
+      finishRead()
+      assert(!ram.sel.toBoolean, "RAM should remain deselected after replacement hit")
+    }
   }
 }
