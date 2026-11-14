@@ -39,24 +39,40 @@ case class DirectMappedCache() extends Component {
   val isRead = active && !io.mainBus.wr
   val cache = Mem(Bits(29 bits), 1024)
   val valid = Reg(Bits(1024 bits)) init 0
-  val tag = Reg(Bits(13 bits))
+  // Capture the entire downstream request in the system clock domain. Keep it
+  // stable until completion; no live CPU address/data path crosses to SDRAM.
+  val requestAddress = Reg(Bits(32 bits)) init 0
+  val requestData = Reg(Bits(16 bits)) init 0
+  val requestWrite = Reg(Bool()) init False
+  val requestUds = Reg(Bool()) init False
+  val requestLds = Reg(Bool()) init False
+  val ramSelected = Reg(Bool()) init False
+  // Qualify completion with the current request: RAM is also ready while idle.
+  // Sample data and completion together before using them in the cache/CPU path.
+  val responseReady = RegNext(ramSelected && io.ramBus.ready) init False
+  val responseData = Reg(Bits(16 bits)) init 0
+  when(ramSelected && io.ramBus.ready) {
+    responseData := io.ramBus.dataIn
+  }
+  val tag = requestAddress(23 downto 11)
+  val requestSlot = requestAddress(10 downto 1).asUInt
   val isValid = Reg(Bool())
   val readEnable = Bool()
   val writeEnable = Bool()
 
   val slot = io.mainBus.address(10 downto 1).asUInt
   val line = cache.readSync(slot, readEnable)
-  cache.write(slot, tag ## io.ramBus.dataIn, writeEnable)
+  cache.write(requestSlot, tag ## responseData, writeEnable)
 
   io.mainBus.irq := False
   io.mainBus.dataIn := 0
   io.mainBus.ready := True
-  io.ramBus.sel := False
-  io.ramBus.address := io.mainBus.address
-  io.ramBus.dataOut := 0
-  io.ramBus.wr := False
-  io.ramBus.uds := False
-  io.ramBus.lds := False
+  io.ramBus.sel := ramSelected
+  io.ramBus.address := requestAddress
+  io.ramBus.dataOut := requestData
+  io.ramBus.wr := ramSelected && requestWrite
+  io.ramBus.uds := ramSelected && requestUds
+  io.ramBus.lds := ramSelected && requestLds
 
   readEnable := False
   writeEnable := False
@@ -68,35 +84,33 @@ case class DirectMappedCache() extends Component {
     val writeDramWait = new State
 
     idle.whenIsActive {
+      when(active) {
+        requestAddress := io.mainBus.address
+        requestData := io.mainBus.dataOut
+        requestWrite := io.mainBus.wr
+        // Read misses fill a complete word even for CPU byte reads.
+        requestUds := io.mainBus.uds || isRead
+        requestLds := io.mainBus.lds || isRead
+      }
       when(isRead) {
         // Read
         io.mainBus.ready := False
-        tag := io.mainBus.address(23 downto 11)
         isValid := valid(slot)
         readEnable := True // Read from cache sync
         goto(readLookup)
       } elsewhen isWrite {
         // Write
         io.mainBus.ready := False
-        io.ramBus.sel := True
-        io.ramBus.wr := True
-        io.ramBus.lds := io.mainBus.lds
-        io.ramBus.uds := io.mainBus.uds
-        io.ramBus.dataOut := io.mainBus.dataOut
+        ramSelected := True
         goto(writeDramWait)
       }
     }
 
     writeDramWait.whenIsActive {
       io.mainBus.ready := False
-      io.ramBus.sel := True
-      io.ramBus.wr := True
-      io.ramBus.lds := io.mainBus.lds
-      io.ramBus.uds := io.mainBus.uds
-      io.ramBus.dataOut := io.mainBus.dataOut
-
-      when(io.ramBus.ready) {
-        valid(slot) := False
+      when(responseReady) {
+        ramSelected := False
+        valid(requestSlot) := False
         io.mainBus.ready := True
         goto(idle)
       }
@@ -113,23 +127,21 @@ case class DirectMappedCache() extends Component {
       } otherwise {
         // Miss
         io.mainBus.ready := False
-        io.ramBus.sel := True
-        io.ramBus.lds := True
-        io.ramBus.uds := True
+        // Start SDRAM only after the lookup has established a miss. Selection
+        // is registered too, so the tag comparator does not cross domains.
+        ramSelected := True
         goto(readDramWait)
       }
     }
 
     readDramWait.whenIsActive {
       io.mainBus.ready := False
-      io.ramBus.sel := True
-      io.ramBus.lds := True
-      io.ramBus.uds := True
-      when(io.ramBus.ready) {
+      when(responseReady) {
+        ramSelected := False
         io.mainBus.ready := True
         writeEnable := True
-        valid(slot) := True
-        io.mainBus.dataIn := io.ramBus.dataIn
+        valid(requestSlot) := True
+        io.mainBus.dataIn := responseData
         goto(idle)
       }
     }

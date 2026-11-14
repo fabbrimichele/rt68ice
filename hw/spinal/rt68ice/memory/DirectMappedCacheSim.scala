@@ -27,11 +27,21 @@ object DirectMappedCacheSim extends App {
       sleep(1)
     }
 
-    // Supply a RAM response; the test checks completion before the next edge.
+    // RAM completion must cross the response register before reaching the CPU.
     def respondFromRam(data: Int): Unit = {
       ram.dataIn #= data
       ram.ready #= true
       sleep(1)
+      assert(!main.ready.toBoolean, "Raw RAM completion must not bypass the response register")
+      dut.clockDomain.waitSampling()
+      sleep(1)
+      assert(main.ready.toBoolean, "Captured RAM completion should release the CPU")
+      // Changing the source after capture must not change the CPU response.
+      ram.dataIn #= (data ^ 0xFFFF)
+      ram.ready #= false
+      sleep(1)
+      assert(main.ready.toBoolean, "CPU completion must use the captured readiness")
+      assert(main.dataIn.toInt == data, "CPU data must use the captured RAM word")
     }
 
     // Check a full-word downstream read without advancing simulation time.
@@ -41,6 +51,15 @@ object DirectMappedCacheSim extends App {
       assert(ram.lds.toBoolean, "RAM lower byte strobe should be asserted")
       assert(!ram.wr.toBoolean, "RAM request should be a read")
       assert(ram.address.toLong == address, "RAM request should use the expected address")
+    }
+
+    // A miss registers selection on the edge after the synchronous lookup.
+    def launchRamRead(address: Long): Unit = {
+      assert(!main.ready.toBoolean, "CPU must stall before registering a miss")
+      assert(!ram.sel.toBoolean, "RAM selection must wait for the request register")
+      dut.clockDomain.waitSampling()
+      sleep(1)
+      checkRamRead(address)
     }
 
     // Small word-addressed RAM model used by the write tests. Apply the actual
@@ -57,6 +76,8 @@ object DirectMappedCacheSim extends App {
     }
 
     def startWrite(address: Long, data: Int, upper: Boolean = true, lower: Boolean = true): Unit = {
+      val previousAddress = ram.address.toLong
+      val previousData = ram.dataOut.toInt
       ram.ready #= false
       main.address #= address
       main.dataOut #= data
@@ -64,6 +85,12 @@ object DirectMappedCacheSim extends App {
       main.uds #= upper
       main.lds #= lower
       main.sel #= true
+      sleep(1)
+      assert(!main.ready.toBoolean, "CPU must stall before capturing a write")
+      assert(!ram.sel.toBoolean, "RAM must stay deselected until the write is captured")
+      assert(ram.address.toLong == previousAddress, "RAM address must change only on the capture edge")
+      assert(ram.dataOut.toInt == previousData, "RAM data must change only on the capture edge")
+      dut.clockDomain.waitSampling()
       sleep(1)
     }
 
@@ -96,11 +123,19 @@ object DirectMappedCacheSim extends App {
       val newWord = (oldWord & (~mask & 0xffff)) | (ram.dataOut.toInt & mask)
       ram.ready #= true
       sleep(1)
-      assert(main.ready.toBoolean, "CPU write should complete when RAM is ready")
+      assert(!main.ready.toBoolean, "Raw write completion must wait for the response register")
       checkRamWrite(address, data, upper, lower)
+      dut.clockDomain.waitSampling()
+      sleep(1)
+      assert(main.ready.toBoolean, "CPU write should complete after capturing RAM readiness")
+      checkRamWrite(address, data, upper, lower)
+      ram.ready #= false
+      sleep(1)
+      assert(main.ready.toBoolean, "Write completion must remain asserted from the response register")
       dut.clockDomain.waitSampling()
       ramWords(wordAddress) = newWord
       sleep(1)
+      assert(!ram.sel.toBoolean, "Accepted write must release RAM before the next request")
     }
 
     // Read the RAM model through the cache and check whether RAM was accessed.
@@ -118,7 +153,7 @@ object DirectMappedCacheSim extends App {
         assert(!ram.sel.toBoolean, "Read hit must not access RAM")
       } else {
         assert(!main.ready.toBoolean, "Invalid or unallocated word should miss")
-        checkRamRead(address)
+        launchRamRead(address)
         dut.clockDomain.waitSampling()
         sleep(1)
         assert(!main.ready.toBoolean, "Read miss must wait for the RAM response")
@@ -159,7 +194,7 @@ object DirectMappedCacheSim extends App {
     sleep(1)
 
     assert(!main.ready.toBoolean, "CPU should be stalled")
-    checkRamRead(0x1234L)
+    launchRamRead(0x1234L)
 
     // RAM takes three more cycles to respond. The request must stay active.
     for (_ <- 0 until 3) {
@@ -212,7 +247,7 @@ object DirectMappedCacheSim extends App {
       dut.clockDomain.waitSampling()
       sleep(1)
       assert(!main.ready.toBoolean, "Different tag in the same slot must cause a miss")
-      checkRamRead(address)
+      launchRamRead(address)
 
       // Enter the RAM-wait state before supplying the replacement word.
       dut.clockDomain.waitSampling()
@@ -280,7 +315,7 @@ object DirectMappedCacheSim extends App {
     dut.clockDomain.waitSampling()
     sleep(1)
     assert(!main.ready.toBoolean, "Reset should invalidate the entry and cause a miss")
-    checkRamRead(0x1234L)
+    launchRamRead(0x1234L)
 
     // Enter the RAM-wait state and verify the CPU is still stalled.
     dut.clockDomain.waitSampling()
@@ -317,7 +352,7 @@ object DirectMappedCacheSim extends App {
             "Consecutive hit should not assert RAM strobes")
         } else {
           assert(!main.ready.toBoolean, "Uncached consecutive word should miss")
-          checkRamRead(address)
+          launchRamRead(address)
           // Exercise a delayed response for each half of the longword.
           for (_ <- 0 until 2) {
             dut.clockDomain.waitSampling()
@@ -367,7 +402,7 @@ object DirectMappedCacheSim extends App {
         } else {
           assert(!main.ready.toBoolean, "Uncached byte read should miss")
           // SdRamDevice drops address bit 0; both strobes request the entire word.
-          checkRamRead(address)
+          launchRamRead(address)
           dut.clockDomain.waitSampling()
           sleep(1)
           assert(!main.ready.toBoolean, "Byte miss should wait for RAM")
@@ -472,5 +507,29 @@ object DirectMappedCacheSim extends App {
     assert(readStoredWord(0x4700L, expectHit = false) == 0x9ABC,
       "Immediate read must fetch the completed write rather than stale cached data")
     assert(readStoredWord(0x4700L, expectHit = true) == 0x9ABC)
+
+    // ------- Read miss followed by same-address write without CPU deselection -------
+    // RAM is already ready: the miss must still wait for registered selection.
+    ram.ready #= true
+    ram.dataIn #= 0x1357
+    startRead(0x4800L)
+    dut.clockDomain.waitSampling()
+    sleep(1)
+    launchRamRead(0x4800L)
+    assert(!main.ready.toBoolean, "Even an immediate response must wait for the response register")
+    dut.clockDomain.waitSampling()
+    sleep(1)
+    assert(main.ready.toBoolean, "Immediate RAM response should complete after capture")
+    assert(main.dataIn.toInt == 0x1357, "Immediate response must return the RAM word")
+    dut.clockDomain.waitSampling()
+    sleep(1)
+    assert(main.sel.toBoolean, "CPU must remain selected between read and write")
+    assert(!ram.sel.toBoolean, "Completed read must release RAM before a same-address write")
+    ramWords(0x4800L) = 0x1357
+    startWrite(0x4800L, 0xABCD)
+    completeRamWrite(0x4800L, 0xABCD)
+    releaseCpuRequest()
+    assert(readStoredWord(0x4800L, expectHit = false) == 0xABCD,
+      "Same-address write must invalidate the word filled by the preceding read")
   }
 }
