@@ -43,6 +43,96 @@ object DirectMappedCacheSim extends App {
       assert(ram.address.toLong == address, "RAM request should use the expected address")
     }
 
+    // Small word-addressed RAM model used by the write tests. Apply the actual
+    // downstream write lanes at the completion edge, not the expected test value.
+    val ramWords = scala.collection.mutable.Map.empty[Long, Int]
+
+    def releaseCpuRequest(): Unit = {
+      main.sel #= false
+      main.uds #= false
+      main.lds #= false
+      main.wr #= false
+      sleep(1)
+      assert(!ram.sel.toBoolean, "RAM should be deselected after releasing the CPU request")
+    }
+
+    def startWrite(address: Long, data: Int, upper: Boolean = true, lower: Boolean = true): Unit = {
+      ram.ready #= false
+      main.address #= address
+      main.dataOut #= data
+      main.wr #= true
+      main.uds #= upper
+      main.lds #= lower
+      main.sel #= true
+      sleep(1)
+    }
+
+    def checkRamWrite(address: Long, data: Int, upper: Boolean, lower: Boolean): Unit = {
+      assert(ram.sel.toBoolean, "RAM write should remain selected")
+      assert(ram.wr.toBoolean, "RAM direction should be write")
+      assert(ram.address.toLong == address, "RAM write address should remain stable")
+      assert(ram.dataOut.toInt == data, "RAM write data should remain stable")
+      assert(ram.uds.toBoolean == upper, "RAM write should preserve the upper byte strobe")
+      assert(ram.lds.toBoolean == lower, "RAM write should preserve the lower byte strobe")
+    }
+
+    // Accept a delayed write, keeping the CPU request active for a possible
+    // next word. Call releaseCpuRequest only when the caller wants an idle gap.
+    def completeRamWrite(address: Long, data: Int,
+                         upper: Boolean = true, lower: Boolean = true): Unit = {
+      assert(!main.ready.toBoolean, "CPU must stall when starting a RAM write")
+      checkRamWrite(address, data, upper, lower)
+      for (_ <- 0 until 3) {
+        dut.clockDomain.waitSampling()
+        sleep(1)
+        assert(!main.ready.toBoolean, "CPU must remain stalled until RAM accepts the write")
+        checkRamWrite(address, data, upper, lower)
+      }
+
+      val wordAddress = ram.address.toLong & ~1L
+      val mask = (if (ram.uds.toBoolean) 0xff00 else 0) |
+        (if (ram.lds.toBoolean) 0x00ff else 0)
+      val oldWord = ramWords.getOrElse(wordAddress, 0)
+      val newWord = (oldWord & (~mask & 0xffff)) | (ram.dataOut.toInt & mask)
+      ram.ready #= true
+      sleep(1)
+      assert(main.ready.toBoolean, "CPU write should complete when RAM is ready")
+      checkRamWrite(address, data, upper, lower)
+      dut.clockDomain.waitSampling()
+      ramWords(wordAddress) = newWord
+      sleep(1)
+    }
+
+    // Read the RAM model through the cache and check whether RAM was accessed.
+    // The returned value is also checked against explicit constants by callers.
+    def readStoredWord(address: Long, expectHit: Boolean): Int = {
+      ram.ready #= false
+      ram.dataIn #= 0xDEAD
+      startRead(address)
+      assert(!main.ready.toBoolean, "CPU read should stall during lookup")
+      assert(!ram.sel.toBoolean, "Lookup should not select RAM before its clock edge")
+      dut.clockDomain.waitSampling()
+      sleep(1)
+      if (expectHit) {
+        assert(main.ready.toBoolean, "Cached word should hit without waiting for RAM")
+        assert(!ram.sel.toBoolean, "Read hit must not access RAM")
+      } else {
+        assert(!main.ready.toBoolean, "Invalid or unallocated word should miss")
+        checkRamRead(address)
+        dut.clockDomain.waitSampling()
+        sleep(1)
+        assert(!main.ready.toBoolean, "Read miss must wait for the RAM response")
+        checkRamRead(address)
+        respondFromRam(ramWords(address & ~1L))
+        assert(main.ready.toBoolean, "Read should complete with the RAM response")
+      }
+      val result = main.dataIn.toInt
+      assert(result == ramWords(address & ~1L), "CPU should see the word stored in RAM")
+      finishRead()
+      assert(!ram.sel.toBoolean, "RAM should be deselected after reading the stored word")
+      result
+    }
+
     // Initialize every input with the CPU bus idle.
     main.address #= 0
     main.dataOut #= 0
@@ -307,5 +397,80 @@ object DirectMappedCacheSim extends App {
       finishRead()
       assert(!ram.sel.toBoolean, "RAM should remain deselected after the word hit")
     }
+
+    // ------- Delayed word write-through -------
+    ramWords(0x4100L) = 0xFFFF
+    startWrite(0x4100L, 0x2468)
+    completeRamWrite(0x4100L, 0x2468)
+    assert(ramWords(0x4100L) == 0x2468, "Word write must reach RAM")
+    releaseCpuRequest()
+
+    // ------- Write invalidates a cached word -------
+    ramWords(0x4300L) = 0x1357
+    assert(readStoredWord(0x4300L, expectHit = false) == 0x1357)
+    assert(readStoredWord(0x4300L, expectHit = true) == 0x1357)
+    startWrite(0x4300L, 0xCAFE)
+    completeRamWrite(0x4300L, 0xCAFE)
+    releaseCpuRequest()
+    assert(ramWords(0x4300L) == 0xCAFE, "Cached-address write must update RAM")
+    assert(readStoredWord(0x4300L, expectHit = false) == 0xCAFE,
+      "Write must invalidate the old cached word")
+    assert(readStoredWord(0x4300L, expectHit = true) == 0xCAFE,
+      "Refilled entry must contain the new word")
+
+    // ------- Write miss must not allocate -------
+    ramWords(0x4400L) = 0xFFFF
+    startWrite(0x4400L, 0x789A)
+    completeRamWrite(0x4400L, 0x789A)
+    releaseCpuRequest()
+    assert(ramWords(0x4400L) == 0x789A, "Uncached-address write must update RAM")
+    assert(readStoredWord(0x4400L, expectHit = false) == 0x789A,
+      "Write miss must not create a valid cache entry")
+    assert(readStoredWord(0x4400L, expectHit = true) == 0x789A)
+
+    // ------- Byte writes preserve the unselected RAM byte -------
+    ramWords(0x4500L) = 0xA17C
+    assert(readStoredWord(0x4500L, expectHit = false) == 0xA17C)
+    // The unselected data lane deliberately differs from the preserved byte.
+    startWrite(0x4500L, 0xB6E9, upper = true, lower = false)
+    completeRamWrite(0x4500L, 0xB6E9, upper = true, lower = false)
+    releaseCpuRequest()
+    assert(ramWords(0x4500L) == 0xB67C, "Upper byte write must preserve the lower byte")
+    assert(readStoredWord(0x4500L, expectHit = false) == 0xB67C,
+      "Upper byte write must invalidate the cached word")
+    assert(readStoredWord(0x4500L, expectHit = true) == 0xB67C)
+
+    startWrite(0x4501L, 0x5AD2, upper = false, lower = true)
+    completeRamWrite(0x4501L, 0x5AD2, upper = false, lower = true)
+    releaseCpuRequest()
+    assert(ramWords(0x4500L) == 0xB6D2, "Lower byte write must preserve the upper byte")
+    assert(readStoredWord(0x4500L, expectHit = false) == 0xB6D2,
+      "Odd-address byte write must invalidate the containing cached word")
+    assert(readStoredWord(0x4500L, expectHit = true) == 0xB6D2)
+
+    // ------- Consecutive writes without CPU bus deselection -------
+    for ((address, data) <- Seq((0x4600L, 0x1122), (0x4602L, 0x3344))) {
+      startWrite(address, data)
+      completeRamWrite(address, data)
+      assert(main.sel.toBoolean && main.uds.toBoolean && main.lds.toBoolean,
+        "Selection and both strobes must stay asserted between longword halves")
+      assert(ramWords(address) == data, "Each longword half must reach its own RAM address")
+      // No release between words: the next startWrite changes address and data
+      // after the preceding word has been accepted, while strobes stay high.
+    }
+    releaseCpuRequest()
+    assert(readStoredWord(0x4600L, expectHit = false) == 0x1122)
+    assert(readStoredWord(0x4602L, expectHit = false) == 0x3344)
+
+    // ------- Write followed by read without an idle cycle -------
+    ramWords(0x4700L) = 0x0F0F
+    assert(readStoredWord(0x4700L, expectHit = false) == 0x0F0F)
+    startWrite(0x4700L, 0x9ABC)
+    completeRamWrite(0x4700L, 0x9ABC)
+    assert(main.sel.toBoolean, "CPU request must remain selected before changing direction")
+    // readStoredWord changes direction directly to read, without releasing sel.
+    assert(readStoredWord(0x4700L, expectHit = false) == 0x9ABC,
+      "Immediate read must fetch the completed write rather than stale cached data")
+    assert(readStoredWord(0x4700L, expectHit = true) == 0x9ABC)
   }
 }

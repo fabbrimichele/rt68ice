@@ -65,6 +65,7 @@ case class DirectMappedCache() extends Component {
     val idle = new State with EntryPoint
     val readLookup = new State
     val readDramWait = new State
+    val writeDramWait = new State
 
     idle.whenIsActive {
       when(isRead) {
@@ -74,9 +75,30 @@ case class DirectMappedCache() extends Component {
         isValid := valid(slot)
         readEnable := True // Read from cache sync
         goto(readLookup)
-      } otherwise {
+      } elsewhen isWrite {
         // Write
-        // TODO
+        io.mainBus.ready := False
+        io.ramBus.sel := True
+        io.ramBus.wr := True
+        io.ramBus.lds := io.mainBus.lds
+        io.ramBus.uds := io.mainBus.uds
+        io.ramBus.dataOut := io.mainBus.dataOut
+        goto(writeDramWait)
+      }
+    }
+
+    writeDramWait.whenIsActive {
+      io.mainBus.ready := False
+      io.ramBus.sel := True
+      io.ramBus.wr := True
+      io.ramBus.lds := io.mainBus.lds
+      io.ramBus.uds := io.mainBus.uds
+      io.ramBus.dataOut := io.mainBus.dataOut
+
+      when(io.ramBus.ready) {
+        valid(slot) := False
+        io.mainBus.ready := True
+        goto(idle)
       }
     }
 
