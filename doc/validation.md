@@ -147,16 +147,16 @@ hardening of the SDRAM wrapper. Loaded binary hashes were not supplied.
 
 The SDRAM copy measurements are from one supplied run per configuration;
 see [SDRAM benchmark details](sdram.md#cached-result-and-comparison-2026-11-14).
-CoreMark compares the five previously recorded uncached runs with four supplied
+CoreMark compares the five previously recorded uncached runs with five supplied
 cached runs. Compiler version, flags, seed CRC and workload size match the
 reported baseline. Executable identity was not verified by hash, and timer
 accuracy has not been checked against an external clock. This supports a
 workload-level improvement, not a raw SDRAM-bandwidth claim.
 
-### CoreMark: four repeatable validated runs
+### CoreMark: five repeatable validated runs
 
 Command: `COREMARK.TOS`, without arguments, from `C:\APPS\COREMARK`.
-All four supplied runs reported exactly:
+All five supplied runs reported exactly:
 
 ```text
 CoreMark Size    : 666
@@ -181,6 +181,15 @@ instead of the uncached run's 110. Its final CRC is iteration-dependent;
 both configurations reported successful validation. Identical reported scores
 show repeatability at the 5 ms timer resolution, not necessarily identical
 sub-tick execution times.
+
+The fifth matching run was supplied after a reboot, alongside successful
+verification of the retained SD file described below.
+
+The published Atari port [reference results](https://github.com/czietz/coremark/wiki/Results)
+list a stock ST / MegaST / MegaSTE at 8 MHz at **1.92 iterations/s**. Relative
+to that reference, RT68ICE scores **3.65x uncached** and **6.70x cached**.
+These ratios compare CoreMark workloads; they do not establish the same
+speedup for graphics, games or all applications, nor identical binary hashes.
 
 For a longer run with the same default performance seeds, the released Atari
 port accepts the iteration count as its fourth argument:
@@ -215,6 +224,53 @@ OS memory, low-memory BRAM, or the framebuffer. The earlier uncached YAARTTT
 log establishes correctness evidence, but its capture gap and different start
 address make it unsuitable as a controlled timing comparison.
 
+### SD integrity and persistence with the cache enabled
+
+The user ran `filetest run C:\CACHE01.DAT 1 3` on the cached bitstream. All
+three write/close/reopen/verify passes succeeded, checking the header, every
+payload byte and exact file length. Each pass used a 1 MiB payload, for 3 MiB
+written and immediately verified in total.
+
+| Pass | Seed | Write time | Verify time | Result |
+| --- | --- | ---: | ---: | --- |
+| 1 | `0x12345678` | 14.410 s | 12.880 s | Passed |
+| 2 | `0x12345679` | 13.825 s | 13.050 s | Passed |
+| 3 | `0x1234567A` | 14.075 s | 13.115 s | Passed |
+
+After a reboot, `filetest verify C:\CACHE01.DAT` successfully checked the
+retained pass-3 file: **1,048,576 payload bytes**, seed **`0x1234567A`**, plus
+header and length. Verification took **13.345 s** (76.7 KiB/s). The user
+explicitly confirmed that this verification and the fifth matching CoreMark
+run were after reboot. This establishes post-reboot persistence for the
+reported file and configuration, not interrupted-write recovery.
+
+The integrity-mode rates include pattern generation and byte-by-byte checking:
+reported writes were 71.0-74.0 KiB/s and immediate verification 78.0-79.5 KiB/s.
+These are not comparable to the earlier sequential `speed` workload's
+245.0/293.0 KiB/s write/read figures; no new cached `speed` result was supplied.
+
+### Physical timing report review
+
+The user generated a detailed nextpnr report, inspected on 2026-11-14.
+Place-and-route finished normally. Final system-domain Fmax is **29.12 MHz**
+against a **25 MHz** constraint; SDRAM-domain Fmax is **77.27 MHz** against
+**50 MHz**. Block RAM usage is **51/56 DP16KD blocks**.
+
+Cross-domain maximum delays are reported separately: **25.53 ns** from system
+to SDRAM and **22.15 ns** in the reverse direction. Both exceed the shortest
+20 ns positive-edge separation for the nominal aligned 25/50 MHz clocks.
+The JSON paths do not report an explicit required time or setup/hold slack for
+these crossings. Therefore, passing per-clock Fmax checks and a positive
+summary histogram do **not** establish cross-domain timing closure. Determine
+which paths are sensitizable and whether any multicycle allowances are valid,
+or revise the interface. Hold timing is not established by these maxima.
+
+The report's routed configuration is byte-identical to the repository's
+current `rt68ice.config`; the FPGA's loaded bitstream identity remains
+unverified. See the [timing review](cache-timing-2026-11-14.md) for the command,
+critical endpoints, resource usage, and artifact hashes. The Desk reset must
+not be attributed to these paths without further evidence.
+
 ### Remaining integration observations
 
 EmuTOS booted, but the user initially reported a reset when opening the Desk
@@ -224,9 +280,10 @@ fixed solely because later benchmarks pass.
 
 Top-level elaboration passes after declaring the system and SDRAM clock
 domains synchronous; their clocks originate from the same PLL. This declaration
-does not establish physical setup/hold timing. Cross-domain timing review and
-repeatable desktop/reset/power-cycle checks remain outstanding before treating
-the cache integration as fully validated. A same-address direction change
+does not establish physical setup/hold timing. The report review above leaves
+cross-domain timing closure unresolved. Repeated desktop-menu and power-cycle
+checks also remain outstanding; the supplied reboot/FILETEST/CoreMark checks
+passed but do not by themselves fully validate the integration. A same-address direction change
 without an idle gap is a conditional limitation of the SDRAM wrapper; that
 sequence has not been established for the current TG68K workload and is not a
 confirmed cause of the reset.

@@ -59,6 +59,13 @@ writes still reach SDRAM. Binary hashes were not supplied, so identical
 benchmark provenance has not been independently established.
 
 The cached design also completed three YAARTTT passes without reported errors
-and four identical validated CoreMark runs at **12.861736 iterations/s**.
+and five identical validated CoreMark runs at **12.861736 iterations/s**.
 See [cached-system validation](validation.md#cached-system-validation-2026-11-14)
-for comparison with the uncached CoreMark baseline and remaining limitations.
+for comparison with the uncached CoreMark baseline, successful cached SD
+integrity/post-reboot verification, and remaining limitations. The cached
+CoreMark score is **6.70x** the published 8 MHz Atari ST reference of
+1.92 iterations/s; this is a CoreMark comparison, not an application-wide claim.
+
+The [physical timing report review](cache-timing-2026-11-14.md) records passing
+per-clock checks but unresolved system/SDRAM cross-domain timing. Hardware
+benchmark success does not substitute for timing closure.
