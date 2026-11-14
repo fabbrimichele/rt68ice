@@ -2,24 +2,45 @@ package rt68ice.memory
 
 import spinal.core.sim._
 
-/** Wiring checks only; cache behavior and RAM transactions will be tested later. */
 object DirectMappedCacheSim extends App {
   SimConfig.compile(DirectMappedCache()).doSim { dut =>
     dut.clockDomain.forkStimulus(period = 10)
     val main = dut.io.mainBus
     val ram = dut.io.ramBus
 
-    def checkPassThrough(): Unit = {
-      sleep(1) // Allow the combinational connection to settle.
-      assert(ram.address.toLong == main.address.toLong, "address")
-      assert(ram.dataOut.toInt == main.dataOut.toInt, "write data")
-      assert(ram.wr.toBoolean == main.wr.toBoolean, "write direction")
-      assert(ram.uds.toBoolean == main.uds.toBoolean, "upper byte")
-      assert(ram.lds.toBoolean == main.lds.toBoolean, "lower byte")
-      assert(ram.sel.toBoolean == main.sel.toBoolean, "selection")
-      assert(main.dataIn.toInt == ram.dataIn.toInt, "read data")
-      assert(main.ready.toBoolean == ram.ready.toBoolean, "ready")
-      assert(main.irq.toBoolean == ram.irq.toBoolean, "IRQ")
+    // Start a full-word CPU read; RAM responses remain controlled by each test.
+    def startRead(address: Long): Unit = {
+      main.address #= address
+      main.wr #= false
+      main.uds #= true
+      main.lds #= true
+      main.sel #= true
+      sleep(1)
+    }
+
+    // Call after checking readiness and data, to accept and end the CPU read.
+    def finishRead(): Unit = {
+      dut.clockDomain.waitSampling()
+      main.sel #= false
+      main.uds #= false
+      main.lds #= false
+      sleep(1)
+    }
+
+    // Supply a RAM response; the test checks completion before the next edge.
+    def respondFromRam(data: Int): Unit = {
+      ram.dataIn #= data
+      ram.ready #= true
+      sleep(1)
+    }
+
+    // Check a full-word downstream read without advancing simulation time.
+    def checkRamRead(address: Long): Unit = {
+      assert(ram.sel.toBoolean, "RAM request should be selected")
+      assert(ram.uds.toBoolean, "RAM upper byte strobe should be asserted")
+      assert(ram.lds.toBoolean, "RAM lower byte strobe should be asserted")
+      assert(!ram.wr.toBoolean, "RAM request should be a read")
+      assert(ram.address.toLong == address, "RAM request should use the expected address")
     }
 
     // Initialize every input with the CPU bus idle.
@@ -32,51 +53,61 @@ object DirectMappedCacheSim extends App {
     ram.dataIn #= 0
     ram.ready #= true
     ram.irq #= false
-    checkPassThrough()
 
-    // Full-word write, first waiting for RAM and then completing.
-    main.address #= 0x1234L
-    main.dataOut #= 0xA55A
-    main.wr #= true
-    main.uds #= true
-    main.lds #= true
-    main.sel #= true
+    // waitSampling counts only clock edges with reset released.
+    // Allow two such edges for the state machine to enter Idle.
+    dut.clockDomain.waitSampling(2)
+
+    // ------- Read -------
     ram.ready #= false
-    checkPassThrough()
-    ram.ready #= true
-    checkPassThrough()
+    startRead(0x1234L)
 
-    // Upper-byte-only write, then lower-byte-only write.
-    main.address #= 0x1236L
-    main.dataOut #= 0xAB00
-    main.lds #= false
-    checkPassThrough()
-    main.address #= 0x1237L
-    main.dataOut #= 0x00CD
-    main.uds #= false
-    main.lds #= true
-    checkPassThrough()
+    assert(!main.ready.toBoolean, "CPU should be stalled")
+    assert(!ram.sel.toBoolean, "RAM should not be selected yet")
 
-    // Read data and readiness return from RAM to the CPU.
-    main.address #= 0x1238L
-    main.wr #= false
-    main.uds #= true
-    ram.dataIn #= 0x5AA5
+    dut.clockDomain.waitSampling()
+    sleep(1)
+
+    assert(!main.ready.toBoolean, "CPU should be stalled")
+    checkRamRead(0x1234L)
+
+    // RAM takes three more cycles to respond. The request must stay active.
+    for (_ <- 0 until 3) {
+      dut.clockDomain.waitSampling()
+      sleep(1)
+      assert(!main.ready.toBoolean, "CPU should remain stalled while RAM waits")
+      checkRamRead(0x1234L)
+    }
+
+    // Present valid RAM data. Check completion before its sampling edge.
+    respondFromRam(0xA55A)
+    assert(main.ready.toBoolean, "CPU should be ready when RAM completes")
+    assert(main.dataIn.toInt == 0xA55A, "CPU should receive the RAM word")
+
+    // Accept the result and cache fill, then release the CPU request.
+    finishRead()
+    assert(!ram.sel.toBoolean, "RAM should be deselected after completion")
+
+
+    // ------- Cache-hit -------
+    ram.dataIn #= 0xDEAD // Different from the cached word; RAM must not supply this read.
     ram.ready #= false
-    checkPassThrough()
-    ram.ready #= true
-    checkPassThrough()
+    startRead(0x1234L)
 
-    // Check the generic IRQ wire, although real SDRAM does not raise IRQ.
-    ram.irq #= true
-    checkPassThrough()
-    ram.irq #= false
-    checkPassThrough()
+    assert(!main.ready.toBoolean, "CPU should stall during the hit lookup")
+    assert(!ram.sel.toBoolean, "Hit lookup should not select RAM")
 
-    // Release the bus.
-    main.sel #= false
-    main.uds #= false
-    main.lds #= false
-    checkPassThrough()
+    dut.clockDomain.waitSampling()
+    sleep(1)
+    assert(main.ready.toBoolean, "Cache hit should complete without waiting for RAM")
+    assert(main.dataIn.toInt == 0xA55A, "Cache hit should return the stored word")
+    assert(!ram.sel.toBoolean, "Cache hit should not select RAM")
+    assert(!ram.uds.toBoolean, "Cache hit should not assert the RAM upper byte strobe")
+    assert(!ram.lds.toBoolean, "Cache hit should not assert the RAM lower byte strobe")
+
+    // Accept the cached result and release the CPU request.
+    finishRead()
+    assert(!ram.sel.toBoolean, "RAM should remain deselected after the hit")
+
   }
 }
