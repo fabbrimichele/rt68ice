@@ -34,6 +34,9 @@ captured. The display mode used during testing was not recorded.
 
 ## Summary
 
+The original rows below describe the uncached baseline. Later cache results
+are recorded separately in [cached-system validation](#cached-system-validation-2026-11-14).
+
 | Test | Observed result | Interpretation |
 | --- | --- | --- |
 | Atari CoreMark 1.0 | Five supplied runs at 7.013069 iterations/s; all validated | Repeatable CPU workload and performance baseline |
@@ -125,6 +128,108 @@ name alone does not establish coverage of byte-write masks; dedicated byte-lane
 tests remain useful.
 
 - [Author's description and downloads](https://www.chzsoft.de/site/hardware/diverse-kleinigkeiten-fur-den-atari-st/#ram-test-software-yaart)
+
+## Cached-system validation (2026-11-14)
+
+The user supplied the following on-board results after integrating a 2 KiB
+unified direct-mapped SDRAM cache on branch `direct-mapped-cache`. CPU/system
+clock remains **25 MHz**, SDRAM **50 MHz**. Entries hold one 16-bit word;
+writes reach SDRAM and invalidate the selected cache slot, without allocating
+an entry. These results precede any proposed same-address direction-change
+hardening of the SDRAM wrapper. Loaded binary hashes were not supplied.
+
+### Performance comparison
+
+| Workload | Uncached | Cached | Improvement |
+| --- | ---: | ---: | --- |
+| SDRAM 256-word copy, counter cycles | 7,191 | 3,733 | 1.93x workload speed; 48.1% less elapsed time |
+| Atari CoreMark 1.0, iterations/s | 7.013069 | 12.861736 | 1.83x score; 83.4% higher iterations/s |
+
+The SDRAM copy measurements are from one supplied run per configuration;
+see [SDRAM benchmark details](sdram.md#cached-result-and-comparison-2026-11-14).
+CoreMark compares the five previously recorded uncached runs with four supplied
+cached runs. Compiler version, flags, seed CRC and workload size match the
+reported baseline. Executable identity was not verified by hash, and timer
+accuracy has not been checked against an external clock. This supports a
+workload-level improvement, not a raw SDRAM-bandwidth claim.
+
+### CoreMark: four repeatable validated runs
+
+Command: `COREMARK.TOS`, without arguments, from `C:\APPS\COREMARK`.
+All four supplied runs reported exactly:
+
+```text
+CoreMark Size    : 666
+Total ticks      : 3110
+Total time (secs): 15.550000
+Iterations/Sec   : 12.861736
+Iterations       : 200
+Compiler version : GCC8.2.1 20181017
+Compiler flags   : -O2 -mcpu=68000 -fomit-frame-pointer -DPERFORMANCE_RUN=1
+Memory location  : Code and data in RAM
+seedcrc          : 0xe9f5
+[0]crclist       : 0xe714
+[0]crcmatrix     : 0x1fd7
+[0]crcstate      : 0x8e3a
+[0]crcfinal      : 0x382f
+Correct operation validated. See README.md for run and reporting rules.
+```
+
+The arithmetic is consistent: `3110 / 200 = 15.550` seconds and
+`200 / 15.550 = 12.861736` iterations/s. The benchmark selected 200 iterations
+instead of the uncached run's 110. Its final CRC is iteration-dependent;
+both configurations reported successful validation. Identical reported scores
+show repeatability at the 5 ms timer resolution, not necessarily identical
+sub-tick execution times.
+
+For a longer run with the same default performance seeds, the released Atari
+port accepts the iteration count as its fourth argument:
+
+```text
+COREMARK.TOS 0 0 0 1000
+```
+
+This requests 1,000 internal iterations, not 1,000 independent benchmark runs.
+It is documented for future use; no result for this command has been supplied.
+See the [released port's argument handling](https://github.com/czietz/coremark/blob/atari_port/core_main.c).
+
+### YAARTTT: three completed passes, zero reported errors
+
+Command: `YAARTTT.TOS` from `C:\APPS\YAART`, selecting `S` for ST-RAM.
+Version 0.2.3 reported the range **`$00026B18` to `$00D80000`**, approximately
+**13.35 MiB**. The supplied log shows:
+
+| Elapsed time | Progress | Reported errors |
+| --- | --- | ---: |
+| 00:00:00 | Pass 1 begins | 0 |
+| 00:04:15 | Pass 2 begins; pass 1 complete | 0 |
+| 00:08:31 | Pass 3 begins; two passes complete | 0 |
+| 00:12:46 | Pass 4 begins; three passes complete | 0 |
+| 00:12:54 | Pass 4, ones/zeros test, pattern `0000` | 0 |
+
+The completed passes exercised own-address patterns, moving inversions with
+zero/one and walking-bit patterns, and random patterns `67b5`, `6a81`, and
+`76e6`. Do not count pass 4 as completed. These are tests of the cached system;
+they do not independently prove every physical SDRAM access or cover reserved
+OS memory, low-memory BRAM, or the framebuffer. The earlier uncached YAARTTT
+log establishes correctness evidence, but its capture gap and different start
+address make it unsuitable as a controlled timing comparison.
+
+### Remaining integration observations
+
+EmuTOS booted, but the user initially reported a reset when opening the Desk
+menu. After reprogramming the FPGA, the user could not reproduce it. The cause
+is unresolved; no exception output was supplied, and it must not be marked
+fixed solely because later benchmarks pass.
+
+Top-level elaboration passes after declaring the system and SDRAM clock
+domains synchronous; their clocks originate from the same PLL. This declaration
+does not establish physical setup/hold timing. Cross-domain timing review and
+repeatable desktop/reset/power-cycle checks remain outstanding before treating
+the cache integration as fully validated. A same-address direction change
+without an idle gap is a conditional limitation of the SDRAM wrapper; that
+sequence has not been established for the current TG68K workload and is not a
+confirmed cause of the reset.
 
 ## SD-card file integrity: partial results
 
