@@ -3,7 +3,7 @@ package rt68ice
 import rt68ice.audio.{Audio, Ym2149Device}
 import rt68ice.core._
 import rt68ice.io._
-import rt68ice.memory.{Mem16Bit, SdRam, SdRamDevice}
+import rt68ice.memory.{DirectMappedCache, Mem16Bit, SdRam, SdRamDevice}
 import rt68ice.timer.{Counter, Timer}
 import rt68ice.video.{Gpdi, VgaDevice}
 import spinal.core._
@@ -61,7 +61,11 @@ case class Rt68IceTopLevel(romFile: String) extends Component {
     // SDRAM
     val sdRamDevice = SdRamDevice(clockCtrl.sdRamCd)
     sdRamDevice.io.sdRam <> io.sdram
-    bus.io.sdRamBus <> sdRamDevice.io.bus
+
+    // Cache
+    val cache = DirectMappedCache()
+    cache.io.ramBus <> sdRamDevice.io.bus
+    cache.io.mainBus <> bus.io.sdRamBus
 
     // Counter
     val counter = Counter()

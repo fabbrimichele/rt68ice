@@ -6,7 +6,7 @@
 /* Commands:
 ```
 ecppll -i 25 --clkin_name clkin_25 --clkout0 125 --clkout0_name clk_hdmi --clkout1 25 --clkout1_name clk_vga -f hw/verilog/pll1.v
-ecppll -i 25 --clkin_name clkin_25 --clkout0 25 --clkout0_name clk_cpu --clkout1 50 --clkout1_name clk_sdram --phase3 180 --clkout2 12 --clkout2_name clk_usb -f hw/verilog/pll2.v
+ecppll -i 25 --clkin_name clkin_25 --clkout0 25 --clkout0_name clk_cpu --clkout1 50 --clkout1_name clk_sdram --phase1 0 --clkout2 12 --clkout2_name clk_usb -f hw/verilog/pll2.v
 ```
 */
 
@@ -16,7 +16,7 @@ module pll
     output clk_hdmi,    // 125 MHz, 0 deg
     output clk_vga,     // 25 MHz, 0 deg
     output clk_cpu,     // 25 MHz, 0 deg
-    output clk_sdram,   // 50 MHz, 180 deg
+    output clk_sdram,   // 50 MHz, 0 deg; SdRamCtrl inverts this for the external SDRAM clock pin
     output clk_usb,     // 12 MHz, 0 deg
     output locked
 );

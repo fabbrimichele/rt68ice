@@ -41,6 +41,11 @@ case class ClockCtrl() extends Component {
     pllClock = pll.io.clk_sdram,
   )
 
+  // Both domains come from pll_1 with a fixed 2:1 frequency ratio and 0-degree
+  // phase settings. Declare that relationship for SpinalHDL's crossing checks;
+  // physical setup/hold timing between the clocks still needs verification.
+  systemCd.setSynchronousWith(sdRamCd)
+
   val usbCd = createClockDomain(
     name = "clkUsb",
     frequency = 12 MHz,
