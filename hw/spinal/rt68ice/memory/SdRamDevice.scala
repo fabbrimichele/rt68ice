@@ -10,15 +10,22 @@ import scala.language.postfixOps
 //noinspection ScalaWeakerAccess
 case class SdRamDevice(sdRamCd: ClockDomain) extends Component {
   val io = new Bundle {
-    val bus       = slave(M68KDeviceBus())
-    val sdRam     = master(SdRam())
+    val bus           = slave(M68KDeviceBus())
+    val readLineData  = out(Bits(64 bits))
+    val sdRam         = master(SdRam())
   }
 
   // This device does not generate interrupt requests.
   io.bus.irq := False
 
   sdRamCd {
-    val sdRam = SdRamCtrl(SdRamCtrlConfig(clockSpeedMhz = sdRamCd.frequency.getValue.toDouble / 1_000_000))
+    val sdRamConfig = SdRamCtrlConfig(
+      clockSpeedMhz = sdRamCd.frequency.getValue.toDouble / 1_000_000,
+      burstLength = 4,
+      p0BurstLength = 4,
+    )
+
+    val sdRam = SdRamCtrl(sdRamConfig)
     io.sdRam.clock    := sdRam.io.sdRam.clock
     io.sdRam.cke      := sdRam.io.sdRam.cke
     io.sdRam.a        := sdRam.io.sdRam.a
@@ -33,7 +40,8 @@ case class SdRamDevice(sdRamCd: ClockDomain) extends Component {
 
     // --- CPU/Chipset interface ---
     sdRam.io.p0Data   := io.bus.dataOut
-    io.bus.dataIn     := sdRam.io.p0Q
+    io.bus.dataIn     := sdRam.io.p0Q(15 downto 0)
+    io.readLineData   := sdRam.io.p0Q
     // Pass enough CPU address bits to access up to 16 MiB of SDRAM.
     // Dropping the byte-select bit produces a 23-bit word offset.
     sdRam.io.p0Addr   := io.bus.address(23 downto 1).resized
