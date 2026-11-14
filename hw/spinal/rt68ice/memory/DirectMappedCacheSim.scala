@@ -206,5 +206,51 @@ object DirectMappedCacheSim extends App {
     // Accept the RAM result and refill, then release the CPU request.
     finishRead()
     assert(!ram.sel.toBoolean, "RAM should be deselected after the post-reset read")
+
+    // ------- Consecutive words without deselection -------
+    // First read both uncached words, then repeat with both words cached.
+    for (cached <- Seq(false, true)) {
+      for ((address, data) <- Seq((0x2000L, 0x1122), (0x2002L, 0x3344))) {
+        ram.ready #= false
+        ram.dataIn #= 0xDEAD
+        startRead(address)
+        assert(!main.ready.toBoolean, "Each word should stall during lookup")
+        assert(!ram.sel.toBoolean, "Word lookup should not select RAM before its edge")
+
+        dut.clockDomain.waitSampling()
+        sleep(1)
+        if (cached) {
+          assert(main.ready.toBoolean, "Cached consecutive word should hit")
+          assert(main.dataIn.toInt == data, "Hit should return the correct consecutive word")
+          assert(!ram.sel.toBoolean, "Consecutive hit should not select RAM")
+          assert(!ram.uds.toBoolean && !ram.lds.toBoolean,
+            "Consecutive hit should not assert RAM strobes")
+        } else {
+          assert(!main.ready.toBoolean, "Uncached consecutive word should miss")
+          checkRamRead(address)
+          // Exercise a delayed response for each half of the longword.
+          for (_ <- 0 until 2) {
+            dut.clockDomain.waitSampling()
+            sleep(1)
+            assert(!main.ready.toBoolean, "CPU should wait for each consecutive RAM read")
+            checkRamRead(address)
+          }
+          respondFromRam(data)
+          assert(main.ready.toBoolean, "Consecutive RAM read should complete")
+          assert(main.dataIn.toInt == data, "Miss should return the correct consecutive word")
+        }
+
+        assert(main.sel.toBoolean && main.uds.toBoolean && main.lds.toBoolean,
+          "CPU selection and both strobes should remain asserted for the longword")
+        if (address == 0x2000L) {
+          // Accept the first word, then change only the address for the second.
+          // Do not call finishRead(): it would deselect the CPU bus.
+          dut.clockDomain.waitSampling()
+        } else {
+          finishRead()
+          assert(!ram.sel.toBoolean, "RAM should be deselected after the second word")
+        }
+      }
+    }
   }
 }
