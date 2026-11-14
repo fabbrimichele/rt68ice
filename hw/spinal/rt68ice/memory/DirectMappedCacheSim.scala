@@ -8,12 +8,12 @@ object DirectMappedCacheSim extends App {
     val main = dut.io.mainBus
     val ram = dut.io.ramBus
 
-    // Start a full-word CPU read; RAM responses remain controlled by each test.
-    def startRead(address: Long): Unit = {
+    // Start a CPU read; default to both byte lanes for a full word.
+    def startRead(address: Long, upper: Boolean = true, lower: Boolean = true): Unit = {
       main.address #= address
       main.wr #= false
-      main.uds #= true
-      main.lds #= true
+      main.uds #= upper
+      main.lds #= lower
       main.sel #= true
       sleep(1)
     }
@@ -251,6 +251,61 @@ object DirectMappedCacheSim extends App {
           assert(!ram.sel.toBoolean, "RAM should be deselected after the second word")
         }
       }
+    }
+
+    // ------- Byte reads -------
+    // Exercise both an even/upper-byte miss and an odd/lower-byte miss.
+    // Each miss must fetch a whole word so the other byte can subsequently hit.
+    for ((base, firstLower, data) <- Seq((0x3000L, false, 0xA17C), (0x3002L, true, 0x6BD2))) {
+      for (cached <- Seq(false, true)) {
+        val lower = if (cached) !firstLower else firstLower
+        val address = base + (if (lower) 1 else 0)
+        val expectedByte = if (lower) data & 0xff else (data >> 8) & 0xff
+        ram.ready #= false
+        ram.dataIn #= 0xDEAD
+        startRead(address, upper = !lower, lower = lower)
+        assert(!main.ready.toBoolean, "Byte read should stall during lookup")
+        assert(!ram.sel.toBoolean, "Byte lookup should not select RAM before its edge")
+
+        dut.clockDomain.waitSampling()
+        sleep(1)
+        if (cached) {
+          assert(main.ready.toBoolean, "The other byte of the filled word should hit")
+          assert(!ram.sel.toBoolean, "Byte hit should not select RAM")
+          assert(!ram.uds.toBoolean && !ram.lds.toBoolean,
+            "Byte hit should not assert RAM strobes")
+        } else {
+          assert(!main.ready.toBoolean, "Uncached byte read should miss")
+          // SdRamDevice drops address bit 0; both strobes request the entire word.
+          checkRamRead(address)
+          dut.clockDomain.waitSampling()
+          sleep(1)
+          assert(!main.ready.toBoolean, "Byte miss should wait for RAM")
+          checkRamRead(address)
+          respondFromRam(data)
+          assert(main.ready.toBoolean, "Byte miss should complete with the RAM response")
+        }
+
+        // TG68K selects the requested byte from its original bus lane.
+        val receivedByte = if (lower) main.dataIn.toInt & 0xff else (main.dataIn.toInt >> 8) & 0xff
+        assert(receivedByte == expectedByte, "Byte read should return the correct byte lane")
+        finishRead()
+        assert(!ram.sel.toBoolean, "RAM should be deselected after the byte read")
+      }
+
+      // Both bytes, including the one not originally requested, must be cached.
+      ram.ready #= false
+      ram.dataIn #= 0xDEAD
+      startRead(base)
+      assert(!main.ready.toBoolean, "Word read after byte fill should stall during lookup")
+      assert(!ram.sel.toBoolean, "Word lookup after byte fill should not select RAM")
+      dut.clockDomain.waitSampling()
+      sleep(1)
+      assert(main.ready.toBoolean, "Byte fill should make the complete word hit")
+      assert(main.dataIn.toInt == data, "Byte fill should preserve both bytes of the word")
+      assert(!ram.sel.toBoolean, "Word hit after byte fill should not access RAM")
+      finishRead()
+      assert(!ram.sel.toBoolean, "RAM should remain deselected after the word hit")
     }
   }
 }
