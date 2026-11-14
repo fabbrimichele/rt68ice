@@ -151,5 +151,60 @@ object DirectMappedCacheSim extends App {
       finishRead()
       assert(!ram.sel.toBoolean, "RAM should remain deselected after replacement hit")
     }
+
+    // ------- Reset invalidation -------
+
+    // Read hits
+    ram.ready #= false
+    startRead(0x1234L)
+
+    assert(!main.ready.toBoolean, "CPU should stall during the hit lookup")
+    assert(!ram.sel.toBoolean, "Hit lookup should not select RAM")
+
+    dut.clockDomain.waitSampling()
+    sleep(1)
+    assert(main.ready.toBoolean, "Cache hit should complete without waiting for RAM")
+    assert(main.dataIn.toInt == 0xA55A, "Cache hit should return the stored word")
+    assert(!ram.sel.toBoolean, "Cache hit should not select RAM")
+    assert(!ram.uds.toBoolean, "Cache hit should not assert the RAM upper byte strobe")
+    assert(!ram.lds.toBoolean, "Cache hit should not assert the RAM lower byte strobe")
+
+    // Accept the cached result and release the CPU request.
+    finishRead()
+    assert(!ram.sel.toBoolean, "RAM should remain deselected after the hit")
+
+    // Reset
+    dut.clockDomain.assertReset()
+    dut.clockDomain.waitRisingEdge(2)
+    dut.clockDomain.deassertReset()
+    dut.clockDomain.waitSampling(2)
+
+    // The previously cached address must miss after reset.
+    ram.ready #= false
+    ram.dataIn #= 0xDEAD
+    startRead(0x1234L)
+
+    assert(!main.ready.toBoolean, "CPU should stall during the post-reset lookup")
+    assert(!ram.sel.toBoolean, "Post-reset lookup should not select RAM before the lookup edge")
+
+    dut.clockDomain.waitSampling()
+    sleep(1)
+    assert(!main.ready.toBoolean, "Reset should invalidate the entry and cause a miss")
+    checkRamRead(0x1234L)
+
+    // Enter the RAM-wait state and verify the CPU is still stalled.
+    dut.clockDomain.waitSampling()
+    sleep(1)
+    assert(!main.ready.toBoolean, "Post-reset miss should wait for RAM data")
+    checkRamRead(0x1234L)
+
+    // A different word proves this read uses RAM rather than stale cached data.
+    respondFromRam(0xCAFE)
+    assert(main.ready.toBoolean, "Post-reset read should complete when RAM is ready")
+    assert(main.dataIn.toInt == 0xCAFE, "Post-reset read should return the new RAM word")
+
+    // Accept the RAM result and refill, then release the CPU request.
+    finishRead()
+    assert(!ram.sel.toBoolean, "RAM should be deselected after the post-reset read")
   }
 }
