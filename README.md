@@ -1,6 +1,17 @@
 # rt68ice
 RT68 IceSugar Pro version
 
+## SDRAM cache
+
+The system includes a 2 KiB unified direct-mapped cache with 1,024 one-word
+lines, write-through and invalidation on writes. SDRAM requests and responses
+are registered; system/SDRAM clocks remain 25/50 MHz. Hardware tests passed
+SDRAM diagnostics, three YAARTTT passes and three validated CoreMark runs.
+The registered cache scores about 11.01 CoreMark iterations/s versus 7.01
+uncached. See [hardware validation](doc/validation.md#registered-cache-hardware-validation-2026-11-14)
+and [interface timing](doc/cache-registered-interface.md) for comparisons and
+remaining timing/coverage limitations. Multiword burst-filled lines are future work.
+
 ## Memory Layout
 See the generated [System Memory Layout](./doc/memory_layout.md).
 

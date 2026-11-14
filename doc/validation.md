@@ -1,6 +1,6 @@
 # RT68ICE validation results
 
-Recorded: 2026-11-05. Updated with SPI CPU word-access results: 2026-11-07.
+Recorded: 2026-11-05. Updated with registered-cache hardware results: 2026-11-14.
 
 These results summarize tests run on the board by the user and reported during
 the EmuTOS porting session. They provide an initial CPU, memory and storage
@@ -35,7 +35,8 @@ captured. The display mode used during testing was not recorded.
 ## Summary
 
 The original rows below describe the uncached baseline. Later cache results
-are recorded separately in [cached-system validation](#cached-system-validation-2026-11-14).
+are recorded separately in [cached-system validation](#cached-system-validation-2026-11-14)
+and [registered-cache validation](#registered-cache-hardware-validation-2026-11-14).
 
 | Test | Observed result | Interpretation |
 | --- | --- | --- |
@@ -287,6 +288,98 @@ passed but do not by themselves fully validate the integration. A same-address d
 without an idle gap is a conditional limitation of the SDRAM wrapper; that
 sequence has not been established for the current TG68K workload and is not a
 confirmed cause of the reset.
+
+## Registered-cache hardware validation (2026-11-14)
+
+After building and programming the request/response-registered cache version,
+the user supplied the results below. The implementation is commit `b57059f`
+on `cache-registered-interface`, subsequently merged through
+`direct-mapped-cache` into `main`. These are user-reported source/build
+associations; hashes of the loaded bitstream and test executables were not
+supplied. CPU/system and SDRAM clocks remain 25 MHz and 50 MHz. The cache
+still has 1,024 one-word entries (2 KiB of data), with write-through,
+no write allocation and slot invalidation on writes.
+
+The request and response registers each add one system clock to SDRAM
+transactions: two cycles total (80 ns) for misses and writes relative to the
+original cache. Cache-hit latency is unchanged.
+
+### SDRAM diagnostics and performance
+
+All four correctness tests reported `Passed!`: data bus integrity, row/bank
+conflict, timing stress and upper SDRAM stress (`$D82000`). The copy benchmark
+reported **4,433 counter cycles**, or **177.32 microseconds** at 25 MHz.
+
+| Configuration | Copy counter cycles | CoreMark iterations/s |
+| --- | ---: | ---: |
+| Uncached | 7,191 | 7.013069 |
+| Original 2 KiB cache | 3,733 | 12.861736 |
+| Registered 2 KiB cache | 4,433 | 11.010184–11.013216 |
+
+Compared with the original cache, copy time increases **18.8%** and CoreMark
+throughput falls about **14.4%**. Compared with uncached, the registered cache
+still gives **1.62x copy speed** (38.4% less elapsed time) and approximately
+**57.0% higher CoreMark throughput**. Copy results are single supplied runs per
+configuration, and CoreMark's uncached run uses 110 iterations versus 200 in
+both cached versions. These are workload comparisons, not raw memory bandwidth.
+
+### CoreMark: three validated runs
+
+Command: `COREMARK.TOS`, without arguments, from `C:\APPS\COREMARK`.
+
+| Run | Iterations | Total ticks | Seconds | Iterations/s | Validation |
+| --- | ---: | ---: | ---: | ---: | --- |
+| 1 | 200 | 3,632 | 18.159999 | 11.013216 | Passed |
+| 2 | 200 | 3,632 | 18.159999 | 11.013216 | Passed |
+| 3 | 200 | 3,633 | 18.165000 | 11.010184 | Passed |
+
+All runs retain size 666, GCC8.2.1 20181017 and flags
+`-O2 -mcpu=68000 -fomit-frame-pointer -DPERFORMANCE_RUN=1`, with code and data
+in RAM. All report seed CRC `e9f5`, list `e714`, matrix `1fd7`, state `8e3a`
+and final `382f`, matching the original cached runs, and successful validation.
+The third run differs by one 5 ms timer tick, about 0.028%. Timer wall-clock
+accuracy and executable identity were not independently established.
+
+### YAARTTT: three completed passes, zero reported errors
+
+`YAARTTT.TOS` v0.2.3, selecting `S` for ST-RAM, tested the same reported range
+`$00026B18`–`$00D80000` as the original cached run (approximately 13.35 MiB).
+
+| Elapsed time | Progress | Reported errors |
+| --- | --- | ---: |
+| 00:00:00 | Pass 1 begins | 0 |
+| 00:04:50 | Pass 2 begins; one complete | 0 |
+| 00:09:40 | Pass 3 begins; two complete | 0 |
+| 00:14:30 | Pass 4 begins; three complete | 0 |
+| 00:14:39 | Pass 4, ones/zeros pattern `0000` | 0 |
+| 00:15:04 | Pass 4, ones/zeros pattern `ffff` begins | Not printed in final excerpt |
+
+The three completed passes include own-address, zero/one, walking-bit and
+random patterns (`2d7f`, `7c7a`, `2654`). Pass 4 is incomplete in the log.
+Each complete pass takes about 4 min 50 s, versus about 4 min 15 s in the
+original cache log (roughly 14% longer). The same coverage limitations apply:
+this is free-memory testing of the cached system, not the full physical SDRAM.
+
+### Timing and remaining observations
+
+The detailed registered-interface route reports **11.370 ns** system to SDRAM
+and **7.841 ns** SDRAM to system, versus 25.528 ns and 22.153 ns for the
+original cache. All final per-clock checks pass; block RAM use remains
+**51/56**. These maxima are below the shortest nominal 20 ns edge interval,
+but explicit related-clock setup/hold sign-off remains outstanding. The
+user rebuilt the bitstream for hardware testing; its routing identity relative
+to the archived timing report was not verified. See
+[registered-interface details](cache-registered-interface.md).
+
+The registered interface releases RAM selection between transactions even
+when CPU selection stays asserted; its standalone simulation checks a read
+miss followed by a same-address write. The earlier conditional wrapper
+limitation is therefore not carried forward unchanged at the cache boundary.
+The initial unexplained Desk-menu reset remains unresolved. Repeated desktop,
+reset and power-cycle checks and FILETEST were not supplied for this registered
+version; the earlier FILETEST and post-reboot success applies to the original
+cache version only. Larger lines and burst fills are future work, not part of
+this tested implementation.
 
 ## SD-card file integrity: partial results
 

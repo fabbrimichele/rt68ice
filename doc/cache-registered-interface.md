@@ -1,4 +1,4 @@
-# Registered cache request experiment
+# Registered cache SDRAM interface
 
 Branch: `cache-registered-interface`, based on `direct-mapped-cache` at
 `f69cec1`. The baseline timing report is
@@ -50,7 +50,7 @@ and readiness after capture does not change the CPU's registered response.
 Existing consecutive request checks also cover clearing stale completion before
 the next request. This is the standalone
 RAM test model, not a simulation of the actual SDRAM controller or physical
-clock timing. The new implementation has not yet been tested on hardware.
+clock timing. Hardware tests supplied after the user rebuilt/programmed this version are recorded below.
 
 ## Request-only routed timing comparison, 2026-11-14
 
@@ -149,14 +149,33 @@ alone do not establish full timing closure. No timing exceptions were added.
 All final per-clock checks pass. Resources are 51/56 DP16KD, 19,936
 TRELLIS_COMB and 6,207 TRELLIS_FF. No additional block RAM is consumed.
 
-The normal `rt68ice.json` now contains both stages. The normal
-`rt68ice.config` and `rt68ice.bit` still contain the original cache build;
-this experiment routed to `/tmp` and did not program the FPGA. Hardware
-validation and performance measurements remain to be repeated for this version;
-the earlier cached benchmark results describe the original implementation.
+At the end of this timing experiment, `rt68ice.json` contained both stages,
+but the normal configuration and bitstream had not been rebuilt: routing
+outputs were written to `/tmp`. The user subsequently rebuilt and programmed
+the FPGA, then supplied the hardware results below. The loaded bitstream's
+identity relative to this archived route was not verified by hash.
 
 | Request and response artifact | SHA-256 |
 | --- | --- |
 | Synthesized netlist | `3060827eb8366739949ac7aae291c934ee76b113e4de10326d780ecc27983cb5` |
 | Timing report | `1ffb35ea13471221dc7042ceed28dc2d4216e7aa8ae136926580c4c59bf4cb6f` |
 | Routed configuration | `55f0f90452abf4d58defc087556550785e5c975707483f9fc7f460768d5122e4` |
+
+## Hardware validation after rebuild, 2026-11-14
+
+The user reports all four SDRAM correctness diagnostics passing and a copy
+benchmark of **4,433 cycles** (original cache 3,733; uncached 7,191). YAARTTT
+completed three passes with zero reported errors over `$00026B18`–`$00D80000`;
+pass 4 was in progress. Three CoreMark runs validated: the first two report
+3,632 ticks and 11.013216 iterations/s; the third reports 3,633 ticks and
+11.010184 iterations/s, all for 200 iterations with matching CRCs.
+
+Copy time is 18.8% longer and CoreMark throughput about 14.4% lower than the
+original cache. The registered cache remains 1.62x faster for the copy workload
+and about 57.0% faster in CoreMark than uncached. These results establish the
+baseline for future multiword cache lines; that feature is not implemented.
+
+See [registered-cache hardware validation](validation.md#registered-cache-hardware-validation-2026-11-14)
+for the complete run table, provenance and limitations. FILETEST and repeated
+desktop/power-cycle checks have not been supplied for this version. The timing
+qualification above remains applicable despite successful hardware tests.
