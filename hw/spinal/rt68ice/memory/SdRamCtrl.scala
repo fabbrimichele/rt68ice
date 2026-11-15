@@ -49,7 +49,8 @@ case class SdRamCtrl(config: SdRamCtrlConfig = SdRamCtrlConfig()) extends Compon
   private val settingTrcdNs = 21
   private val settingRefreshTimerNs = 7500
   private val settingTmrdCycles = 2
-  private val settingUseFastInputRegister = true
+  // DQ is sampled directly below; there is no extra input-register pipeline stage.
+  private val settingUseFastInputRegister = false
 
   private val cyclesUntilStartInhibit =
     ceilCycles(settingInhibitDelayMicroSec * 500.0)

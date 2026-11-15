@@ -8,6 +8,18 @@ object DirectMappedCacheSim extends App {
     val main = dut.io.mainBus
     val ram = dut.io.ramBus
 
+    // Word-addressed backing store. A burst packs the lowest address in bits 15:0.
+    val ramWords = scala.collection.mutable.Map.empty[Long, Int]
+    val lineMask = (BigInt(1) << 64) - 1
+    def packedLine(address: Long): BigInt = {
+      val base = address & ~7L
+      (0 until 4).foldLeft(BigInt(0)) { (packed, word) =>
+        val wordAddress = base + word * 2
+        val data = ramWords.getOrElse(wordAddress, ((wordAddress >> 1) ^ 0x5A5A).toInt & 0xFFFF)
+        packed | (BigInt(data) << (word * 16))
+      }
+    }
+
     // Start a CPU read; default to both byte lanes for a full word.
     def startRead(address: Long, upper: Boolean = true, lower: Boolean = true): Unit = {
       main.address #= address
@@ -29,7 +41,10 @@ object DirectMappedCacheSim extends App {
 
     // RAM completion must cross the response register before reaching the CPU.
     def respondFromRam(data: Int): Unit = {
-      ram.dataIn #= data
+      ramWords(main.address.toLong & ~1L) = data
+      val burst = packedLine(main.address.toLong)
+      dut.io.ramReadLineData #= burst
+      ram.dataIn #= (data ^ 0xFFFF) // The old 16-bit bus must not supply the read.
       ram.ready #= true
       sleep(1)
       assert(!main.ready.toBoolean, "Raw RAM completion must not bypass the response register")
@@ -37,20 +52,22 @@ object DirectMappedCacheSim extends App {
       sleep(1)
       assert(main.ready.toBoolean, "Captured RAM completion should release the CPU")
       // Changing the source after capture must not change the CPU response.
-      ram.dataIn #= (data ^ 0xFFFF)
+      dut.io.ramReadLineData #= (burst ^ lineMask)
+      ram.dataIn #= 0xDEAD
       ram.ready #= false
       sleep(1)
       assert(main.ready.toBoolean, "CPU completion must use the captured readiness")
       assert(main.dataIn.toInt == data, "CPU data must use the captured RAM word")
     }
 
-    // Check a full-word downstream read without advancing simulation time.
+    // Check a full-line downstream read without advancing simulation time.
     def checkRamRead(address: Long): Unit = {
       assert(ram.sel.toBoolean, "RAM request should be selected")
       assert(ram.uds.toBoolean, "RAM upper byte strobe should be asserted")
       assert(ram.lds.toBoolean, "RAM lower byte strobe should be asserted")
       assert(!ram.wr.toBoolean, "RAM request should be a read")
-      assert(ram.address.toLong == address, "RAM request should use the expected address")
+      assert(ram.address.toLong == (address & ~7L),
+        f"RAM burst for CPU address $$${address}%X should start at aligned line $$${address & ~7L}%X")
     }
 
     // A miss registers selection on the edge after the synchronous lookup.
@@ -62,9 +79,7 @@ object DirectMappedCacheSim extends App {
       checkRamRead(address)
     }
 
-    // Small word-addressed RAM model used by the write tests. Apply the actual
-    // downstream write lanes at the completion edge, not the expected test value.
-    val ramWords = scala.collection.mutable.Map.empty[Long, Int]
+    // Writes below apply the actual downstream address/data/byte lanes to RAM.
 
     def releaseCpuRequest(): Unit = {
       main.sel #= false
@@ -143,6 +158,7 @@ object DirectMappedCacheSim extends App {
     def readStoredWord(address: Long, expectHit: Boolean): Int = {
       ram.ready #= false
       ram.dataIn #= 0xDEAD
+      dut.io.ramReadLineData #= lineMask
       startRead(address)
       assert(!main.ready.toBoolean, "CPU read should stall during lookup")
       assert(!ram.sel.toBoolean, "Lookup should not select RAM before its clock edge")
@@ -176,6 +192,7 @@ object DirectMappedCacheSim extends App {
     main.lds #= false
     main.sel #= false
     ram.dataIn #= 0
+    dut.io.ramReadLineData #= 0
     ram.ready #= true
     ram.irq #= false
 
@@ -204,7 +221,7 @@ object DirectMappedCacheSim extends App {
       checkRamRead(0x1234L)
     }
 
-    // Present valid RAM data. Check completion before its sampling edge.
+    // Present the whole line; completion and data must pass the response register.
     respondFromRam(0xA55A)
     assert(main.ready.toBoolean, "CPU should be ready when RAM completes")
     assert(main.dataIn.toInt == 0xA55A, "CPU should receive the RAM word")
@@ -234,10 +251,26 @@ object DirectMappedCacheSim extends App {
     finishRead()
     assert(!ram.sel.toBoolean, "RAM should remain deselected after the hit")
 
+    // ------- Every word offset on a miss, then all four words hit -------
+    // Distinct words expose reversed burst packing or a constant word selector.
+    for (firstWord <- 0 until 4) {
+      val base = 0x10000L + firstWord * 8
+      for (word <- 0 until 4) {
+        ramWords(base + word * 2) = 0x8100 + firstWord * 0x10 + word
+      }
+      val firstAddress = base + firstWord * 2
+      assert(readStoredWord(firstAddress, expectHit = false) == 0x8100 + firstWord * 0x10 + firstWord,
+        "A miss at any word offset must return that word from the aligned burst")
+      for (word <- 0 until 4) {
+        assert(readStoredWord(base + word * 2, expectHit = true) == 0x8100 + firstWord * 0x10 + word,
+          "One burst fill must cache all four words in address order")
+      }
+    }
+
     // ------- Conflict and replacement -------
-    // $1234 and $1A34 share slot $11A, but have different tags.
-    // Replace $1234 with $1A34, then verify that reading $1234 misses again.
-    for ((address, data) <- Seq((0x1A34L, 0xBEEF), (0x1234L, 0xA55A))) {
+    // $1234 and $3234 are $2000 bytes apart: same slot $246, different tags.
+    // Replace the entire $1230 line with $3230, then verify $1234 misses again.
+    for ((address, data) <- Seq((0x3234L, 0xBEEF), (0x1234L, 0xA55A))) {
       ram.ready #= false
       ram.dataIn #= 0xDEAD
       startRead(address)
@@ -333,9 +366,14 @@ object DirectMappedCacheSim extends App {
     assert(!ram.sel.toBoolean, "RAM should be deselected after the post-reset read")
 
     // ------- Consecutive words without deselection -------
-    // First read both uncached words, then repeat with both words cached.
-    for (cached <- Seq(false, true)) {
-      for ((address, data) <- Seq((0x2000L, 0x1122), (0x2002L, 0x3344))) {
+    // Within a line the second word hits after the first miss. Across a line
+    // boundary both words miss on the first traversal. CPU selection stays high.
+    for ((firstAddress, secondAddress, sameLine) <-
+         Seq((0x2000L, 0x2002L, true), (0x2106L, 0x2108L, false));
+         cached <- Seq(false, true)) {
+      ramWords(firstAddress) = 0x1122
+      ramWords(secondAddress) = 0x3344
+      for ((address, data) <- Seq((firstAddress, 0x1122), (secondAddress, 0x3344))) {
         ram.ready #= false
         ram.dataIn #= 0xDEAD
         startRead(address)
@@ -344,8 +382,8 @@ object DirectMappedCacheSim extends App {
 
         dut.clockDomain.waitSampling()
         sleep(1)
-        if (cached) {
-          assert(main.ready.toBoolean, "Cached consecutive word should hit")
+        if (cached || (sameLine && address == secondAddress)) {
+          assert(main.ready.toBoolean, "A consecutive word in an already filled line should hit")
           assert(main.dataIn.toInt == data, "Hit should return the correct consecutive word")
           assert(!ram.sel.toBoolean, "Consecutive hit should not select RAM")
           assert(!ram.uds.toBoolean && !ram.lds.toBoolean,
@@ -367,7 +405,7 @@ object DirectMappedCacheSim extends App {
 
         assert(main.sel.toBoolean && main.uds.toBoolean && main.lds.toBoolean,
           "CPU selection and both strobes should remain asserted for the longword")
-        if (address == 0x2000L) {
+        if (address == firstAddress) {
           // Accept the first word, then change only the address for the second.
           // Do not call finishRead(): it would deselect the CPU bus.
           dut.clockDomain.waitSampling()
@@ -381,7 +419,7 @@ object DirectMappedCacheSim extends App {
     // ------- Byte reads -------
     // Exercise both an even/upper-byte miss and an odd/lower-byte miss.
     // Each miss must fetch a whole word so the other byte can subsequently hit.
-    for ((base, firstLower, data) <- Seq((0x3000L, false, 0xA17C), (0x3002L, true, 0x6BD2))) {
+    for ((base, firstLower, data) <- Seq((0x3000L, false, 0xA17C), (0x300AL, true, 0x6BD2))) {
       for (cached <- Seq(false, true)) {
         val lower = if (cached) !firstLower else firstLower
         val address = base + (if (lower) 1 else 0)
@@ -401,7 +439,7 @@ object DirectMappedCacheSim extends App {
             "Byte hit should not assert RAM strobes")
         } else {
           assert(!main.ready.toBoolean, "Uncached byte read should miss")
-          // SdRamDevice drops address bit 0; both strobes request the entire word.
+          // Even an odd-byte request must fetch the aligned four-word line.
           launchRamRead(address)
           dut.clockDomain.waitSampling()
           sleep(1)
@@ -454,34 +492,41 @@ object DirectMappedCacheSim extends App {
       "Refilled entry must contain the new word")
 
     // ------- Write miss must not allocate -------
-    ramWords(0x4400L) = 0xFFFF
-    startWrite(0x4400L, 0x789A)
-    completeRamWrite(0x4400L, 0x789A)
+    ramWords(0x4406L) = 0xFFFF
+    startWrite(0x4406L, 0x789A)
+    completeRamWrite(0x4406L, 0x789A)
     releaseCpuRequest()
-    assert(ramWords(0x4400L) == 0x789A, "Uncached-address write must update RAM")
-    assert(readStoredWord(0x4400L, expectHit = false) == 0x789A,
+    assert(ramWords(0x4406L) == 0x789A, "Uncached-address write must update RAM")
+    assert(readStoredWord(0x4406L, expectHit = false) == 0x789A,
       "Write miss must not create a valid cache entry")
-    assert(readStoredWord(0x4400L, expectHit = true) == 0x789A)
+    assert(readStoredWord(0x4406L, expectHit = true) == 0x789A)
 
     // ------- Byte writes preserve the unselected RAM byte -------
-    ramWords(0x4500L) = 0xA17C
-    assert(readStoredWord(0x4500L, expectHit = false) == 0xA17C)
+    ramWords(0x4500L) = 0x1122
+    ramWords(0x4502L) = 0x3344
+    ramWords(0x4504L) = 0xA17C
+    ramWords(0x4506L) = 0x7788
+    assert(readStoredWord(0x4504L, expectHit = false) == 0xA17C)
     // The unselected data lane deliberately differs from the preserved byte.
-    startWrite(0x4500L, 0xB6E9, upper = true, lower = false)
-    completeRamWrite(0x4500L, 0xB6E9, upper = true, lower = false)
+    startWrite(0x4504L, 0xB6E9, upper = true, lower = false)
+    completeRamWrite(0x4504L, 0xB6E9, upper = true, lower = false)
     releaseCpuRequest()
-    assert(ramWords(0x4500L) == 0xB67C, "Upper byte write must preserve the lower byte")
-    assert(readStoredWord(0x4500L, expectHit = false) == 0xB67C,
-      "Upper byte write must invalidate the cached word")
-    assert(readStoredWord(0x4500L, expectHit = true) == 0xB67C)
+    assert(ramWords(0x4504L) == 0xB67C, "Upper byte write must preserve the lower byte")
+    assert(readStoredWord(0x4500L, expectHit = false) == 0x1122,
+      "Upper byte write must invalidate the entire line, including neighbouring words")
+    assert(readStoredWord(0x4504L, expectHit = true) == 0xB67C,
+      "Refill after upper byte write must contain the updated word")
+    assert(readStoredWord(0x4504L, expectHit = true) == 0xB67C)
 
-    startWrite(0x4501L, 0x5AD2, upper = false, lower = true)
-    completeRamWrite(0x4501L, 0x5AD2, upper = false, lower = true)
+    startWrite(0x4505L, 0x5AD2, upper = false, lower = true)
+    completeRamWrite(0x4505L, 0x5AD2, upper = false, lower = true)
     releaseCpuRequest()
-    assert(ramWords(0x4500L) == 0xB6D2, "Lower byte write must preserve the upper byte")
-    assert(readStoredWord(0x4500L, expectHit = false) == 0xB6D2,
-      "Odd-address byte write must invalidate the containing cached word")
-    assert(readStoredWord(0x4500L, expectHit = true) == 0xB6D2)
+    assert(ramWords(0x4504L) == 0xB6D2, "Lower byte write must preserve the upper byte")
+    assert(readStoredWord(0x4500L, expectHit = false) == 0x1122,
+      "Odd-address byte write must invalidate the entire containing line")
+    assert(readStoredWord(0x4504L, expectHit = true) == 0xB6D2,
+      "Refill after lower byte write must contain the updated word")
+    assert(readStoredWord(0x4504L, expectHit = true) == 0xB6D2)
 
     // ------- Consecutive writes without CPU bus deselection -------
     for ((address, data) <- Seq((0x4600L, 0x1122), (0x4602L, 0x3344))) {
@@ -495,7 +540,8 @@ object DirectMappedCacheSim extends App {
     }
     releaseCpuRequest()
     assert(readStoredWord(0x4600L, expectHit = false) == 0x1122)
-    assert(readStoredWord(0x4602L, expectHit = false) == 0x3344)
+    assert(readStoredWord(0x4602L, expectHit = true) == 0x3344,
+      "Reading the first longword half must also cache the second half")
 
     // ------- Write followed by read without an idle cycle -------
     ramWords(0x4700L) = 0x0F0F
@@ -511,7 +557,9 @@ object DirectMappedCacheSim extends App {
     // ------- Read miss followed by same-address write without CPU deselection -------
     // RAM is already ready: the miss must still wait for registered selection.
     ram.ready #= true
-    ram.dataIn #= 0x1357
+    ramWords(0x4800L) = 0x1357
+    dut.io.ramReadLineData #= packedLine(0x4800L)
+    ram.dataIn #= 0xDEAD
     startRead(0x4800L)
     dut.clockDomain.waitSampling()
     sleep(1)

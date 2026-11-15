@@ -14,6 +14,7 @@ Tested with `sdram_test.asm`, test name `Benchmark`:
 | 50 SDRAM (uncached, 2026-11-14) | 25 | 7191 |
 | 50 SDRAM (original 2 KiB cache, 2026-11-14) | 25 | 3733 |
 | 50 SDRAM (registered 2 KiB cache, 2026-11-14) | 25 | 4433 |
+| 50 SDRAM (registered 8 KiB, four-word lines, 2026-11-15) | 25 | 4137 |
 
 I tried the following configuration but the SDRAM doesn't work:
 - SDRAM clock: 78.1250 
@@ -93,3 +94,20 @@ without reported errors, and three CoreMark runs validated at
 for results, comparisons and coverage limitations. Registered-interface routed
 maxima are 11.370/7.841 ns in the two directions; explicit related-clock
 setup/hold sign-off remains outstanding.
+
+### Four-word burst cache (2026-11-15)
+
+The `expand_cache_line` version has 1,024 four-word lines (8 KiB of data),
+registered requests/responses and single-word write-through. Its unmatched
+fast-input-register delay was disabled to capture SDRAM bursts at the proper
+cycle. All four SDRAM diagnostics passed; the copy benchmark reports
+**4,137 cycles**, or **165.48 microseconds** at 25 MHz.
+
+This is 6.7% less copy time than the registered one-word cache's 4,433 cycles,
+and 1.74x copy speed versus uncached. Four CoreMark runs validated at
+12.578616–12.582572 iterations/s, about 14.2% higher throughput than the
+registered 2 KiB baseline. Three YAARTTT passes completed without errors
+in 14:35, essentially unchanged from 14:30. Capacity, burst fills and capture
+timing changed together; the individual contributions were not measured.
+See [burst-cache validation](validation.md#four-word-burst-cache-validation-2026-11-15)
+for full results, resource measurements and remaining checks.

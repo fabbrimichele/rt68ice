@@ -65,6 +65,7 @@ case class Rt68IceTopLevel(romFile: String) extends Component {
     // Cache
     val cache = DirectMappedCache()
     cache.io.ramBus <> sdRamDevice.io.bus
+    cache.io.ramReadLineData := sdRamDevice.io.readLineData
     cache.io.mainBus <> bus.io.sdRamBus
 
     // Counter
