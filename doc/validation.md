@@ -1,6 +1,6 @@
 # RT68ICE validation results
 
-Recorded: 2026-11-05. Updated with registered-cache hardware results: 2026-11-14.
+Recorded: 2026-11-05. Updated with four-word burst-cache hardware results: 2026-11-15.
 
 These results summarize tests run on the board by the user and reported during
 the EmuTOS porting session. They provide an initial CPU, memory and storage
@@ -634,3 +634,103 @@ It requires adaptation before it can provide a meaningful RAM-access result.
 Full original logs are not stored in this report; the CoreMark output and
 selected YAART, SD filetest and GEMBench evidence above were transcribed from
 the supplied logs.
+
+## Four-word burst-cache validation (2026-11-15)
+
+Branch `expand_cache_line` extends the registered cache to **1,024 lines of
+four 16-bit words**, or **8 KiB of data**, with 11-bit tags and separate valid
+bits. Read misses fetch an aligned eight-byte line through the 64-bit SDRAM
+response. Writes remain single-word write-through, with byte enables, no
+allocation and whole-line invalidation. CPU/system and SDRAM clocks remain
+25/50 MHz. Results were supplied by the user after rebuilding/programming;
+loaded binary hashes and external timer accuracy were not recorded.
+
+### Capture timing correction and startup
+
+The first burst build stalled at startup and produced garbled serial output
+following reset. The controller retained a delay for a fast input-register
+stage, although the SpinalHDL capture logic reads DQ directly. Setting
+`settingUseFastInputRegister` to `false` removes the unmatched cycle; the user
+then reported the monitor starting successfully.
+
+A temporary pin-waveform diagnostic using the generated controller and the
+chip's CAS-2 timing captured `2222,3333,4444,invalid` before the correction,
+instead of the supplied `1111,2222,3333,4444` burst. Advancing capture one
+cycle returned all four words correctly; the diagnostic was repeated against
+the corrected generated controller and passed. This diagnostic is not a full
+SDRAM model or a permanent repository test. See the manufacturer
+[datasheet, page 26](https://media.digikey.com/pdf/Data%20Sheets/ISSI%20PDFs/IS42S83200B,IS42S16160B.pdf)
+for CAS timing. The explanation that late single-word reads previously worked
+because of residual bus data remains unverified.
+
+### SDRAM diagnostics and performance
+
+Data bus integrity, row/bank conflict, timing stress and upper-SDRAM stress
+all reported `Passed!`. The copy benchmark reported **4,137 cycles**,
+**165.48 microseconds** at 25 MHz.
+
+| Configuration | Copy cycles | Copy speed vs uncached | CoreMark iterations/s |
+| --- | ---: | ---: | ---: |
+| Uncached | 7,191 | 1.00x | 7.013069 |
+| Original unregistered 2 KiB cache | 3,733 | 1.93x | 12.861736 |
+| Registered 2 KiB, one-word lines | 4,433 | 1.62x | 11.010184–11.013216 |
+| Registered 8 KiB, four-word lines | 4,137 | 1.74x | 12.578616–12.582572 |
+
+Against the registered 2 KiB baseline, copy time falls **6.7%** (7.2% higher
+workload speed), while CoreMark throughput rises about **14.2%**. CoreMark is
+about 2.2% below the original unregistered cache and 79.4% above uncached.
+These changes combine capacity, burst fills and corrected capture timing;
+no isolated measurement attributes the gain to one change. Copy measurements
+are one supplied run per configuration and do not measure raw SDRAM bandwidth.
+
+### CoreMark: four validated runs
+
+Command: `COREMARK.TOS`, without arguments. All use 200 iterations, size 666,
+GCC8.2.1 20181017 and flags
+`-O2 -mcpu=68000 -fomit-frame-pointer -DPERFORMANCE_RUN=1`, code/data in RAM.
+
+| Run | Ticks | Reported seconds | Iterations/s | Validation |
+| --- | ---: | ---: | ---: | --- |
+| 1 | 3,179 | 15.895000 | 12.582572 | Passed |
+| 2 | 3,180 | 15.899999 | 12.578616 | Passed |
+| 3 | 3,179 | 15.895000 | 12.582572 | Passed |
+| 4 | 3,179 | 15.895000 | 12.582572 | Passed |
+
+All report seed CRC `e9f5`, list `e714`, matrix `1fd7`, state `8e3a`, final
+`382f` and successful operation validation. Variation is one 5 ms timer tick.
+
+### YAARTTT: three completed passes without reported errors
+
+`YAARTTT.TOS` 0.2.3, ST-RAM (`S`), reported `$00026B18`–`$00D80000`,
+approximately 13.35 MiB of free memory.
+
+| Elapsed | Progress | Reported errors |
+| --- | --- | ---: |
+| 00:00:00 | Pass 1 begins | 0 |
+| 00:04:51 | Pass 2 begins; one complete | 0 |
+| 00:09:43 | Pass 3 begins; two complete | 0 |
+| 00:14:35 | Pass 4 begins; three complete | 0 |
+
+Completed passes exercised address, zero/one, walking-bit and random patterns
+`1ed5`, `0e23`, `23da`. Pass 4 is not established complete. The registered
+one-word version took 14:30 for three passes; this workload is effectively
+unchanged (five seconds longer). These tests do not cover the full physical
+32 MiB, reserved OS regions, low BRAM or framebuffer.
+
+### Simulation, resources and remaining checks
+
+The updated `DirectMappedCacheSim` and top-level generation pass. Simulation
+supplies 64-bit lines, checks all word offsets on misses and hits, aligned
+reads, same-line and cross-line consecutive reads, byte reads, whole-line byte
+write invalidation, single-word writes, reset and registered responses.
+Conflict/replacement now uses `$1234` and `$3234`, `$2000` apart. The simulation
+uses a backing-store model rather than the SDRAM controller/pins.
+
+A detailed route of the burst design before the capture-delay correction used
+**54/56 DP16KD blocks** and passed final per-clock checks, with maxima
+12.123 ns system-to-SDRAM and 7.477 ns reverse. Artifacts are local
+`/tmp/rt68ice-burst-debug.{json,config,log}`. Those figures are not timing
+sign-off of the corrected implementation. Final related-clock setup/hold
+verification remains outstanding. FILETEST and verification after reboot have
+not been supplied for this version; earlier storage results apply to earlier
+cache configurations.
