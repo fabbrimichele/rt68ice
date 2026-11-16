@@ -28,6 +28,7 @@ case class DirectMappedCache() extends Component {
     val mainBus = slave(M68KDeviceBus())
     val ramBus = master(M68KDeviceBus())
     val ramReadLineData  = in(Bits(64 bits))
+    val events = out(CacheEvents())
   }
 
   val active = io.mainBus.sel && (io.mainBus.uds || io.mainBus.lds)
@@ -78,6 +79,14 @@ case class DirectMappedCache() extends Component {
 
   readEnable := False
   writeEnable := False
+  io.events.readHit := False
+  io.events.readMiss := False
+  io.events.writeRequest := False
+  // Total CPU stalls include lookup/launch; RAM-wait events below are a subset.
+  io.events.readStall := isRead && !io.mainBus.ready
+  io.events.writeStall := isWrite && !io.mainBus.ready
+  io.events.readRamWait := False
+  io.events.writeRamWait := False
 
   new StateMachine {
     val idle = new State with EntryPoint
@@ -101,6 +110,7 @@ case class DirectMappedCache() extends Component {
         readEnable := True // Read from cache sync
         goto(readLookup)
       } elsewhen isWrite {
+        io.events.writeRequest := True
         // Write
         io.mainBus.ready := False
         ramSelected := True
@@ -110,6 +120,7 @@ case class DirectMappedCache() extends Component {
 
     writeDramWait.whenIsActive {
       io.mainBus.ready := False
+      io.events.writeRamWait := !responseReady
       when(responseReady) {
         ramSelected := False
         valid(requestSlot) := False
@@ -123,6 +134,7 @@ case class DirectMappedCache() extends Component {
       val lineData = line(63 downto 0)
 
       when(isValid && lineTag === tag) {
+        io.events.readHit := True
         // Hit
         io.mainBus.dataIn := wordOffset.mux(
           0 -> lineData(15 downto 0),
@@ -132,6 +144,7 @@ case class DirectMappedCache() extends Component {
         )
         goto(idle)
       } otherwise {
+        io.events.readMiss := True
         // Miss
         io.mainBus.ready := False
         // Start SDRAM only after the lookup has established a miss. Selection
@@ -143,6 +156,7 @@ case class DirectMappedCache() extends Component {
 
     readDramWait.whenIsActive {
       io.mainBus.ready := False
+      io.events.readRamWait := !responseReady
       when(responseReady) {
         ramSelected := False
         io.mainBus.ready := True

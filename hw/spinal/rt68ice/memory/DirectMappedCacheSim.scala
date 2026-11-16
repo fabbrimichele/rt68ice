@@ -73,6 +73,8 @@ object DirectMappedCacheSim extends App {
     // A miss registers selection on the edge after the synchronous lookup.
     def launchRamRead(address: Long): Unit = {
       assert(!main.ready.toBoolean, "CPU must stall before registering a miss")
+      assert(dut.io.events.readMiss.toBoolean && !dut.io.events.readHit.toBoolean,
+        "A miss must emit exactly the miss lookup event")
       assert(!ram.sel.toBoolean, "RAM selection must wait for the request register")
       dut.clockDomain.waitSampling()
       sleep(1)
@@ -102,6 +104,7 @@ object DirectMappedCacheSim extends App {
       main.sel #= true
       sleep(1)
       assert(!main.ready.toBoolean, "CPU must stall before capturing a write")
+      assert(dut.io.events.writeRequest.toBoolean, "Write acceptance must emit a write event")
       assert(!ram.sel.toBoolean, "RAM must stay deselected until the write is captured")
       assert(ram.address.toLong == previousAddress, "RAM address must change only on the capture edge")
       assert(ram.dataOut.toInt == previousData, "RAM data must change only on the capture edge")
@@ -129,6 +132,9 @@ object DirectMappedCacheSim extends App {
         sleep(1)
         assert(!main.ready.toBoolean, "CPU must remain stalled until RAM accepts the write")
         checkRamWrite(address, data, upper, lower)
+        assert(!dut.io.events.writeRequest.toBoolean, "A held write must not be counted again")
+        assert(dut.io.events.writeRamWait.toBoolean && dut.io.events.writeStall.toBoolean,
+          "Delayed writes must emit stall and RAM-wait events each waiting cycle")
       }
 
       val wordAddress = ram.address.toLong & ~1L
@@ -166,6 +172,9 @@ object DirectMappedCacheSim extends App {
       sleep(1)
       if (expectHit) {
         assert(main.ready.toBoolean, "Cached word should hit without waiting for RAM")
+        assert(dut.io.events.readHit.toBoolean && !dut.io.events.readMiss.toBoolean,
+          "A hit must emit exactly the hit lookup event")
+        assert(!dut.io.events.readStall.toBoolean, "The completed hit must not count as a stall")
         assert(!ram.sel.toBoolean, "Read hit must not access RAM")
       } else {
         assert(!main.ready.toBoolean, "Invalid or unallocated word should miss")

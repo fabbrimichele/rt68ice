@@ -23,6 +23,7 @@ object BusControllerSim extends App {
       dut.io.counterBus,
       dut.io.ledsBus,
       dut.io.dipSwitchesBus,
+      dut.io.cacheStatsBus,
       dut.io.usbBus,
       dut.io.timerBus,
       dut.io.spiBus, dut.io.psgBus, dut.io.ds1302Bus

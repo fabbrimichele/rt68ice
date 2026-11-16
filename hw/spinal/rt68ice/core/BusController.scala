@@ -28,6 +28,7 @@ case class BusController() extends Component {
     val counterBus      = master(M68KDeviceBus())
     val ledsBus         = master(M68KDeviceBus())
     val dipSwitchesBus  = master(M68KDeviceBus())
+    val cacheStatsBus   = master(M68KDeviceBus())
     val usbBus          = master(M68KDeviceBus())
     val timerBus        = master(M68KDeviceBus())
     val spiBus          = master(M68KDeviceBus())
@@ -114,6 +115,7 @@ case class BusController() extends Component {
   io.counterBus.sel := False
   io.ledsBus.sel := False
   io.dipSwitchesBus.sel := False
+  io.cacheStatsBus.sel := False
   io.usbBus.sel := False
   io.timerBus.sel := False
   io.spiBus.sel := False
@@ -148,6 +150,7 @@ case class BusController() extends Component {
   val psgMapping      = SizeMapping(0x00F24000L, 16 KiB)  // $F24000 - $F27FFF
   val ds1302Mapping   = SizeMapping(0x00F28000L, 16 KiB)  // $F28000 - $F2BFFF
   val dipSwitchesMapping = SizeMapping(0x00F2C000L, 16 KiB)  // $F2C000 - $F2FFFF
+  val cacheStatsMapping = SizeMapping(0x00F30000L, 16 KiB) // $F30000 - $F33FFF
   val romMapping      = SizeMapping(0x00FC0000L, 16 KiB)  // $FC0000 - $FC3FFF
 
   saveMemoryLayout(
@@ -170,6 +173,7 @@ case class BusController() extends Component {
     "PSG" -> psgMapping,
     "DS1302" -> ds1302Mapping,
     "DIP SWITCHES" -> dipSwitchesMapping,
+    "CACHE STATS" -> cacheStatsMapping,
     "MAIN ROM" -> romMapping,
   )
 
@@ -201,6 +205,8 @@ case class BusController() extends Component {
     io.ledsBus.sel := True
   } elsewhen dipSwitchesMapping.hit(address) {
     io.dipSwitchesBus.sel := True
+  } elsewhen cacheStatsMapping.hit(address) {
+    io.cacheStatsBus.sel := True
   } elsewhen usbMapping.hit(address) {
     io.usbBus.sel := True
   } elsewhen timerMapping.hit(address) {
@@ -222,7 +228,7 @@ case class BusController() extends Component {
   val buses = List(
     io.romBus, io.ramBus, io.ledBus, io.uartBus, io.videoBus,
     io.counterBus, io.ledsBus, io.dipSwitchesBus, io.usbBus,
-    io.timerBus, io.spiBus
+    io.timerBus, io.spiBus, io.cacheStatsBus
   )
 
   for (bus <- buses) {
@@ -267,6 +273,8 @@ case class BusController() extends Component {
     io.cpuBus.dataIn := io.ledsBus.dataIn
   } elsewhen io.dipSwitchesBus.sel {
     io.cpuBus.dataIn := io.dipSwitchesBus.dataIn
+  } elsewhen io.cacheStatsBus.sel {
+    io.cpuBus.dataIn := io.cacheStatsBus.dataIn
   } elsewhen io.usbBus.sel {
     io.cpuBus.dataIn := io.usbBus.dataIn
   } elsewhen io.timerBus.sel {
