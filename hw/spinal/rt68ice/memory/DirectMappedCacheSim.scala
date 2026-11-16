@@ -171,13 +171,13 @@ object DirectMappedCacheSim extends App {
       dut.clockDomain.waitSampling()
       sleep(1)
       if (expectHit) {
-        assert(main.ready.toBoolean, "Cached word should hit without waiting for RAM")
+        assert(main.ready.toBoolean, f"Expected a cache hit at CPU address $$${address}%X")
         assert(dut.io.events.readHit.toBoolean && !dut.io.events.readMiss.toBoolean,
           "A hit must emit exactly the hit lookup event")
         assert(!dut.io.events.readStall.toBoolean, "The completed hit must not count as a stall")
         assert(!ram.sel.toBoolean, "Read hit must not access RAM")
       } else {
-        assert(!main.ready.toBoolean, "Invalid or unallocated word should miss")
+        assert(!main.ready.toBoolean, f"Expected a cache miss at CPU address $$${address}%X")
         launchRamRead(address)
         dut.clockDomain.waitSampling()
         sleep(1)
@@ -499,6 +499,37 @@ object DirectMappedCacheSim extends App {
       "Write must invalidate the old cached word")
     assert(readStoredWord(0x4300L, expectHit = true) == 0xCAFE,
       "Refilled entry must contain the new word")
+
+    // ------- Write miss must preserve a different tag in the same slot -------
+    // $5200 and $7204 share slot $240, with tags 2 and 3 respectively.
+    val preservedLine = 0x5200L
+    val writeMissAddress = 0x7204L
+    val preservedWords = Seq(0x1357, 0x2468, 0x369C, 0x48AD)
+    for ((data, word) <- preservedWords.zipWithIndex) {
+      ramWords(preservedLine + word * 2) = data
+    }
+    assert(readStoredWord(preservedLine, expectHit = false) == preservedWords.head)
+
+    // Leave the last lookup on another slot with tag 3. This also catches a
+    // missing synchronous lookup for writes: stale tag 3 would falsely hit.
+    ramWords(0x7208L) = 0xBEEF
+    assert(readStoredWord(0x7208L, expectHit = false) == 0xBEEF)
+    assert(readStoredWord(0x7208L, expectHit = true) == 0xBEEF)
+
+    ramWords(writeMissAddress) = 0xFFFF
+    startWrite(writeMissAddress, 0xABCD)
+    completeRamWrite(writeMissAddress, 0xABCD)
+    releaseCpuRequest()
+    assert(ramWords(writeMissAddress) == 0xABCD,
+      "A conflicting write miss must still update its original SDRAM address")
+    for ((data, word) <- preservedWords.zipWithIndex) {
+      assert(readStoredWord(preservedLine + word * 2, expectHit = true) == data,
+        "A write miss with a different tag must preserve every word of the cached line")
+    }
+    assert(readStoredWord(0x7208L, expectHit = true) == 0xBEEF,
+      "A write miss must also preserve lines in other slots")
+    assert(readStoredWord(writeMissAddress, expectHit = false) == 0xABCD,
+      "A conflicting write miss must not allocate a line; a later read must fetch RAM")
 
     // ------- Write miss must not allocate -------
     ramWords(0x4406L) = 0xFFFF
