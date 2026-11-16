@@ -68,6 +68,10 @@ case class Rt68IceTopLevel(romFile: String) extends Component {
     cache.io.ramReadLineData := sdRamDevice.io.readLineData
     cache.io.mainBus <> bus.io.sdRamBus
 
+    val cacheStats = CacheStatsDevice(clockHz = clockCtrl.systemCd.frequency.getValue.toLong)
+    cacheStats.io.events := cache.io.events
+    cacheStats.io.bus <> bus.io.cacheStatsBus
+
     // Counter
     val counter = Counter()
     bus.io.counterBus <> counter.io.bus

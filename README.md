@@ -13,6 +13,10 @@ for the capture-timing correction, comparisons and remaining checks. The earlier
 [registered-interface report](doc/cache-registered-interface.md) describes the
 one-word baseline; its timing figures do not sign off this wider cache.
 
+Cache profiling is available on the `cache-performance-counters` branch:
+[registers and CACHSTAT.TOS](doc/cache-stats.md) provide atomic snapshots of
+hits, misses, writes, elapsed time and read/write stall cycles.
+
 ## Memory Layout
 See the generated [System Memory Layout](./doc/memory_layout.md).
 
