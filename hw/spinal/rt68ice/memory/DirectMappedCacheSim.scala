@@ -124,10 +124,10 @@ object DirectMappedCacheSim extends App {
     // Accept a delayed write, keeping the CPU request active for a possible
     // next word. Call releaseCpuRequest only when the caller wants an idle gap.
     def completeRamWrite(address: Long, data: Int,
-                         upper: Boolean = true, lower: Boolean = true): Unit = {
+                         upper: Boolean = true, lower: Boolean = true, waitCycles: Int = 3): Unit = {
       assert(!main.ready.toBoolean, "CPU must stall when starting a RAM write")
       checkRamWrite(address, data, upper, lower)
-      for (_ <- 0 until 3) {
+      for (_ <- 0 until waitCycles) {
         dut.clockDomain.waitSampling()
         sleep(1)
         assert(!main.ready.toBoolean, "CPU must remain stalled until RAM accepts the write")
@@ -142,6 +142,9 @@ object DirectMappedCacheSim extends App {
         (if (ram.lds.toBoolean) 0x00ff else 0)
       val oldWord = ramWords.getOrElse(wordAddress, 0)
       val newWord = (oldWord & (~mask & 0xffff)) | (ram.dataOut.toInt & mask)
+      // A write response carries no useful line data. Poison it so a cache
+      // update accidentally using responseData cannot pass these tests.
+      dut.io.ramReadLineData #= BigInt("0123456789ABCDEF", 16)
       ram.ready #= true
       sleep(1)
       assert(!main.ready.toBoolean, "Raw write completion must wait for the response register")
@@ -487,7 +490,7 @@ object DirectMappedCacheSim extends App {
     assert(ramWords(0x4100L) == 0x2468, "Word write must reach RAM")
     releaseCpuRequest()
 
-    // ------- Write invalidates a cached word -------
+    // ------- Word write hit updates RAM and remains cached -------
     ramWords(0x4300L) = 0x1357
     assert(readStoredWord(0x4300L, expectHit = false) == 0x1357)
     assert(readStoredWord(0x4300L, expectHit = true) == 0x1357)
@@ -495,10 +498,8 @@ object DirectMappedCacheSim extends App {
     completeRamWrite(0x4300L, 0xCAFE)
     releaseCpuRequest()
     assert(ramWords(0x4300L) == 0xCAFE, "Cached-address write must update RAM")
-    assert(readStoredWord(0x4300L, expectHit = false) == 0xCAFE,
-      "Write must invalidate the old cached word")
     assert(readStoredWord(0x4300L, expectHit = true) == 0xCAFE,
-      "Refilled entry must contain the new word")
+      "Write hit must update the cached word without invalidation or a refill")
 
     // ------- Write miss must preserve a different tag in the same slot -------
     // $5200 and $7204 share slot $240, with tags 2 and 3 respectively.
@@ -552,23 +553,26 @@ object DirectMappedCacheSim extends App {
     completeRamWrite(0x4504L, 0xB6E9, upper = true, lower = false)
     releaseCpuRequest()
     assert(ramWords(0x4504L) == 0xB67C, "Upper byte write must preserve the lower byte")
-    assert(readStoredWord(0x4500L, expectHit = false) == 0x1122,
-      "Upper byte write must invalidate the entire line, including neighbouring words")
+    assert(readStoredWord(0x4500L, expectHit = true) == 0x1122,
+      "Upper byte write must preserve neighbouring words as hits")
     assert(readStoredWord(0x4504L, expectHit = true) == 0xB67C,
-      "Refill after upper byte write must contain the updated word")
+      "Upper byte write must update the cached word without a refill")
     assert(readStoredWord(0x4504L, expectHit = true) == 0xB67C)
 
     startWrite(0x4505L, 0x5AD2, upper = false, lower = true)
     completeRamWrite(0x4505L, 0x5AD2, upper = false, lower = true)
     releaseCpuRequest()
     assert(ramWords(0x4504L) == 0xB6D2, "Lower byte write must preserve the upper byte")
-    assert(readStoredWord(0x4500L, expectHit = false) == 0x1122,
-      "Odd-address byte write must invalidate the entire containing line")
+    assert(readStoredWord(0x4500L, expectHit = true) == 0x1122,
+      "Odd-address byte write must preserve neighbouring words as hits")
     assert(readStoredWord(0x4504L, expectHit = true) == 0xB6D2,
-      "Refill after lower byte write must contain the updated word")
+      "Lower byte write must retain the upper byte updated by the previous write")
     assert(readStoredWord(0x4504L, expectHit = true) == 0xB6D2)
 
-    // ------- Consecutive writes without CPU bus deselection -------
+    // ------- Consecutive write hits without CPU bus deselection -------
+    for ((data, word) <- Seq(0xCAFE, 0xDEAD, 0x5566, 0x7788).zipWithIndex)
+      ramWords(0x4600L + word * 2) = data
+    assert(readStoredWord(0x4600L, expectHit = false) == 0xCAFE)
     for ((address, data) <- Seq((0x4600L, 0x1122), (0x4602L, 0x3344))) {
       startWrite(address, data)
       completeRamWrite(address, data)
@@ -579,9 +583,9 @@ object DirectMappedCacheSim extends App {
       // after the preceding word has been accepted, while strobes stay high.
     }
     releaseCpuRequest()
-    assert(readStoredWord(0x4600L, expectHit = false) == 0x1122)
-    assert(readStoredWord(0x4602L, expectHit = true) == 0x3344,
-      "Reading the first longword half must also cache the second half")
+    for ((data, word) <- Seq(0x1122, 0x3344, 0x5566, 0x7788).zipWithIndex)
+      assert(readStoredWord(0x4600L + word * 2, expectHit = true) == data,
+        "Consecutive write hits must retain both updated words and their neighbours")
 
     // ------- Write followed by read without an idle cycle -------
     ramWords(0x4700L) = 0x0F0F
@@ -590,8 +594,8 @@ object DirectMappedCacheSim extends App {
     completeRamWrite(0x4700L, 0x9ABC)
     assert(main.sel.toBoolean, "CPU request must remain selected before changing direction")
     // readStoredWord changes direction directly to read, without releasing sel.
-    assert(readStoredWord(0x4700L, expectHit = false) == 0x9ABC,
-      "Immediate read must fetch the completed write rather than stale cached data")
+    assert(readStoredWord(0x4700L, expectHit = true) == 0x9ABC,
+      "Immediate read must hit the updated cached word without fetching RAM")
     assert(readStoredWord(0x4700L, expectHit = true) == 0x9ABC)
 
     // ------- Read miss followed by same-address write without CPU deselection -------
@@ -617,7 +621,85 @@ object DirectMappedCacheSim extends App {
     startWrite(0x4800L, 0xABCD)
     completeRamWrite(0x4800L, 0xABCD)
     releaseCpuRequest()
-    assert(readStoredWord(0x4800L, expectHit = false) == 0xABCD,
-      "Same-address write must invalidate the word filled by the preceding read")
+    assert(readStoredWord(0x4800L, expectHit = true) == 0xABCD,
+      "Same-address write must update the word just filled by the preceding read")
+
+    // ------- Every write lane / word offset, with immediate and delayed RAM -------
+    val writeLanes = Seq((true, true), (true, false), (false, true))
+    var hitCases = 0
+    for (waitCycles <- Seq(0, 1, 3, 8); wordOffset <- 0 until 4;
+         (upper, lower) <- writeLanes) {
+      val base = 0x18000L + hitCases * 8
+      val original = Vector(0x1357, 0x2468, 0x369C, 0x48AD)
+      for ((value, word) <- original.zipWithIndex) ramWords(base + word * 2) = value
+      val writeData = 0xB6E9 ^ (hitCases << 4)
+      val mask = (if (upper) 0xFF00 else 0) | (if (lower) 0x00FF else 0)
+      val changed = (original(wordOffset) & (~mask & 0xFFFF)) | (writeData & mask)
+      val expected = original.updated(wordOffset, changed)
+      val address = base + wordOffset * 2 + (if (!upper) 1 else 0)
+      readStoredWord(base + ((wordOffset + 1) % 4) * 2, expectHit = false)
+
+      // Leave the previous lookup on a different slot and tag. The write must
+      // perform its own synchronous lookup, rather than reuse that old line.
+      val other = 0x40000L + 0x800 + hitCases * 8
+      ramWords(other) = 0xDA00 + hitCases
+      readStoredWord(other, expectHit = false)
+      startWrite(address, writeData, upper, lower)
+
+      // The accepted request is already registered. Deliberately change live
+      // CPU inputs while busy to detect accidental use of dataOut/UDS/LDS,
+      // address or word offset instead of the captured request.
+      main.address #= other + 6
+      main.dataOut #= (writeData ^ 0xFFFF)
+      main.uds #= !upper
+      main.lds #= upper
+      completeRamWrite(address, writeData, upper, lower, waitCycles)
+      releaseCpuRequest()
+      for ((value, word) <- expected.zipWithIndex) {
+        assert(ramWords(base + word * 2) == value,
+          "Write-through must change only the selected SDRAM bytes")
+        assert(readStoredWord(base + word * 2, expectHit = true) == value,
+          s"Write-hit case $hitCases must retain all four correct cached words")
+      }
+      assert(readStoredWord(other, expectHit = true) == 0xDA00 + hitCases,
+        "Write hit must not change another cache slot")
+      hitCases += 1
+    }
+
+    // ------- Every write-miss lane / offset must preserve a conflicting line -------
+    var missCases = 0
+    for (waitCycles <- Seq(0, 5); wordOffset <- 0 until 4;
+         (upper, lower) <- writeLanes) {
+      val base = 0x1C000L + missCases * 8
+      val conflicting = base + 0x2000
+      val resident = Vector(0x1468, 0x2579, 0x368A, 0x479B)
+      val backing = Vector(0xA15C, 0xB26D, 0xC37E, 0xD48F)
+      for (word <- 0 until 4) {
+        ramWords(base + word * 2) = resident(word)
+        ramWords(conflicting + word * 2) = backing(word)
+      }
+      readStoredWord(base, expectHit = false)
+      val address = conflicting + wordOffset * 2 + (if (!upper) 1 else 0)
+      val value = 0xE6A9
+      val mask = (if (upper) 0xFF00 else 0) | (if (lower) 0x00FF else 0)
+      val expected = backing.updated(wordOffset,
+        (backing(wordOffset) & (~mask & 0xFFFF)) | (value & mask))
+      startWrite(address, value, upper, lower)
+      completeRamWrite(address, value, upper, lower, waitCycles)
+      releaseCpuRequest()
+      for (word <- 0 until 4) {
+        assert(readStoredWord(base + word * 2, expectHit = true) == resident(word),
+          "Write miss must neither overwrite nor invalidate a conflicting cached line")
+        assert(ramWords(conflicting + word * 2) == expected(word),
+          "Write miss must still update exactly the selected SDRAM bytes")
+      }
+      assert(readStoredWord(conflicting + wordOffset * 2, expectHit = false) == expected(wordOffset),
+        "Write miss must not allocate: the first read still requires a RAM fill")
+      for (word <- 0 until 4)
+        assert(readStoredWord(conflicting + word * 2, expectHit = true) == expected(word),
+          "Fill after write miss must contain the updated RAM data")
+      missCases += 1
+    }
+    println(s"Write-hit update checks passed: $hitCases hit cases and $missCases conflicting-miss cases")
   }
 }

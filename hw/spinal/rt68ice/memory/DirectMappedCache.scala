@@ -16,8 +16,10 @@ In the packed data, word 0 is bits [15:0], word 3 is bits [63:48].
 
 Read misses fetch an eight-byte-aligned SDRAM burst and cache all four words.
 The original CPU address selects the returned word on both misses and hits.
-Writes keep their original address and byte strobes, reach SDRAM, and
-invalidate the entire selected cache line without allocating a new line.
+Writes are write-through: their captured address, data and byte strobes reach
+SDRAM. On completion, a write hit updates only the selected word or byte(s) in
+the cached line, preserving its tag, other data and valid bit. A write miss
+leaves the cache unchanged and does not allocate a line.
 Addresses $1234 and $3234 share slot $246 and word offset 2, but differ in tag.
 */
 
@@ -60,7 +62,32 @@ case class DirectMappedCache() extends Component {
 
   val slot = io.mainBus.address(12 downto 3).asUInt
   val line = cache.readSync(slot, readEnable)
-  cache.write(requestSlot, tag ## responseData, writeEnable)
+
+  val updateWriteHit = Bool()
+  val writeData = Bits(64 bits)
+  when(updateWriteHit) {
+    val lineWords = line(63 downto 0).subdivideIn(16 bits)
+
+    // Copy the old word and line first, preserving all untouched bytes and words.
+    val updatedWord = Bits(16 bits)
+    updatedWord := lineWords(wordOffset)
+    when (requestUds) {
+      updatedWord(15 downto 8) := requestData.takeHigh(8)
+    }
+    when (requestLds) {
+      updatedWord(7 downto 0) := requestData.takeLow(8)
+    }
+
+    val updatedWords = Vec.fill(4)(Bits(16 bits))
+    updatedWords := lineWords
+    updatedWords(wordOffset) := updatedWord
+
+    writeData := updatedWords.asBits
+  } otherwise {
+    writeData := responseData
+  }
+
+  cache.write(requestSlot, tag ## writeData, writeEnable)
 
   io.mainBus.irq := False
   io.mainBus.dataIn := 0
@@ -79,6 +106,7 @@ case class DirectMappedCache() extends Component {
 
   readEnable := False
   writeEnable := False
+  updateWriteHit := False
   io.events.readHit := False
   io.events.readMiss := False
   io.events.writeRequest := False
@@ -127,8 +155,9 @@ case class DirectMappedCache() extends Component {
       when(responseReady) {
         ramSelected := False
         when(isValid && lineTag === tag) {
-          // hit, invalidate the line
-          valid(requestSlot) := False
+          // hit, update the cache
+          updateWriteHit := True
+          writeEnable := True
         }
         io.mainBus.ready := True
         goto(idle)

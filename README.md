@@ -3,19 +3,23 @@ RT68 IceSugar Pro version
 
 ## SDRAM cache
 
-This branch includes an 8 KiB unified direct-mapped cache with 1,024 four-word
-lines, SDRAM burst read fills, and single-word write-through with whole-line
-invalidation. Requests and responses remain registered at 25/50 MHz system/SDRAM
-clocks. SDRAM diagnostics, three YAARTTT passes and four CoreMark runs passed.
-CoreMark reports about 12.58 iterations/s versus 11.01 with the registered
-2 KiB cache and 7.01 uncached. See [hardware validation](doc/validation.md#four-word-burst-cache-validation-2026-11-15)
-for the capture-timing correction, comparisons and remaining checks. The earlier
-[registered-interface report](doc/cache-registered-interface.md) describes the
-one-word baseline; its timing figures do not sign off this wider cache.
+The design includes an 8 KiB unified direct-mapped cache with 1,024 four-word
+lines and SDRAM burst read fills. Writes are write-through with no write
+allocation: a write hit updates the selected cached word or byte(s), while a
+write miss preserves existing lines. The CPU still waits for the SDRAM write
+to complete. Requests and responses remain registered at 25/50 MHz
+system/SDRAM clocks, and SDRAM inputs use dedicated IOLOGIC registers.
 
-Cache profiling is available on the `cache-performance-counters` branch:
-[registers and CACHSTAT.TOS](doc/cache-stats.md) provide atomic snapshots of
-hits, misses, writes, elapsed time and read/write stall cycles.
+The current implementation completed four clean YAARTTT passes and four
+validated CoreMark runs at **14.316391 iterations/s**, versus 12.578616 with
+write-hit invalidation and 7.013069 uncached. These are about **13.8%** and
+**104.1%** higher CoreMark throughput respectively. See
+[write-hit update validation](doc/validation.md#write-hit-update-validation-2026-11-18)
+for source provenance, the earlier implementation's results and remaining
+coverage. Hardware tests do not establish complete external timing closure.
+
+[Cache profiling registers and CACHSTAT.TOS](doc/cache-stats.md) provide atomic
+snapshots of hits, misses, writes, elapsed time and read/write stall cycles.
 
 ## Memory Layout
 See the generated [System Memory Layout](./doc/memory_layout.md).

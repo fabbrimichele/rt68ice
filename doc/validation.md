@@ -1,6 +1,6 @@
 # RT68ICE validation results
 
-Recorded: 2026-11-05. Updated with SDRAM input-register hardware results: 2026-11-17.
+Recorded: 2026-11-05. Updated with write-hit update hardware results: 2026-11-18.
 
 These results summarize tests run on the board by the user and reported during
 the EmuTOS porting session. They provide an initial CPU, memory and storage
@@ -790,3 +790,109 @@ failure; they do not establish complete external SDRAM timing closure.
 
 The SDRAM diagnostic copy benchmark and file-I/O tests have not been rerun for
 this input-register build.
+
+
+## Write-hit update validation (2026-11-18)
+
+Configuration: 25 MHz CPU/cache, 50 MHz SDRAM, 8 KiB direct-mapped cache with
+1,024 four-word lines, burst read fills and dedicated SDRAM input registers.
+Write hits now update the cached word or enabled bytes rather than invalidate
+the line. Write misses preserve cached lines without allocating. The policy
+remains write-through and CPU completion still waits for the SDRAM write.
+
+Two implementations were tested on the board by the user:
+
+- Commit `4074442`, with explicit word-selection and concatenation muxes.
+- The working-tree refactor based on that commit, using `Vec` word selection,
+  copying the original line and word, and independent byte overrides. This
+  refactor is the implementation accompanying this report.
+
+The user identified which version was programmed. The final local generated
+Verilog contains `updateWriteHit`, matching the refactor. The local bitstream
+associated with that run has SHA-256:
+
+```text
+251c1b7d94fb3190ab8d0b5d2bda8f639fe1f6794f89238d9bccebdbf3b8539b
+```
+
+Programming-file identity on the board was not independently read back.
+
+### YAARTTT 0.2.3, ST-RAM
+
+Both runs tested `$00026B18` through `$00D80000`, selecting S, with zero
+reported errors through four complete passes:
+
+| Implementation | Pass 5 began | Last supplied status |
+| --- | --- | --- |
+| `4074442` | 17:15 | Pass 5, zero/one test at 17:23; zero errors |
+| Vec/byte-override refactor | 17:16 | Pass 5, zero/one test at 17:23; zero errors |
+
+The completed passes include own-address, zero/one, all eight walking-bit
+patterns and random-pattern tests. Pass five is not established complete.
+The preceding input-register build with write-hit invalidation reached pass
+five at 19:26. Four passes therefore took about 11.2% less time with the first
+write-hit update implementation, and 11.1% less with the refactor. This is
+YAART workload throughput, not a general application performance claim.
+
+### CoreMark
+
+All eight write-hit-update runs used 200 iterations and validated. Compiler:
+GCC 8.2.1 20181017, flags `-O2 -mcpu=68000 -fomit-frame-pointer
+-DPERFORMANCE_RUN=1`; code and data were in RAM. All reported CRCs matched:
+seed `e9f5`, list `e714`, matrix `1fd7`, state `8e3a`, final `382f`.
+
+| Implementation | Runs | Ticks | Reported seconds | Iterations/s |
+| --- | ---: | --- | --- | --- |
+| Input-register baseline, invalidate on write hit | 3 | 3180 each | 15.899999 each | 12.578616 each |
+| `4074442`, update on write hit | 4 | 2792, 2793, 2792, 2793 | 13.960000–13.965000 | 14.321517–14.326647 |
+| Vec/byte-override refactor | 4 | 2794 each | 13.970000 each | 14.316391 each |
+
+The final version has about 13.8% higher throughput and 12.1% less execution
+time than the input-register invalidating baseline. Its throughput is about
+104.1% above the original uncached 7.013069 result (2.04x). These compare the
+supplied benchmark results; performance improvements are workload-dependent.
+
+Relative to `4074442`, the refactor takes 1–2 more 5 ms timer ticks, a measured
+throughput reduction of approximately 0.04–0.07%. The cause has not been
+established. YAART's four-pass elapsed time differs by one second.
+
+### Simulation and synthesis comparison
+
+`DirectMappedCacheSim` passes with the new policy. It checks 48 write-hit
+cases spanning all four word offsets, word/upper-byte/lower-byte writes and
+RAM delays of 0, 1, 3 and 8 waiting clocks. It verifies all words remain hits
+with the correct data, neighbours and other slots remain unchanged, writes
+reach RAM with the original address/data/lanes, and live CPU inputs do not
+replace the captured request. Arbitrary RAM response data is supplied during
+writes to catch accidental use of read-response data for cache updates.
+
+Another 24 cases cover conflicting-tag write misses across all offsets and
+byte lanes with immediate and delayed responses: the resident line must
+remain a correct hit, the RAM write must occur, and the written address must
+still miss until a later read fills it. Existing reset, read-fill, byte-read,
+replacement and consecutive-request tests remain in the regression. Tests
+also check consecutive write hits and immediate read-after-write hits.
+
+Cache-only Yosys synthesis, using the same settings and normalized top-module
+name, produced the following counts. These are not full-system placement or
+timing results:
+
+| Cell type | `4074442` | Refactor |
+| --- | ---: | ---: |
+| DP16KD | 5 | 5 |
+| TRELLIS_FF | 1145 | 1145 |
+| LUT4 | 2957 | 2955 |
+| PFUMX | 240 | 242 |
+| L6MUX21 | 47 | 47 |
+| CCU2C | 6 | 6 |
+
+The storage counts are unchanged, with a small combinational mapping change.
+This is not a formal equivalence proof or proof of equal physical timing.
+
+### Remaining coverage
+
+The diagnostic SDRAM copy benchmark, file-I/O verification and profiling
+counter measurements have not been rerun for this version. The cache-only
+simulation does not model SDRAM pins. External SDRAM and related-clock
+setup/hold timing signoff remain outstanding; clean hardware runs do not
+replace that analysis.
