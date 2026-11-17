@@ -1,6 +1,6 @@
 # RT68ICE validation results
 
-Recorded: 2026-11-05. Updated with four-word burst-cache hardware results: 2026-11-15.
+Recorded: 2026-11-05. Updated with SDRAM input-register hardware results: 2026-11-17.
 
 These results summarize tests run on the board by the user and reported during
 the EmuTOS porting session. They provide an initial CPU, memory and storage
@@ -734,3 +734,59 @@ sign-off of the corrected implementation. Final related-clock setup/hold
 verification remains outstanding. FILETEST and verification after reboot have
 not been supplied for this version; earlier storage results apply to earlier
 cache configurations.
+
+
+## SDRAM input-register validation (2026-11-17)
+
+Configuration: 25 MHz CPU/cache, 50 MHz SDRAM, 8 KiB four-word cache,
+write-through writes with invalidation only on a tag hit. The controller now
+samples DQ through 16 dedicated IOLOGIC input registers before assembling each
+burst, with one additional SDRAM read-pipeline cycle. The original Makefile
+synthesis recipe and default placement seed were used.
+
+The tested sources are the input-register change following `0fee3af` on
+`cache-write-hit-update`. The local programming file matches the preserved
+build artifact. Its SHA-256 is:
+
+```text
+d9c1ff96b2acd0848c94ee6b95bb521e3bb141c7f65205e65c7121270cda34ef
+```
+
+### Hardware results reported by the user
+
+- YAARTTT 0.2.3, ST-RAM: seven complete passes with zero errors; pass eight
+  remained clean through the `4040` pattern at 37:32. The previously failing
+  `0404` pattern passed eight times. This is not eight completed passes.
+- CoreMark: three validated runs, each 200 iterations, 3180 ticks,
+  15.899999 reported seconds, and 12.578616 iterations/s.
+- CoreMark CRCs: seed `e9f5`, list `e714`, matrix `1fd7`, state `8e3a`,
+  final `382f`.
+
+Compared with the earlier counter-enabled main baseline of 12.654223
+iterations/s and 3161 ticks, this is about 0.6% lower throughput and 95 ms
+longer per run. Conditional invalidation and input capture changed between
+those builds, so the comparison does not isolate the register's cost.
+
+Before the input stage, the original conditional-invalidation route failed
+repeatedly with `0404` read as `0004`, while an identical synthesis netlist
+rerouted with seed 2 completed five clean passes and remained clean in pass
+six's final test. That comparison and the new clean run support a timing-sensitive
+failure; they do not establish complete external SDRAM timing closure.
+
+### Implementation checks
+
+- `DirectMappedCacheSim` passed, including write-hit invalidation and
+  preservation of a conflicting cached line on a write miss.
+- `SdRamCtrlInputSim` passed burst lengths 1, 4 and 8 with CAS latencies 2 and
+  3. Each of the six configurations checked 128 read bursts and 96 full-word
+  and byte writes using a simplified SDRAM pin model.
+- A temporary negative control that removed the added read-delay cycle failed
+  the burst-alignment check, as expected.
+- Post-route inspection confirmed all 16 DQ input FFs packed into IOLOGIC,
+  with no `dqInput` flip-flops remaining in general fabric.
+- Internal per-clock Fmax: system 27.305 MHz against 25 MHz; SDRAM 96.600 MHz
+  against 50 MHz. These checks do not include complete board-level external
+  setup/hold signoff.
+
+The SDRAM diagnostic copy benchmark and file-I/O tests have not been rerun for
+this input-register build.

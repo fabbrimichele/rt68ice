@@ -111,3 +111,35 @@ in 14:35, essentially unchanged from 14:30. Capacity, burst fills and capture
 timing changed together; the individual contributions were not measured.
 See [burst-cache validation](validation.md#four-word-burst-cache-validation-2026-11-15)
 for full results, resource measurements and remaining checks.
+
+## Dedicated SDRAM read input stage
+
+The 16 SDRAM DQ pins now feed a common input-register stage in the 50 MHz
+SDRAM controller domain. The burst buffer consumes those registered samples
+instead of sampling each pin directly into four separate fabric registers.
+The `syn_useioff` attribute requests dedicated ECP5 IOLOGIC input flip-flops;
+the installed Yosys `synth_ecp5` flow already transfers that attribute to the
+mapped FFs, so the Makefile needs no additional synthesis pass.
+
+`settingUseFastInputRegister` is now true because the input stage actually
+exists. Its read-delay adjustment compensates for the added pipeline cycle:
+one 20 ns SDRAM cycle per read burst at 50 MHz. The write path is unchanged.
+The prior direct-sampling implementation correctly kept that setting false.
+
+Run the controller-level regression with:
+
+```sh
+sbt 'runMain rt68ice.memory.SdRamCtrlInputSim'
+```
+
+The simulation generates the SpinalHDL controller and uses Icarus with a small
+SDRAM pin model. It checks burst lengths 1, 4 and 8 at CAS latencies 2 and 3,
+including distinct consecutive words, repeated reads, full-word writes, and
+both byte-write lanes. Each configuration checks 128 bursts and 96 writes.
+It verifies pipeline alignment and data handling; the simplified pin model
+does not establish board-level setup/hold timing closure.
+
+Hardware validation on 2026-11-17 recorded seven complete clean YAARTTT passes
+and three validated CoreMark runs at 12.578616 iterations/s. See the
+[input-register validation results](validation.md#sdram-input-register-validation-2026-11-17)
+for provenance, comparisons, and remaining coverage.
