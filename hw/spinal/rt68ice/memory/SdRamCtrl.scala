@@ -49,8 +49,8 @@ case class SdRamCtrl(config: SdRamCtrlConfig = SdRamCtrlConfig()) extends Compon
   private val settingTrcdNs = 21
   private val settingRefreshTimerNs = 7500
   private val settingTmrdCycles = 2
-  // DQ is sampled directly below; there is no extra input-register pipeline stage.
-  private val settingUseFastInputRegister = false
+  // The dedicated DQ input stage below adds one controller clock to the read path.
+  private val settingUseFastInputRegister = true
 
   private val cyclesUntilStartInhibit =
     ceilCycles(settingInhibitDelayMicroSec * 500.0)
@@ -126,6 +126,13 @@ case class SdRamCtrl(config: SdRamCtrlConfig = SdRamCtrlConfig()) extends Compon
   private val p0ByteEnQueue = Reg(Bits(2 bits)) init 0
   private val p0AddrQueue = Reg(Bits(24 bits)) init 0
   private val p0DataQueue = Reg(Bits(16 bits)) init 0
+
+  // Capture every SDRAM word at the pins before routing it to the burst buffer.
+  // No reset/enable: only completed read bursts consume these samples. The
+  // synth_ecp5 flow transfers this attribute to the FFs so nextpnr must pack
+  // them into dedicated IOLOGIC input registers rather than general fabric.
+  private val dqInput = RegNext(io.sdRam.dq)
+  dqInput.addAttribute("syn_useioff", 1)
 
   private val readBuffer = Reg(Bits(128 bits)) init 0
 
@@ -309,14 +316,14 @@ case class SdRamCtrl(config: SdRamCtrlConfig = SdRamCtrlConfig()) extends Compon
       }
 
       switch(readCounter) {
-        is(0) { readBuffer(15 downto 0) := io.sdRam.dq }
-        is(1) { readBuffer(31 downto 16) := io.sdRam.dq }
-        is(2) { readBuffer(47 downto 32) := io.sdRam.dq }
-        is(3) { readBuffer(63 downto 48) := io.sdRam.dq }
-        is(4) { readBuffer(79 downto 64) := io.sdRam.dq }
-        is(5) { readBuffer(95 downto 80) := io.sdRam.dq }
-        is(6) { readBuffer(111 downto 96) := io.sdRam.dq }
-        is(7) { readBuffer(127 downto 112) := io.sdRam.dq }
+        is(0) { readBuffer(15 downto 0) := dqInput }
+        is(1) { readBuffer(31 downto 16) := dqInput }
+        is(2) { readBuffer(47 downto 32) := dqInput }
+        is(3) { readBuffer(63 downto 48) := dqInput }
+        is(4) { readBuffer(79 downto 64) := dqInput }
+        is(5) { readBuffer(95 downto 80) := dqInput }
+        is(6) { readBuffer(111 downto 96) := dqInput }
+        is(7) { readBuffer(127 downto 112) := dqInput }
       }
 
       p0QReg := readBuffer(config.p0BurstLength * 16 - 1 downto 0)

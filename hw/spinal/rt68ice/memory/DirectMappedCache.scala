@@ -102,16 +102,17 @@ case class DirectMappedCache() extends Component {
         // Read misses fill a complete four-word line even for CPU byte reads.
         requestUds := io.mainBus.uds || isRead
         requestLds := io.mainBus.lds || isRead
+        isValid := valid(slot)
       }
       when(isRead) {
         // Read
         io.mainBus.ready := False
-        isValid := valid(slot)
         readEnable := True // Read from cache sync
         goto(readLookup)
       } elsewhen isWrite {
-        io.events.writeRequest := True
         // Write
+        io.events.writeRequest := True
+        readEnable := True // Read from cache sync
         io.mainBus.ready := False
         ramSelected := True
         goto(writeDramWait)
@@ -119,11 +120,16 @@ case class DirectMappedCache() extends Component {
     }
 
     writeDramWait.whenIsActive {
+      val lineTag = line(74 downto 64)
       io.mainBus.ready := False
       io.events.writeRamWait := !responseReady
+
       when(responseReady) {
         ramSelected := False
-        valid(requestSlot) := False
+        when(isValid && lineTag === tag) {
+          // hit, invalidate the line
+          valid(requestSlot) := False
+        }
         io.mainBus.ready := True
         goto(idle)
       }
@@ -134,8 +140,8 @@ case class DirectMappedCache() extends Component {
       val lineData = line(63 downto 0)
 
       when(isValid && lineTag === tag) {
-        io.events.readHit := True
         // Hit
+        io.events.readHit := True
         io.mainBus.dataIn := wordOffset.mux(
           0 -> lineData(15 downto 0),
           1 -> lineData(31 downto 16),
