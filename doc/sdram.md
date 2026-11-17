@@ -143,3 +143,31 @@ Hardware validation on 2026-11-17 recorded seven complete clean YAARTTT passes
 and three validated CoreMark runs at 12.578616 iterations/s. See the
 [input-register validation results](validation.md#sdram-input-register-validation-2026-11-17)
 for provenance, comparisons, and remaining coverage.
+
+
+## Write-hit updates (2026-11-18)
+
+The cache now updates the selected word or enabled byte(s) on a completed
+SDRAM write hit and retains the line's tag, valid bit and other data. A write
+miss leaves the cache unchanged and does not allocate. Writes still complete
+in SDRAM before the CPU is released; there is no posted-write buffer.
+
+The line-update logic views the 64-bit data as four 16-bit words using `Vec`.
+Default copies preserve the old line and word, and independent UDS/LDS
+overrides replace the enabled bytes using the captured request. This replaces
+manual word-selection and whole-line concatenation cases without adding a
+register stage.
+
+The final refactor completed four YAARTTT passes without errors in 17:16,
+with pass five underway. Four CoreMark runs all validated at 2794 ticks,
+13.970000 seconds and 14.316391 iterations/s. Compared with the input-register
+baseline that invalidated on a write hit (3180 ticks, 12.578616 iterations/s),
+this is about 12.1% less execution time and 13.8% higher throughput.
+
+The preceding implementation also completed four clean YAARTTT passes in
+17:15 and four validated CoreMark runs at 14.321517–14.326647 iterations/s.
+The refactor is 5–10 ms slower in these supplied CoreMark runs, approximately
+0.04–0.07%; the cause of that small difference has not been established.
+See [write-hit update validation](validation.md#write-hit-update-validation-2026-11-18)
+for the detailed results and simulation coverage. The diagnostic copy benchmark
+and file-I/O tests have not been rerun for this version.

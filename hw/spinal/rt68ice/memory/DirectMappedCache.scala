@@ -63,28 +63,26 @@ case class DirectMappedCache() extends Component {
   val slot = io.mainBus.address(12 downto 3).asUInt
   val line = cache.readSync(slot, readEnable)
 
-  val isWriteHit = Bool()
+  val updateWriteHit = Bool()
   val writeData = Bits(64 bits)
-  when(isWriteHit) {
-    val lineData = line(63 downto 0)
-    val selectedWord = wordOffset.mux(
-      3 -> lineData(63 downto 48),
-      2 -> lineData(47 downto 32),
-      1 -> lineData(31 downto 16),
-      0 -> lineData(15 downto 0),
-    )
-    val updatedWord = (requestUds ## requestLds).mux(
-      B"11" -> requestData,
-      B"10" -> requestData(15 downto 8) ## selectedWord(7 downto 0),
-      B"01" -> selectedWord(15 downto 8) ## requestData(7 downto 0),
-      B"00" -> selectedWord,
-    )
-    writeData := wordOffset.mux(
-      3 -> updatedWord ## lineData(47 downto 0),
-      2 -> lineData(63 downto 48) ## updatedWord ## lineData(31 downto 0),
-      1 -> lineData(63 downto 32) ## updatedWord ## lineData(15 downto 0),
-      0 -> lineData(63 downto 16) ## updatedWord,
-    )
+  when(updateWriteHit) {
+    val lineWords = line(63 downto 0).subdivideIn(16 bits)
+
+    // Copy the old word and line first, preserving all untouched bytes and words.
+    val updatedWord = Bits(16 bits)
+    updatedWord := lineWords(wordOffset)
+    when (requestUds) {
+      updatedWord(15 downto 8) := requestData.takeHigh(8)
+    }
+    when (requestLds) {
+      updatedWord(7 downto 0) := requestData.takeLow(8)
+    }
+
+    val updatedWords = Vec.fill(4)(Bits(16 bits))
+    updatedWords := lineWords
+    updatedWords(wordOffset) := updatedWord
+
+    writeData := updatedWords.asBits
   } otherwise {
     writeData := responseData
   }
@@ -108,7 +106,7 @@ case class DirectMappedCache() extends Component {
 
   readEnable := False
   writeEnable := False
-  isWriteHit := False
+  updateWriteHit := False
   io.events.readHit := False
   io.events.readMiss := False
   io.events.writeRequest := False
@@ -158,7 +156,7 @@ case class DirectMappedCache() extends Component {
         ramSelected := False
         when(isValid && lineTag === tag) {
           // hit, update the cache
-          isWriteHit := True
+          updateWriteHit := True
           writeEnable := True
         }
         io.mainBus.ready := True
