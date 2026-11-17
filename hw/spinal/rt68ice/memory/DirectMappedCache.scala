@@ -16,8 +16,10 @@ In the packed data, word 0 is bits [15:0], word 3 is bits [63:48].
 
 Read misses fetch an eight-byte-aligned SDRAM burst and cache all four words.
 The original CPU address selects the returned word on both misses and hits.
-Writes keep their original address and byte strobes, reach SDRAM, and
-invalidate the entire selected cache line without allocating a new line.
+Writes are write-through: their captured address, data and byte strobes reach
+SDRAM. On completion, a write hit updates only the selected word or byte(s) in
+the cached line, preserving its tag, other data and valid bit. A write miss
+leaves the cache unchanged and does not allocate a line.
 Addresses $1234 and $3234 share slot $246 and word offset 2, but differ in tag.
 */
 
@@ -60,7 +62,34 @@ case class DirectMappedCache() extends Component {
 
   val slot = io.mainBus.address(12 downto 3).asUInt
   val line = cache.readSync(slot, readEnable)
-  cache.write(requestSlot, tag ## responseData, writeEnable)
+
+  val isWriteHit = Bool()
+  val writeData = Bits(64 bits)
+  when(isWriteHit) {
+    val lineData = line(63 downto 0)
+    val selectedWord = wordOffset.mux(
+      3 -> lineData(63 downto 48),
+      2 -> lineData(47 downto 32),
+      1 -> lineData(31 downto 16),
+      0 -> lineData(15 downto 0),
+    )
+    val updatedWord = (requestUds ## requestLds).mux(
+      B"11" -> requestData,
+      B"10" -> requestData(15 downto 8) ## selectedWord(7 downto 0),
+      B"01" -> selectedWord(15 downto 8) ## requestData(7 downto 0),
+      B"00" -> selectedWord,
+    )
+    writeData := wordOffset.mux(
+      3 -> updatedWord ## lineData(47 downto 0),
+      2 -> lineData(63 downto 48) ## updatedWord ## lineData(31 downto 0),
+      1 -> lineData(63 downto 32) ## updatedWord ## lineData(15 downto 0),
+      0 -> lineData(63 downto 16) ## updatedWord,
+    )
+  } otherwise {
+    writeData := responseData
+  }
+
+  cache.write(requestSlot, tag ## writeData, writeEnable)
 
   io.mainBus.irq := False
   io.mainBus.dataIn := 0
@@ -79,6 +108,7 @@ case class DirectMappedCache() extends Component {
 
   readEnable := False
   writeEnable := False
+  isWriteHit := False
   io.events.readHit := False
   io.events.readMiss := False
   io.events.writeRequest := False
@@ -127,8 +157,9 @@ case class DirectMappedCache() extends Component {
       when(responseReady) {
         ramSelected := False
         when(isValid && lineTag === tag) {
-          // hit, invalidate the line
-          valid(requestSlot) := False
+          // hit, update the cache
+          isWriteHit := True
+          writeEnable := True
         }
         io.mainBus.ready := True
         goto(idle)
