@@ -38,6 +38,7 @@ case class DirectMappedCache() extends Component {
   val isRead = active && !io.mainBus.wr
   val cache = Mem(Bits(75 bits), 1024)
   val valid = Reg(Bits(1024 bits)) init 0
+
   // Capture the entire downstream request in the system clock domain. Keep it
   // stable until completion; no live CPU address/data path crosses to SDRAM.
   val requestAddress = Reg(Bits(32 bits)) init 0
@@ -46,6 +47,14 @@ case class DirectMappedCache() extends Component {
   val requestUds = Reg(Bool()) init False
   val requestLds = Reg(Bool()) init False
   val ramSelected = Reg(Bool()) init False
+
+  // Capture the pending request (required by the write buffer)
+  val pendingWriteAddress = Reg(Bits(32 bits)) init 0
+  val pendingWriteData = Reg(Bits(16 bits)) init 0
+  val pendingWriteUds = Reg(Bool()) init False
+  val pendingWriteLds = Reg(Bool()) init False
+  val writePending = Reg(Bool()) init False
+
   // Qualify completion with the current request: RAM is also ready while idle.
   // Sample data and completion together before using them in the cache/CPU path.
   val responseReady = RegNext(ramSelected && io.ramBus.ready) init False
@@ -93,16 +102,19 @@ case class DirectMappedCache() extends Component {
   io.mainBus.dataIn := 0
   io.mainBus.ready := True
   io.ramBus.sel := ramSelected
-  when (requestWrite) {
-    io.ramBus.address := requestAddress
+  when (writePending) {
+    io.ramBus.address := pendingWriteAddress
+    io.ramBus.dataOut := pendingWriteData
+    io.ramBus.wr := ramSelected
+    io.ramBus.uds := ramSelected && pendingWriteUds
+    io.ramBus.lds := ramSelected && pendingWriteLds
   } otherwise {
     io.ramBus.address := (requestAddress(23 downto 3) ## B"000").resized
+    io.ramBus.dataOut := requestData
+    io.ramBus.wr := False
+    io.ramBus.uds := ramSelected && requestUds
+    io.ramBus.lds := ramSelected && requestLds
   }
-
-  io.ramBus.dataOut := requestData
-  io.ramBus.wr := ramSelected && requestWrite
-  io.ramBus.uds := ramSelected && requestUds
-  io.ramBus.lds := ramSelected && requestLds
 
   readEnable := False
   writeEnable := False
@@ -142,6 +154,15 @@ case class DirectMappedCache() extends Component {
         io.events.writeRequest := True
         readEnable := True // Read from cache sync
         io.mainBus.ready := False
+
+        // Required by buffered write
+        pendingWriteAddress := io.mainBus.address
+        pendingWriteData := io.mainBus.dataOut
+        pendingWriteUds := io.mainBus.uds
+        pendingWriteLds := io.mainBus.lds
+        writePending := True
+
+        // Start SDRAM write
         ramSelected := True
         goto(writeDramWait)
       }
@@ -159,6 +180,7 @@ case class DirectMappedCache() extends Component {
           updateWriteHit := True
           writeEnable := True
         }
+        writePending := False
         io.mainBus.ready := True
         goto(idle)
       }
