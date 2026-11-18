@@ -16,10 +16,12 @@ In the packed data, word 0 is bits [15:0], word 3 is bits [63:48].
 
 Read misses fetch an eight-byte-aligned SDRAM burst and cache all four words.
 The original CPU address selects the returned word on both misses and hits.
-Writes are write-through: their captured address, data and byte strobes reach
-SDRAM. On completion, a write hit updates only the selected word or byte(s) in
-the cached line, preserving its tag, other data and valid bit. A write miss
-leaves the cache unchanged and does not allocate a line.
+Writes are write-through with one posted entry holding address, data and byte
+strobes until SDRAM completion. After lookup, a write hit updates only the
+selected cached word or byte(s), preserving its tag, other data and valid bit;
+a write miss leaves the cache unchanged and does not allocate. The CPU is
+acknowledged after lookup/update while SDRAM continues independently. Read
+hits may proceed; another write or a read miss waits for the entry to drain.
 Addresses $1234 and $3234 share slot $246 and word offset 2, but differ in tag.
 */
 
@@ -39,8 +41,9 @@ case class DirectMappedCache() extends Component {
   val cache = Mem(Bits(75 bits), 1024)
   val valid = Reg(Bits(1024 bits)) init 0
 
-  // Capture the entire downstream request in the system clock domain. Keep it
-  // stable until completion; no live CPU address/data path crosses to SDRAM.
+  // Capture the current CPU request in the system clock domain. Reads retain
+  // it through completion; posted writes use the separate pending entry below.
+  // No live CPU address/data path crosses to SDRAM.
   val requestAddress = Reg(Bits(32 bits)) init 0
   val requestData = Reg(Bits(16 bits)) init 0
   val requestWrite = Reg(Bool()) init False
@@ -157,37 +160,40 @@ case class DirectMappedCache() extends Component {
         goto(readLookup)
       } elsewhen isWrite {
         // Write
-        io.events.writeRequest := True
-        readEnable := True // Read from cache sync
         io.mainBus.ready := False
 
-        // Required by buffered write
-        pendingWriteAddress := io.mainBus.address
-        pendingWriteData := io.mainBus.dataOut
-        pendingWriteUds := io.mainBus.uds
-        pendingWriteLds := io.mainBus.lds
-        writePending := True
+        when (!writePending) {
+          // Start a new write only when the previous one is done
+          io.events.writeRequest := True
+          readEnable := True // Read from cache sync
 
-        // Start SDRAM write
-        ramSelected := True
-        goto(writeDramWait)
+          // Required by buffered write
+          pendingWriteAddress := io.mainBus.address
+          pendingWriteData := io.mainBus.dataOut
+          pendingWriteUds := io.mainBus.uds
+          pendingWriteLds := io.mainBus.lds
+          writePending := True
+
+          // Start SDRAM write
+          ramSelected := True
+          goto(writeDramWait)
+        }
       }
     }
 
     writeDramWait.whenIsActive {
       val lineTag = line(74 downto 64)
-      io.mainBus.ready := False
       io.events.writeRamWait := !responseReady
 
-      when(responseReady) {
-        when(isValid && lineTag === tag) {
-          // hit, update the cache
-          updateWriteHit := True
-          writeEnable := True
-        }
-        io.mainBus.ready := True
-        goto(idle)
+      // Let CPU and write continue in parallel
+      when(isValid && lineTag === tag) {
+        // hit, update the cache
+        updateWriteHit := True
+        writeEnable := True
       }
+
+      io.mainBus.ready := True
+      goto(idle)
     }
 
     readLookup.whenIsActive {
@@ -205,13 +211,17 @@ case class DirectMappedCache() extends Component {
         )
         goto(idle)
       } otherwise {
-        io.events.readMiss := True
         // Miss
         io.mainBus.ready := False
-        // Start SDRAM only after the lookup has established a miss. Selection
-        // is registered too, so the tag comparator does not cross domains.
-        ramSelected := True
-        goto(readDramWait)
+
+        // Wait until SDRAM is free
+        when (!writePending) {
+          io.events.readMiss := True
+          // Start SDRAM only after the lookup has established a miss. Selection
+          // is registered too, so the tag comparator does not cross domains.
+          ramSelected := True
+          goto(readDramWait)
+        }
       }
     }
 

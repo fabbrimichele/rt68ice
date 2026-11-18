@@ -6,20 +6,26 @@ RT68 IceSugar Pro version
 The design includes an 8 KiB unified direct-mapped cache with 1,024 four-word
 lines and SDRAM burst read fills. Writes are write-through with no write
 allocation: a write hit updates the selected cached word or byte(s), while a
-write miss preserves existing lines. The CPU still waits for the SDRAM write
-to complete. Requests and responses remain registered at 25/50 MHz
-system/SDRAM clocks, and SDRAM inputs use dedicated IOLOGIC registers.
+write miss preserves existing lines. A single-entry posted-write buffer
+releases the CPU after the cache lookup/update while SDRAM finishes the write.
+Cache read hits can proceed; another write or a read miss waits for the entry
+to drain. Requests and responses remain registered at 25/50 MHz system/SDRAM
+clocks, and SDRAM inputs use dedicated IOLOGIC registers.
 
-The current implementation completed four clean YAARTTT passes and four
-validated CoreMark runs at **14.316391 iterations/s**, versus 12.578616 with
-write-hit invalidation and 7.013069 uncached. These are about **13.8%** and
-**104.1%** higher CoreMark throughput respectively. See
-[write-hit update validation](doc/validation.md#write-hit-update-validation-2026-11-18)
-for source provenance, the earlier implementation's results and remaining
-coverage. Hardware tests do not establish complete external timing closure.
+The posted-write implementation completed six clean YAARTTT passes in 23:51
+on a retry and three validated CoreMark runs averaging **15.170670 iterations/s**.
+That is **6.0%** higher CoreMark throughput than the preceding unbuffered
+write-through cache and **116.3%** above uncached (**2.16x**). YAART's first
+four passes are **8.6% faster**. One earlier run rebooted during pass five;
+the cause remains unresolved. See the
+[complete performance progression](doc/validation.md#cache-performance-progression)
+and [posted-write validation](doc/validation.md#single-entry-posted-write-buffer-validation-2026-11-18).
+Hardware tests do not establish complete external timing closure.
 
 [Cache profiling registers and CACHSTAT.TOS](doc/cache-stats.md) provide atomic
 snapshots of hits, misses, writes, elapsed time and read/write stall cycles.
+The write RAM-wait counter has a documented limitation with posted writes;
+it does not measure background write duration.
 
 ## Memory Layout
 See the generated [System Memory Layout](./doc/memory_layout.md).
@@ -48,11 +54,11 @@ the OSS CAD environment variables.
 
 To run the testbench:
 ```
-sbt "runMain playground.BlinkSim"
+sbt "runMain rt68ice.memory.DirectMappedCacheSim"
 ```
 To generate the Verilog:
 ```sh
-make hw/gen/Blink.v
+sbt "runMain rt68ice.Rt68IceTopLevelVerilog"
 ```
 To generate the bit stream:
 ```sh
