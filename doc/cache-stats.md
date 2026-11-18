@@ -1,12 +1,14 @@
 # Cache performance counters (register ABI 1)
 
-The `cache-performance-counters` branch adds an observer to the registered
-four-word SDRAM cache. It does not change the cache policy or clock rates.
+The counter peripheral observes the registered four-word SDRAM cache.
+The observer does not change the cache policy or clock rates. The current
+cache uses a single-entry posted-write buffer; see the event definitions below
+for the legacy write RAM-wait counter's limitation.
 Counters are disabled and zero after FPGA reset. They occupy flip-flops,
 not block RAM. Resource use and routed timing must be checked for the build.
 
 Use the accompanying `CACHSTAT.TOS` utility in
-[`emutos-apps/rt68ice/cachestat`](https://github.com/fabbrimichele/emutos-apps/tree/cache-performance-counters/rt68ice/cachestat).
+[`emutos-apps/rt68ice/cachestat`](https://github.com/fabbrimichele/emutos-apps/tree/main/rt68ice/cachestat).
 Run it from EmuTOS, for example:
 
 ```text
@@ -73,8 +75,10 @@ frozen view; counter data reads return zero until the next snapshot.
 
 ## What the counters measure
 
-- **Read hits/misses:** one event in the cache lookup state per 16-bit read
-  request. A four-word fill counts as one miss, not four reads. A longword can
+- **Read hits/misses:** one event per resolved 16-bit read request. A hit is
+  counted in the lookup state; a miss waiting for a pending write is counted
+  only when it can launch its SDRAM read, not on each waiting cycle. A four-word
+  fill counts as one miss, not four reads. A longword can
   count as a miss followed by a hit. Instruction and data reads are combined.
 - **Writes:** one event when Idle accepts a write; a held/stalled request is
   not repeatedly counted. A 32-bit CPU store consists of two word requests.
@@ -83,18 +87,26 @@ frozen view; counter data reads return zero until the next snapshot.
   well as controller and registered-response waiting. Hit lookup therefore
   contributes to read stalls. Other peripherals' and CPU-internal cycles do
   not contribute to these two counts.
-- **RAM waits:** cycles in the respective cache SDRAM-wait state with captured
-  completion still false. Includes response-register waiting; excludes the
-  initial lookup/launch cycles and the ready completion cycle. These are
-  system-clock cycles, not SDRAM-clock cycles or isolated chip latency.
+- **Read RAM waits:** cycles in the read SDRAM-wait state with captured
+  completion still false. Includes response-register waiting; excludes lookup,
+  time spent draining a pending write before read launch, and the ready cycle.
+- **Write RAM waits (legacy limitation):** the current event is asserted only
+  in the one-cycle write lookup/acknowledgement state when captured completion
+  is false. It does not follow the background SDRAM write after CPU release.
+  Consequently this value and its per-write average must not be interpreted as
+  SDRAM write duration or CPU write-stall time. The register ABI/layout is
+  unchanged. Earlier blocking-write builds counted their write-wait state.
+  All wait counts use system clocks, not SDRAM clocks or isolated chip latency.
 - **Elapsed:** all enabled system-clock cycles, including idle/ROM/peripheral
   work and interrupts. Counts continue while the CPU is stalled.
 
 Hit rate = hits / (hits + misses). Average read/write stalls divide total
 stall cycles by the corresponding read/write request count. RAM-wait averages
 divide by misses or writes. Stall shares divide by elapsed cycles. Ratios with
-zero denominators print `n/a`; displayed fractions are truncated. Stall totals
-already include the RAM-wait subset: do not add those counters together.
+zero denominators print `n/a`; displayed fractions are truncated. Read RAM
+waits are a subset of CPU read stalls. With posted writes, write RAM waits are
+not a CPU write-stall subset; use CPU write stalls to assess CPU blocking.
+Do not add RAM-wait and CPU-stall totals together.
 These figures do not split instruction from data traffic or identify why a
 particular miss happened.
 
@@ -112,7 +124,8 @@ make -C ../emutos-apps/rt68ice/cachestat build check
 The CSR simulation checks reset/disabled behaviour, event counts, clear/start,
 stop/snapshot, resume, freeze from running, ignored partial/unselected
 writes, 64-bit carry, and big-endian read ordering. The cache regression also
-checks hit/miss event classification, write acceptance and held write waits.
+checks hit/miss event classification, one-time write acceptance, early CPU
+acknowledgement, full-buffer stalls, overlapping cache hits and ordered misses.
 Memory-map regressions cover selection/readback and the window boundary.
 The utility's host mock checks commands, unavailable/unsupported hardware,
 64-bit formatting, arithmetic and zero denominators. A headless Hatari/EmuTOS

@@ -1,3 +1,11 @@
+# SDRAM and cache
+
+The current cache is 8 KiB with four-word burst fills, write-hit updates and
+a [single-entry posted-write buffer](#single-entry-posted-write-buffer-2026-11-18).
+For measured changes at every step, see the
+[performance progression](validation.md#cache-performance-progression).
+The dated results below describe successive historical versions.
+
 ### Resources
 - [AtariST_MiSTer/rtl/sdram.v](https://github.com/MiSTer-devel/AtariST_MiSTer/blob/master/rtl/sdram.v)
 - [Higher level SDRAM controller - hides refresh](https://github.com/agg23/sdram-controller/blob/master/sdram.sv)
@@ -20,7 +28,7 @@ I tried the following configuration but the SDRAM doesn't work:
 - SDRAM clock: 78.1250 
 - CPU clock: 26.0417
 
-### Current uncached baseline
+### Uncached comparison baseline (2026-11-14)
 
 On 2026-11-14, the user reran `sdram_test.asm`, menu option **4. Benchmark**,
 with the cache not integrated. The supplied output reports **7,191 clock
@@ -147,10 +155,12 @@ for provenance, comparisons, and remaining coverage.
 
 ## Write-hit updates (2026-11-18)
 
-The cache now updates the selected word or enabled byte(s) on a completed
-SDRAM write hit and retains the line's tag, valid bit and other data. A write
-miss leaves the cache unchanged and does not allocate. Writes still complete
-in SDRAM before the CPU is released; there is no posted-write buffer.
+Before the posted-write buffer, the cache updated the selected word or enabled
+byte(s) on a completed SDRAM write hit and retained the line's tag, valid bit
+and other data. A write
+miss left the cache unchanged and did not allocate. In that version, writes
+completed in SDRAM before the CPU was released. The posted-write version below
+supersedes that CPU completion policy.
 
 The line-update logic views the 64-bit data as four 16-bit words using `Vec`.
 Default copies preserve the old line and word, and independent UDS/LDS
@@ -171,3 +181,41 @@ The refactor is 5–10 ms slower in these supplied CoreMark runs, approximately
 See [write-hit update validation](validation.md#write-hit-update-validation-2026-11-18)
 for the detailed results and simulation coverage. The diagnostic copy benchmark
 and file-I/O tests have not been rerun for this version.
+
+
+## Single-entry posted-write buffer (2026-11-18)
+
+Writes remain write-through with no write allocation. The cache captures a
+write's address, data and byte enables in a separate pending entry and starts
+the SDRAM transaction. After the synchronous cache lookup, a hit updates the
+selected cached bytes and the CPU is acknowledged without waiting for SDRAM.
+The pending entry stays occupied until registered SDRAM completion releases it.
+There is one entry total, including the in-flight write, not an extra queued
+entry behind it. SDRAM writes remain single-word; no write bursts or combining
+were added.
+
+While a write is pending, cache read hits can complete using updated cached
+data. A second write stalls without overwriting the entry. A read miss holds
+its captured request in the lookup state until the write finishes, then launches
+a burst read after a full deselected system-clock interval. Write responses
+cannot supply read data or cache fills. Peripherals do not currently access
+SDRAM; peripheral operations are not gated on buffer drain. Future SDRAM DMA
+or video clients will require an ordering/coherency review.
+
+Three CoreMark runs validated at 15.168752, 15.174507 and 15.168752 iterations/s,
+with a mean of **15.170670**: **6.0% higher throughput** and **5.6% less execution
+time** than the preceding Vec implementation. Relative to uncached, throughput
+is **116.3% higher (2.16x)**. YAART completed six clean passes in 23:51 on a
+retry; its first four passes took 15:54 versus 17:16 without the buffer, an
+**8.6% throughput increase** (7.9% less time).
+
+An earlier run rebooted during pass five's random-pattern test after the 19:27
+status, with no reported memory errors beforehand. The cause is unresolved.
+Long breadboard reset-button wiring is a possible source of glitches, not a
+confirmed diagnosis; reset filtering has not changed in this version.
+
+See [posted-write validation](validation.md#single-entry-posted-write-buffer-validation-2026-11-18)
+for simulation coverage, exact runs, remaining checks and the
+[full performance history](validation.md#cache-performance-progression).
+The legacy write RAM-wait event does not track background write duration;
+see [counter definitions](cache-stats.md#what-the-counters-measure).

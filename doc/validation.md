@@ -1,6 +1,6 @@
 # RT68ICE validation results
 
-Recorded: 2026-11-05. Updated with write-hit update hardware results: 2026-11-18.
+Recorded: 2026-11-05. Updated with posted-write hardware results: 2026-11-18.
 
 These results summarize tests run on the board by the user and reported during
 the EmuTOS porting session. They provide an initial CPU, memory and storage
@@ -33,6 +33,9 @@ loaded on the board. Bitstream/image hashes and exact build provenance were not
 captured. The display mode used during testing was not recorded.
 
 ## Summary
+
+See the [complete cache performance progression](#cache-performance-progression)
+and [current posted-write results](#single-entry-posted-write-buffer-validation-2026-11-18).
 
 The original rows below describe the uncached baseline. Later cache results
 are recorded separately in [cached-system validation](#cached-system-validation-2026-11-14)
@@ -896,3 +899,136 @@ counter measurements have not been rerun for this version. The cache-only
 simulation does not model SDRAM pins. External SDRAM and related-clock
 setup/hold timing signoff remain outstanding; clean hardware runs do not
 replace that analysis.
+
+
+## Cache performance progression
+
+All rows use 25 MHz CPU/system and 50 MHz SDRAM. Scores below are arithmetic
+means of the supplied validated CoreMark runs, rounded to six decimal places;
+percentages use the unrounded means. The uncached executable ran 110
+iterations; later runs used 200. All report GCC 8.2.1 20181017,
+`-O2 -mcpu=68000 -fomit-frame-pointer -DPERFORMANCE_RUN=1`, code and data in RAM.
+Executable hashes and all historical bitstream hashes were not captured.
+These are workload measurements, not raw SDRAM bandwidth or isolated effects
+of individual RTL changes. The detailed dated sections preserve the original
+ranges, clocks, coverage and provenance.
+
+| Step | Validated runs | Mean iterations/s | Change vs previous step | Change vs uncached |
+| --- | ---: | ---: | ---: | ---: |
+| No cache | 5 | 7.013069 | — | — |
+| Original 2 KiB cache, one-word lines, invalidating writes | 5 | 12.861736 | +83.40% | +83.40% |
+| Registered request/response interface, 2 KiB cache | 3 | 11.012205 | -14.38% | +57.02% |
+| 8 KiB cache, four-word burst fills | 4 | 12.581583 | +14.25% | +79.40% |
+| Dedicated SDRAM input stage, invalidate only on write hit | 3 | 12.578616 | -0.02% | +79.36% |
+| Write-hit updates, explicit mux implementation (`4074442`) | 4 | 14.324082 | +13.88% | +104.25% |
+| Write-hit updates, Vec/byte-override refactor | 4 | 14.316391 | -0.05% | +104.14% |
+| Single-entry posted-write buffer | 3 | 15.170670 | +5.97% | +116.32% |
+
+The initial cache removed the largest bottleneck. Registration traded some
+throughput for registered interfaces; larger burst lines recovered it. Keeping
+lines cached on write hits and posting one write then raised throughput about
+20.6% beyond the dedicated-input-stage baseline. The final score is **2.16x**
+uncached. Differences of one or two timer ticks around the input-stage and
+Vec refactor steps should not be treated as isolated optimization effects.
+
+
+## Single-entry posted-write buffer validation (2026-11-18)
+
+Configuration remains 25 MHz CPU/cache, 50 MHz SDRAM, 8 KiB direct-mapped cache,
+1,024 four-word lines and dedicated SDRAM input registers. The tested working
+tree is on `cache-posted-write-buffer`, based on `00aca70` and merged write-hit
+implementation `3e83b17`. The user built/programmed that working version;
+loaded bitstream and executable hashes were not supplied for these runs.
+
+The one entry includes the in-flight write. CPU acknowledgement follows the
+synchronous lookup and write-hit cache update, rather than waiting for SDRAM.
+Pending address/data/byte enables remain stable until registered completion.
+A second write stalls while the entry is occupied. Read hits can proceed; a
+miss waits with its captured request until the write drains, with a deselected
+system-clock interval before the next SDRAM request. Write misses do not
+allocate. SDRAM writes are still single-word, without combining or bursts.
+
+### CoreMark: three validated runs
+
+Each run used 200 iterations, size 666, the compiler/flags listed above and
+RAM for code and data. All reported correct-operation validation and matching
+CRCs: seed `e9f5`, list `e714`, matrix `1fd7`, state `8e3a`, final `382f`.
+
+| Run | Ticks | Reported seconds | Iterations/s |
+| --- | ---: | ---: | ---: |
+| 1 | 2637 | 13.185000 | 15.168752 |
+| 2 | 2636 | 13.180000 | 15.174507 |
+| 3 | 2637 | 13.185000 | 15.168752 |
+
+Mean throughput is **15.170670 iterations/s** and mean elapsed time
+**13.183333 seconds**. Against the preceding four identical unbuffered Vec
+runs (14.316391 iterations/s, 13.970000 seconds), this is **5.97% higher
+throughput** and **5.63% less execution time**. Variation within the new runs
+is one 5 ms timer tick. Against uncached, the score is **116.32% higher**.
+
+### YAARTTT: six clean completed passes on retry; earlier reboot unresolved
+
+The user ran YAARTTT 0.2.3, ST-RAM (`S`), over `$00026B18`–`$00D80000`.
+An initial run reached pass five's random-pattern test at 19:27 with zero
+reported errors, then printed the RT68F boot monitor banner. The reboot cause
+has not been identified. The user reported long reset-button wires on a
+breadboard, making an input glitch a plausible hypothesis, not proof. The
+current reset logic asserts immediately on the raw button; its existing 20 ms
+hold after release does not require a sustained press. No reset change is
+included in this branch.
+
+The retry used the same bitstream according to the user and recorded:
+
+| Elapsed time | Progress | Reported errors |
+| --- | --- | ---: |
+| 00:00:00 | Pass 1 begins | 0 |
+| 00:03:58 | Pass 2 begins | 0 |
+| 00:07:57 | Pass 3 begins | 0 |
+| 00:11:55 | Pass 4 begins | 0 |
+| 00:15:54 | Pass 5 begins; four complete | 0 |
+| 00:19:52 | Pass 6 begins; five complete | 0 |
+| 00:23:51 | Pass 7 begins; six complete | 0 |
+| 00:24:18 | Pass 7, zero/one pattern `ffff` | 0 |
+
+No reboot appears in the supplied retry. The first four complete passes took
+954 seconds versus 1,036 seconds without the buffer: **7.92% less time** or
+**8.60% higher workload throughput**. This clean retry does not explain or
+invalidate the earlier reboot. Pass seven is not established complete.
+
+### Simulation coverage and remaining checks
+
+`DirectMappedCacheSim` passed against the final controller after removing the
+duplicate unconditional ready assignment. It separates CPU acknowledgement
+from downstream completion and verifies:
+
+- CPU acknowledgement while SDRAM ready is still low.
+- Word/upper-byte/lower-byte write hits followed by reads of updated and
+  neighbouring cached words while the write is still pending in SDRAM.
+- Consecutive longword halves with CPU selection held, second-write stalls,
+  no duplicate acceptance events, and stable pending address/data/byte enables.
+- Same-address and conflicting-address read misses waiting for posted word or
+  byte writes, launching only after drain and a deselected cycle.
+- Held-high RAM readiness across write completion/read launch cannot let stale
+  write completion or poisoned write-response data satisfy the new read.
+- SDRAM completion coinciding with CPU write acknowledgement.
+- The existing 48 write-hit and 24 conflicting-write-miss cases, all word
+  offsets and byte lanes, plus read fill/replacement/reset regressions.
+
+The legacy write RAM-wait event remains tied to the one-cycle write lookup
+state; it does not measure background write occupancy. CPU write-stall counts
+remain the metric for CPU blocking. No new on-board profiling snapshot was
+supplied. See [counter definitions](cache-stats.md#what-the-counters-measure).
+
+A longer stability run is recommended before merging because the earlier
+reboot is unresolved. Diagnostic SDRAM copy and file-I/O verification have not
+been rerun for the posted-write build. Cache simulation is not a pin-level
+SDRAM or physical timing test; related-clock and external SDRAM setup/hold
+signoff remain outstanding. Peripherals currently do not access SDRAM; future
+DMA/video clients will need explicit ordering/coherency review.
+
+
+Pre-PR verification also passed `CacheStatsDeviceSim`, `BusControllerSim`,
+`MemoryMapSim` and integrated `Rt68IceTopLevelVerilog` generation, alongside
+the cache regression. No additional full bitstream build was run for these
+documentation/comment changes; the on-board results above refer to the user's
+previously built and programmed version.

@@ -1,5 +1,10 @@
 # Registered cache SDRAM interface
 
+This is a historical report for the 2026-11-14 registered one-word cache.
+Its invalidating writes and CPU-waits-for-write descriptions apply to that
+version. The current cache has four-word lines, write-hit updates and a
+[single-entry posted-write buffer](sdram.md#single-entry-posted-write-buffer-2026-11-18).
+
 Branch: `cache-registered-interface`, based on `direct-mapped-cache` at
 `f69cec1`. The baseline timing report is
 [cache-timing-2026-11-14.md](cache-timing-2026-11-14.md).

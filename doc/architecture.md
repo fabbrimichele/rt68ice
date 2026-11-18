@@ -28,14 +28,14 @@ Design and implement a high-performance Motorola 680x0-compatible System-on-a-Ch
 
 ## Architectural Specification
 * **Processor: [TG68K](https://github.com/TobiFlex/TG68K.C/tree/master)**
-    * **68020 Configuration:** Enables 32-bit internal longword operations, improved bitfield instructions, and advanced addressing modes.
+    * **Current CPU configuration:** 68000 mode. Enabling the core's partial 68020 support is a separate future change.
     * **Data Bus:** 16-bit external; direct 1:1 mapping to the iCESugar Pro’s 16-bit wide SDRAM chip.
 * **RAM:**
     * **Low Memory:** The 14MB CPU window is contiguous from `0x000000` to `0xDFFFFF`.
-    * **Vector Table:** The first 16KB is overlaid by FPGA BRAM for high-speed exception, interrupt, stack and firmware-data access. The first eight bytes are read from ROM for the reset stack pointer and program counter.
-    * **Main Memory:** The board's 32MB SDRAM is accessed through the 14MB low-memory CPU window. A larger window and cache can be added later.
+    * **Vector Table:** The first 1 KiB is overlaid by FPGA BRAM for high-speed exception, interrupt, stack and firmware-data access. The first eight bytes are read from ROM for the reset stack pointer and program counter.
+    * **Main Memory:** The board's 32MB SDRAM is accessed through the 14MB low-memory CPU window. An 8 KiB unified direct-mapped cache has four-word burst fills, write-hit updates and a single-entry posted-write buffer. A larger CPU memory window remains future work.
 * **ROM:**
-    * The 16KB boot ROM is mapped at the Atari-compatible `0xFC0000` address, with its first eight bytes also visible at reset-vector addresses `0x000000-0x000007`.
+    * The 4 KiB boot ROM is decoded in a 16 KiB window at the Atari-compatible `0xFC0000` address, with its first eight bytes also visible at reset-vector addresses `0x000000-0x000007`.
 * **Custom I/O:**
     * The dedicated framebuffer is at `0xE00000`; custom peripherals occupy 16KB windows beginning at `0xF00000`.
 * **Graphic Modes:**

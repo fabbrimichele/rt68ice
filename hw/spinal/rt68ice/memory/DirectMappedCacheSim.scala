@@ -121,45 +121,62 @@ object DirectMappedCacheSim extends App {
       assert(ram.lds.toBoolean == lower, "RAM write should preserve the lower byte strobe")
     }
 
-    // Accept a delayed write, keeping the CPU request active for a possible
-    // next word. Call releaseCpuRequest only when the caller wants an idle gap.
-    def completeRamWrite(address: Long, data: Int,
-                         upper: Boolean = true, lower: Boolean = true, waitCycles: Int = 3): Unit = {
-      assert(!main.ready.toBoolean, "CPU must stall when starting a RAM write")
+    // The CPU accepts a posted write before SDRAM completes it. End the CPU
+    // transaction independently so later requests cannot accidentally replay it.
+    def acceptPostedWrite(address: Long, data: Int,
+                          upper: Boolean = true, lower: Boolean = true): Unit = {
+      assert(!ram.ready.toBoolean, "Exercise early CPU acknowledgement while SDRAM is busy")
+      assert(main.ready.toBoolean, "A buffered write must release the CPU without RAM completion")
+      assert(!dut.io.events.writeRequest.toBoolean, "The lookup must not count the write again")
+      checkRamWrite(address, data, upper, lower)
+      dut.clockDomain.waitSampling()
+      main.sel #= false
+      main.wr #= false
+      main.uds #= false
+      main.lds #= false
+      sleep(1)
+      checkRamWrite(address, data, upper, lower)
+    }
+
+    // Complete only the downstream transaction. The CPU may be idle, reading
+    // the cache, or stalled on another request throughout this operation.
+    def finishPendingWrite(address: Long, data: Int,
+                           upper: Boolean = true, lower: Boolean = true,
+                           waitCycles: Int = 3, holdReady: Boolean = false): Unit = {
       checkRamWrite(address, data, upper, lower)
       for (_ <- 0 until waitCycles) {
+        assert(!dut.io.events.writeRequest.toBoolean,
+          "An occupied buffer must not accept another CPU write")
         dut.clockDomain.waitSampling()
         sleep(1)
-        assert(!main.ready.toBoolean, "CPU must remain stalled until RAM accepts the write")
         checkRamWrite(address, data, upper, lower)
-        assert(!dut.io.events.writeRequest.toBoolean, "A held write must not be counted again")
-        assert(dut.io.events.writeRamWait.toBoolean && dut.io.events.writeStall.toBoolean,
-          "Delayed writes must emit stall and RAM-wait events each waiting cycle")
       }
 
+      // Use actual downstream signals, independently of the CPU request.
       val wordAddress = ram.address.toLong & ~1L
       val mask = (if (ram.uds.toBoolean) 0xff00 else 0) |
         (if (ram.lds.toBoolean) 0x00ff else 0)
       val oldWord = ramWords.getOrElse(wordAddress, 0)
       val newWord = (oldWord & (~mask & 0xffff)) | (ram.dataOut.toInt & mask)
-      // A write response carries no useful line data. Poison it so a cache
-      // update accidentally using responseData cannot pass these tests.
+      // Write responses must never supply a cache fill or a later read response.
       dut.io.ramReadLineData #= BigInt("0123456789ABCDEF", 16)
       ram.ready #= true
       sleep(1)
-      assert(!main.ready.toBoolean, "Raw write completion must wait for the response register")
       checkRamWrite(address, data, upper, lower)
-      dut.clockDomain.waitSampling()
-      sleep(1)
-      assert(main.ready.toBoolean, "CPU write should complete after capturing RAM readiness")
-      checkRamWrite(address, data, upper, lower)
-      ram.ready #= false
-      sleep(1)
-      assert(main.ready.toBoolean, "Write completion must remain asserted from the response register")
       dut.clockDomain.waitSampling()
       ramWords(wordAddress) = newWord
       sleep(1)
-      assert(!ram.sel.toBoolean, "Accepted write must release RAM before the next request")
+      checkRamWrite(address, data, upper, lower)
+      if (!holdReady) ram.ready #= false
+      dut.clockDomain.waitSampling()
+      sleep(1)
+      assert(!ram.sel.toBoolean, "Registered write completion must release RAM before another launch")
+    }
+
+    def completeRamWrite(address: Long, data: Int,
+                         upper: Boolean = true, lower: Boolean = true, waitCycles: Int = 3): Unit = {
+      acceptPostedWrite(address, data, upper, lower)
+      finishPendingWrite(address, data, upper, lower, waitCycles)
     }
 
     // Read the RAM model through the cache and check whether RAM was accessed.
@@ -483,7 +500,7 @@ object DirectMappedCacheSim extends App {
       assert(!ram.sel.toBoolean, "RAM should remain deselected after the word hit")
     }
 
-    // ------- Delayed word write-through -------
+    // ------- Posted word write-through with delayed SDRAM completion -------
     ramWords(0x4100L) = 0xFFFF
     startWrite(0x4100L, 0x2468)
     completeRamWrite(0x4100L, 0x2468)
@@ -569,34 +586,138 @@ object DirectMappedCacheSim extends App {
       "Lower byte write must retain the upper byte updated by the previous write")
     assert(readStoredWord(0x4504L, expectHit = true) == 0xB6D2)
 
-    // ------- Consecutive write hits without CPU bus deselection -------
+    // ------- Consecutive longword halves: second write waits for the buffer -------
     for ((data, word) <- Seq(0xCAFE, 0xDEAD, 0x5566, 0x7788).zipWithIndex)
       ramWords(0x4600L + word * 2) = data
     assert(readStoredWord(0x4600L, expectHit = false) == 0xCAFE)
-    for ((address, data) <- Seq((0x4600L, 0x1122), (0x4602L, 0x3344))) {
-      startWrite(address, data)
-      completeRamWrite(address, data)
-      assert(main.sel.toBoolean && main.uds.toBoolean && main.lds.toBoolean,
-        "Selection and both strobes must stay asserted between longword halves")
-      assert(ramWords(address) == data, "Each longword half must reach its own RAM address")
-      // No release between words: the next startWrite changes address and data
-      // after the preceding word has been accepted, while strobes stay high.
+    startWrite(0x4600L, 0x1122)
+    assert(main.ready.toBoolean, "First longword half should be acknowledged early")
+    checkRamWrite(0x4600L, 0x1122, true, true)
+    dut.clockDomain.waitSampling() // Accept first half, keep sel and strobes high.
+    main.address #= 0x4602L
+    main.dataOut #= 0x3344
+    sleep(1)
+    for (_ <- 0 until 5) {
+      assert(!main.ready.toBoolean, "Second longword half must wait while the buffer is full")
+      assert(!dut.io.events.writeRequest.toBoolean, "A stalled second write must not be counted")
+      checkRamWrite(0x4600L, 0x1122, true, true)
+      dut.clockDomain.waitSampling()
+      sleep(1)
     }
+    finishPendingWrite(0x4600L, 0x1122, waitCycles = 0, holdReady = true)
+    assert(!main.ready.toBoolean, "Second write still needs its capture and cache lookup")
+    assert(dut.io.events.writeRequest.toBoolean, "Freed entry should accept the held second write")
+    assert(main.sel.toBoolean && main.uds.toBoolean && main.lds.toBoolean,
+      "CPU selection and strobes must remain high between longword halves")
+    ram.ready #= false
+    dut.clockDomain.waitSampling()
+    sleep(1)
+    checkRamWrite(0x4602L, 0x3344, true, true)
+    completeRamWrite(0x4602L, 0x3344)
     releaseCpuRequest()
-    for ((data, word) <- Seq(0x1122, 0x3344, 0x5566, 0x7788).zipWithIndex)
+    for ((data, word) <- Seq(0x1122, 0x3344, 0x5566, 0x7788).zipWithIndex) {
+      assert(ramWords(0x4600L + word * 2) == data, "Both longword halves must reach RAM in order")
       assert(readStoredWord(0x4600L + word * 2, expectHit = true) == data,
         "Consecutive write hits must retain both updated words and their neighbours")
+    }
 
-    // ------- Write followed by read without an idle cycle -------
-    ramWords(0x4700L) = 0x0F0F
-    assert(readStoredWord(0x4700L, expectHit = false) == 0x0F0F)
-    startWrite(0x4700L, 0x9ABC)
-    completeRamWrite(0x4700L, 0x9ABC)
-    assert(main.sel.toBoolean, "CPU request must remain selected before changing direction")
-    // readStoredWord changes direction directly to read, without releasing sel.
-    assert(readStoredWord(0x4700L, expectHit = true) == 0x9ABC,
-      "Immediate read must hit the updated cached word without fetching RAM")
-    assert(readStoredWord(0x4700L, expectHit = true) == 0x9ABC)
+    // ------- Read hits proceed while a posted word/byte write is still pending -------
+    for (((upper, lower), lane) <- Seq((true, true), (true, false), (false, true)).zipWithIndex) {
+      val base = 0x15000L + lane * 8
+      ramWords(base) = 0xA17C
+      ramWords(base + 2) = 0x5678
+      assert(readStoredWord(base, expectHit = false) == 0xA17C)
+      val address = base + (if (!upper) 1 else 0)
+      val mask = (if (upper) 0xFF00 else 0) | (if (lower) 0x00FF else 0)
+      val expected = (0xA17C & (~mask & 0xFFFF)) | (0xB6E9 & mask)
+      startWrite(address, 0xB6E9, upper, lower)
+      assert(main.ready.toBoolean, "Write lookup must acknowledge without RAM readiness")
+      dut.clockDomain.waitSampling() // Accept write, immediately change direction.
+      for ((readAddress, value) <- Seq((base, expected), (base + 2, 0x5678), (base, expected))) {
+        startRead(readAddress)
+        assert(!main.ready.toBoolean, "Read must perform its own synchronous lookup")
+        checkRamWrite(address, 0xB6E9, upper, lower)
+        dut.clockDomain.waitSampling()
+        sleep(1)
+        assert(main.ready.toBoolean && main.dataIn.toInt == value,
+          "Read hit must return the latest cached bytes before SDRAM completion")
+        assert(dut.io.events.readHit.toBoolean && !dut.io.events.readMiss.toBoolean)
+        checkRamWrite(address, 0xB6E9, upper, lower)
+        assert(ramWords(base) == 0xA17C, "SDRAM must still contain the old value during these hits")
+        finishRead()
+        checkRamWrite(address, 0xB6E9, upper, lower)
+      }
+      finishPendingWrite(address, 0xB6E9, upper, lower)
+      releaseCpuRequest()
+      assert(ramWords(base) == expected)
+      assert(readStoredWord(base, expectHit = true) == expected)
+    }
+
+    // ------- Read misses drain the write, including a same-address byte write -------
+    // Keep ready high across write completion and read launch, then drop it
+    // before the read response edge. The old write response must not satisfy it.
+    for (sameAddress <- Seq(true, false); (upper, lower) <- Seq((true, true), (true, false), (false, true))) {
+      val base = 0x26000L
+      val readAddress = if (sameAddress) base else base + 0x2000L
+      // Evict both target tags from this slot before each no-allocate write.
+      ramWords(base + 0x4000L) = 0xFEDC
+      readStoredWord(base + 0x4000L, expectHit = false)
+      ramWords(base) = 0xA17C
+      ramWords(base + 0x2000L) = 0x3579
+      val address = base + (if (!upper) 1 else 0)
+      startWrite(address, 0xB6E9, upper, lower)
+      acceptPostedWrite(address, 0xB6E9, upper, lower)
+      startRead(readAddress)
+      dut.clockDomain.waitSampling()
+      sleep(1)
+      for (_ <- 0 until 4) {
+        assert(!main.ready.toBoolean, "Read miss must stall behind a pending write")
+        assert(!dut.io.events.readMiss.toBoolean && !dut.io.events.readHit.toBoolean,
+          "Waiting for the write must not repeatedly count or launch a read miss")
+        checkRamWrite(address, 0xB6E9, upper, lower)
+        dut.clockDomain.waitSampling()
+        sleep(1)
+      }
+      finishPendingWrite(address, 0xB6E9, upper, lower, waitCycles = 0, holdReady = true)
+      assert(!main.ready.toBoolean, "Write completion must not acknowledge the waiting read")
+      launchRamRead(readAddress) // Also checks the full deselected cycle and miss event.
+      assert(!main.ready.toBoolean, "Stale write readiness must not complete the new read")
+      ram.ready #= false
+      dut.clockDomain.waitSampling(2)
+      sleep(1)
+      assert(!main.ready.toBoolean, "Read must wait for its own RAM response")
+      checkRamRead(readAddress)
+      val mask = (if (upper) 0xFF00 else 0) | (if (lower) 0x00FF else 0)
+      val written = (0xA17C & (~mask & 0xFFFF)) | (0xB6E9 & mask)
+      assert(ramWords(base) == written, "Pending write must reach RAM before the read starts")
+      val expected = if (sameAddress) written else 0x3579
+      respondFromRam(expected)
+      finishRead()
+      assert(readStoredWord(readAddress, expectHit = true) == expected,
+        "Refill must contain the read response, never the poisoned write response")
+    }
+
+    // ------- RAM may complete on the same edge as the CPU write acknowledgement -------
+    ramWords(0x17000L) = 0x1234
+    assert(readStoredWord(0x17000L, expectHit = false) == 0x1234)
+    startWrite(0x17000L, 0xABCD)
+    assert(main.ready.toBoolean, "CPU readiness must not depend on RAM readiness")
+    ram.ready #= true
+    dut.io.ramReadLineData #= lineMask
+    dut.clockDomain.waitSampling()
+    ramWords(0x17000L) = 0xABCD
+    main.sel #= false
+    main.wr #= false
+    main.uds #= false
+    main.lds #= false
+    sleep(1)
+    checkRamWrite(0x17000L, 0xABCD, true, true)
+    dut.clockDomain.waitSampling()
+    sleep(1)
+    assert(!ram.sel.toBoolean, "Immediate write completion must free the entry")
+    ram.ready #= false
+    assert(readStoredWord(0x17000L, expectHit = true) == 0xABCD)
+    println("Posted-write checks passed: early acknowledgement, overlapping hits, second-write backpressure, ordered misses")
 
     // ------- Read miss followed by same-address write without CPU deselection -------
     // RAM is already ready: the miss must still wait for registered selection.
@@ -647,7 +768,7 @@ object DirectMappedCacheSim extends App {
       startWrite(address, writeData, upper, lower)
 
       // The accepted request is already registered. Deliberately change live
-      // CPU inputs while busy to detect accidental use of dataOut/UDS/LDS,
+      // CPU inputs before acknowledgement to detect accidental use of dataOut/UDS/LDS,
       // address or word offset instead of the captured request.
       main.address #= other + 6
       main.dataOut #= (writeData ^ 0xFFFF)
