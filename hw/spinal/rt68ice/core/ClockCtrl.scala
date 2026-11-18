@@ -14,7 +14,9 @@ case class ClockCtrl() extends Component {
 
   private val pll = new PllBB
 
-  private val reset = Reset(20 ms)
+  // Filter only the external button; PLL lock loss below still asserts reset
+  // independently, without waiting for button qualification.
+  private val reset = Reset(holdTime = 20 ms, pressTime = 10 ms)
   reset.io.resetButton := io.resetButton
 
   val vgaCd = createClockDomain(

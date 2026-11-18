@@ -5,21 +5,31 @@ import spinal.lib.{BufferCC, Timeout}
 
 import scala.language.postfixOps
 
+/** Runs in the free-running board clock domain, outside the reset it generates.
+  * Filter active-low button presses before assertion; retain power-on reset and
+  * hold reset after a qualified press is released.
+  */
 //noinspection TypeAnnotation
 //noinspection ScalaWeakerAccess
-case class Reset(time: TimeNumber) extends Component {
+case class Reset(holdTime: TimeNumber, pressTime: TimeNumber = 10 ms) extends Component {
   val io = new Bundle {
     val resetButton = in Bool()
     val resetOut = out Bool()
   }
 
-  val timer = Timeout(time)
-  val pressedRaw = !io.resetButton
-  val pressedSync = BufferCC(pressedRaw, init = True)
+  val pressedSync = BufferCC(!io.resetButton, init = False)
+  val pressTimer = Timeout(pressTime)
+  when(!pressedSync) {
+    pressTimer.clear()
+  }
+  val pressedQualified = pressedSync && pressTimer.state
 
-  when (pressedSync) {
-    timer.clear()
+  // Starts unexpired at power-on. Only qualified presses can restart the hold;
+  // short glitches must neither assert reset nor extend its release delay.
+  val holdTimer = Timeout(holdTime)
+  when(pressedQualified) {
+    holdTimer.clear()
   }
 
-  io.resetOut := pressedRaw || pressedSync || !timer.state
+  io.resetOut := pressedQualified || !holdTimer.state
 }
