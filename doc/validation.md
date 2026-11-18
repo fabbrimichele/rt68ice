@@ -973,9 +973,10 @@ An initial run reached pass five's random-pattern test at 19:27 with zero
 reported errors, then printed the RT68F boot monitor banner. The reboot cause
 has not been identified. The user reported long reset-button wires on a
 breadboard, making an input glitch a plausible hypothesis, not proof. The
-current reset logic asserts immediately on the raw button; its existing 20 ms
-hold after release does not require a sustained press. No reset change is
-included in this branch.
+reset logic in that tested write-buffer version asserted immediately on the
+raw button; its existing 20 ms hold after release did not require a sustained
+press. The separate [reset-filter improvement](reset.md) was implemented later
+and has not yet been validated on the board.
 
 The retry used the same bitstream according to the user and recorded:
 

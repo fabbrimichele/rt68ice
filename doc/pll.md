@@ -68,3 +68,12 @@ ecppll -i 25 --clkin_name clkin_25 \
 ```
 
 The two generated PLL instances are combined in `hw/verilog/pll.v`.
+
+
+## Reset requests
+
+PLL-lock loss continues to request reset independently of the external button.
+The button now requires a continuous synchronized 10 ms press, followed by a
+20 ms hold after release; see [reset button filtering](reset.md). The reset
+filter uses the free-running board clock, not a clock domain reset by its own
+output.

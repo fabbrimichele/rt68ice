@@ -27,6 +27,13 @@ snapshots of hits, misses, writes, elapsed time and read/write stall cycles.
 The write RAM-wait counter has a documented limitation with posted writes;
 it does not measure background write duration.
 
+## Reset button
+
+The active-low reset button must remain pressed for 10 ms after synchronization
+before resetting the system. Reset remains asserted while held and for 20 ms
+after release. Power-on reset and PLL-lock reset requests remain independent
+of button qualification. See [reset timing and tests](doc/reset.md).
+
 ## Memory Layout
 See the generated [System Memory Layout](./doc/memory_layout.md).
 
