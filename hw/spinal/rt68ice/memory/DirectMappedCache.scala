@@ -116,6 +116,12 @@ case class DirectMappedCache() extends Component {
     io.ramBus.lds := ramSelected && requestLds
   }
 
+  when (writePending && responseReady) {
+    // Write done, release RAM
+    writePending := False
+    ramSelected := False
+  }
+
   readEnable := False
   writeEnable := False
   updateWriteHit := False
@@ -174,13 +180,11 @@ case class DirectMappedCache() extends Component {
       io.events.writeRamWait := !responseReady
 
       when(responseReady) {
-        ramSelected := False
         when(isValid && lineTag === tag) {
           // hit, update the cache
           updateWriteHit := True
           writeEnable := True
         }
-        writePending := False
         io.mainBus.ready := True
         goto(idle)
       }
