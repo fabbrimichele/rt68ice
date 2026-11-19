@@ -37,6 +37,10 @@ of button qualification. See [reset timing and tests](doc/reset.md).
 ## Memory Layout
 See the generated [System Memory Layout](./doc/memory_layout.md).
 
+The [CPU upper-address regression](doc/cpu-upper-address.md) verifies accesses
+above 16 MiB in the real core's 68000 mode. It is groundwork for a larger memory
+map; the production SDRAM window remains unchanged.
+
 See [onboard SPI flash](./doc/spi_flash.md) for the SD/flash device ports,
 flash pin assignments, and SPI register selection.
 
