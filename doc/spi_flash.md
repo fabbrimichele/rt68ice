@@ -1,6 +1,6 @@
 # Onboard SPI flash
 
-The SPI controller at CPU address `$F20000` has two device ports:
+The SPI controller at CPU address `$02120000` has two device ports:
 
 | Port | Device | Chip-select | MOSI | MISO | Clock |
 | --- | --- | --- | --- | --- | --- |
@@ -19,21 +19,21 @@ transfer settings between devices; firmware must finish and deselect one
 device before selecting another and set the appropriate transfer configuration.
 
 The data register accepts word reads/writes (both UDS and LDS asserted),
-and low-byte reads at `$F20001`. Partial data writes are ignored.
+and low-byte reads at `$02120001`. Partial data writes are ignored.
 Command/status and configuration also accept low-byte accesses using LDS.
 The wrapper handles CPU byte lanes; the core keeps a generic 16-bit interface.
 Upper-byte-only accesses are ignored and return zero.
 
 | Address | Register |
 | --- | --- |
-| `$F20000` / read byte `$F20001` | 16-bit transmit buffer / received shift register |
-| `$F20002` / byte `$F20003` | Command/status |
-| `$F20004` / byte `$F20005` | Transfer length and clock divider |
-| `$F20006` | Reserved |
+| `$02120000` / read byte `$02120001` | 16-bit transmit buffer / received shift register |
+| `$02120002` / byte `$02120003` | Command/status |
+| `$02120004` / byte `$02120005` | Transfer length and clock divider |
+| `$02120006` | Reserved |
 
 Assembly definitions are shared in `sw/lib/asm/mem_map_spi.asm`, with one
-name per register: `SPI_DATA` at `$F20000`, `SPI_STATUS` at `$F20003`, and
-`SPI_CONFIG` at `$F20005`. The monitor and SPI examples use `move.w` for data
+name per register: `SPI_DATA` at `$02120000`, `SPI_STATUS` at `$02120003`, and
+`SPI_CONFIG` at `$02120005`. The monitor and SPI examples use `move.w` for data
 writes, `move.b SPI_DATA+1` for received bytes,
 `move.b` for command/configuration writes, and `btst #0,SPI_STATUS` for direct
 BUSY polling. Memory `btst` performs a byte read on the 68000, so status uses
@@ -81,7 +81,7 @@ does not run the image. For EmuTOS, subsequently use `run 00D80000`.
 `boot` performs the same load and verification, then jumps to the header's
 load address only if successful.
 
-At each reset, the monitor reads the DIP-switch register at `$F2C000` once
+At each reset, the monitor reads the DIP-switch register at `$0212C000` once
 and selects the boot policy below. ON means a logical set bit in the register;
 the FPGA inverts the physical switch inputs before exposing them to software.
 

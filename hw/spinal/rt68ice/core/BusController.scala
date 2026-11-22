@@ -137,21 +137,23 @@ case class BusController() extends Component {
   val sdRamMapping1   = SizeMapping(0x00000000L, 8 MiB)   // $000000 - $7FFFFF
   val sdRamMapping2   = SizeMapping(0x00800000L, 4 MiB)   // $800000 - $BFFFFF
   val sdRamMapping3   = SizeMapping(0x00C00000L, 2 MiB)   // $C00000 - $DFFFFF
-  val vidFbMapping    = SizeMapping(0x00E00000L, 128 KiB) // $E00000 - $E1FFFF; first 75 KiB used
-  val ledMapping      = SizeMapping(0x00F00000L, 16 KiB)  // $F00000 - $F03FFF
-  val uartMapping     = SizeMapping(0x00F04000L, 16 KiB)  // $F04000 - $F07FFF
-  val vidPalMapping   = SizeMapping(0x00F08000L, 16 KiB)  // $F08000 - $F0BFFF
-  val vidCtrlMapping  = SizeMapping(0x00F0C000L, 16 KiB)  // $F0C000 - $F0FFFF
-  val counterMapping  = SizeMapping(0x00F10000L, 16 KiB)  // $F10000 - $F13FFF
-  val ledsMapping     = SizeMapping(0x00F14000L, 16 KiB)  // $F14000 - $F17FFF
-  val usbMapping      = SizeMapping(0x00F18000L, 16 KiB)  // $F18000 - $F1BFFF
-  val timerMapping    = SizeMapping(0x00F1C000L, 16 KiB)  // $F1C000 - $F1FFFF
-  val spiMapping      = SizeMapping(0x00F20000L, 16 KiB)  // $F20000 - $F23FFF
-  val psgMapping      = SizeMapping(0x00F24000L, 16 KiB)  // $F24000 - $F27FFF
-  val ds1302Mapping   = SizeMapping(0x00F28000L, 16 KiB)  // $F28000 - $F2BFFF
-  val dipSwitchesMapping = SizeMapping(0x00F2C000L, 16 KiB)  // $F2C000 - $F2FFFF
-  val cacheStatsMapping = SizeMapping(0x00F30000L, 16 KiB) // $F30000 - $F33FFF
-  val romMapping      = SizeMapping(0x00FC0000L, 16 KiB)  // $FC0000 - $FC3FFF
+  // Relocate the former $00E00000-$00FFFFFF device block above 32 MiB.
+  // The SDRAM mappings above remain 14 MiB until the memory-expansion step.
+  val vidFbMapping    = SizeMapping(0x02000000L, 128 KiB) // $02000000 - $0201FFFF; first 75 KiB used
+  val ledMapping      = SizeMapping(0x02100000L, 16 KiB)  // $02100000 - $02103FFF
+  val uartMapping     = SizeMapping(0x02104000L, 16 KiB)  // $02104000 - $02107FFF
+  val vidPalMapping   = SizeMapping(0x02108000L, 16 KiB)  // $02108000 - $0210BFFF
+  val vidCtrlMapping  = SizeMapping(0x0210C000L, 16 KiB)  // $0210C000 - $0210FFFF
+  val counterMapping  = SizeMapping(0x02110000L, 16 KiB)  // $02110000 - $02113FFF
+  val ledsMapping     = SizeMapping(0x02114000L, 16 KiB)  // $02114000 - $02117FFF
+  val usbMapping      = SizeMapping(0x02118000L, 16 KiB)  // $02118000 - $0211BFFF
+  val timerMapping    = SizeMapping(0x0211C000L, 16 KiB)  // $0211C000 - $0211FFFF
+  val spiMapping      = SizeMapping(0x02120000L, 16 KiB)  // $02120000 - $02123FFF
+  val psgMapping      = SizeMapping(0x02124000L, 16 KiB)  // $02124000 - $02127FFF
+  val ds1302Mapping   = SizeMapping(0x02128000L, 16 KiB)  // $02128000 - $0212BFFF
+  val dipSwitchesMapping = SizeMapping(0x0212C000L, 16 KiB)  // $0212C000 - $0212FFFF
+  val cacheStatsMapping = SizeMapping(0x02130000L, 16 KiB) // $02130000 - $02133FFF
+  val romMapping      = SizeMapping(0x021C0000L, 16 KiB)  // $021C0000 - $021C3FFF
 
   saveMemoryLayout(
     "doc/memory_layout.md",

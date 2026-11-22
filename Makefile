@@ -127,8 +127,9 @@ rom: $(ROM_HEX_FILES)
 
 # When building the monitor hex file, temporarily replace the generic linker script
 $(HEX_CLASS_DIR)/monitor.hex: LD_SCRIPT = $(ASM_SRC_DIR)/monitor.ld
+$(HEX_CLASS_DIR)/monitor.hex: $(ASM_SRC_DIR)/monitor.ld
 
-$(HEX_CLASS_DIR)/%.hex: $(ASM_SRC_DIR)/%.asm $(ASM_LIB_SOURCES)
+$(HEX_CLASS_DIR)/%.hex: $(ASM_SRC_DIR)/%.asm $(ASM_LIB_SOURCES) $(ASM_SRC_DIR)/fw.ld
 	@echo "----------------------------------------------"
 	@echo "- Assembling and Converting '$*'"
 	@echo "----------------------------------------------"
@@ -155,7 +156,7 @@ apps: $(BIN_APP_TARGETS)
 
 # We use target-specific assignment (= or :=) so $* is evaluated inside the rule context
 $(TARGET_APP_DIR)/%.bin: RAW_FILE_NAME = $(TARGET_APP_DIR)/$*_raw.bin
-$(TARGET_APP_DIR)/%.bin: $(ASM_APP_DIR)/%.asm $(ASM_LIB_SOURCES) tools/make_monitor_image.py
+$(TARGET_APP_DIR)/%.bin: $(ASM_APP_DIR)/%.asm $(ASM_LIB_SOURCES) $(LD_SCRIPT_APP) tools/make_monitor_image.py
 	@mkdir -p $(TARGET_APP_DIR)
 	# Assemble to a raw binary image (*_raw.bin)
 	vasmm68k_mot -Felf $< -o $(TARGET_APP_DIR)/$*.o

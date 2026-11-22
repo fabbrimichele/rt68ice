@@ -6,7 +6,7 @@
 IMAGE_MAGIC equ     $52543638   ; ASCII "RT68"
 FLASH_IMAGE_OFFSET equ $00100000
 FLASH_IMAGE_MAX equ $02000000-FLASH_IMAGE_OFFSET-16
-DIP_SWITCHES equ    $00F2C000   ; word read: logical switch states in bits 2..0
+DIP_SWITCHES equ    $0212C000   ; word read: logical switch states in bits 2..0
     include '../../lib/asm/mem_map_spi.asm'
 
 ; ------------------------------
@@ -300,6 +300,7 @@ image_load:
     beq     image_bad_range
     add.l   d1,d0
     bcs     image_bad_range
+    ; Keep the current 14 MiB SDRAM limit; device relocation does not add RAM.
     cmpi.l  #$00e00000,d0
     bhi     image_bad_range
     tst.b   d7

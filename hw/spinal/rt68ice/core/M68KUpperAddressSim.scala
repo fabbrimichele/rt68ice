@@ -49,12 +49,15 @@ object M68KUpperAddressSim extends App {
       s"CPU upper-address test failed with wait_cycles=$waitCycles")
   }
 
-  val negativeOutput = ArrayBuffer.empty[String]
-  val negativeStatus = Seq("vvp", path("cpu.sim"), "+truncate_address").!(
-    ProcessLogger(line => negativeOutput += line, line => negativeOutput += line))
-  Files.write(new File(path("negative-control.log")).toPath,
-    negativeOutput.mkString("\n").getBytes(StandardCharsets.US_ASCII))
-  require(negativeStatus != 0 && negativeOutput.exists(_.contains("CPU test program reported failure")),
-    s"Negative control must detect 24-bit memory aliasing; see ${path("negative-control.log")}")
-  println("PASS: negative control detects memory aliasing when address bit 24 is discarded")
+  for (bit <- Seq(24, 25)) {
+    val negativeOutput = ArrayBuffer.empty[String]
+    val negativeStatus = Seq("vvp", path("cpu.sim"), s"+truncate_bits=$bit").!(
+      ProcessLogger(line => negativeOutput += line, line => negativeOutput += line))
+    val logName = s"negative-control-bit$bit.log"
+    Files.write(new File(path(logName)).toPath,
+      negativeOutput.mkString("\n").getBytes(StandardCharsets.US_ASCII))
+    require(negativeStatus != 0 && negativeOutput.exists(_.contains("CPU test program reported failure")),
+      s"Negative control must detect $bit-bit memory aliasing; see ${path(logName)}")
+    println(s"PASS: negative control detects memory aliasing when address bit $bit is discarded")
+  }
 }

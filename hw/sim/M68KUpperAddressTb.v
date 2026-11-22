@@ -23,23 +23,31 @@ module M68KUpperAddressTb;
   reg [15:0] rom [0:2047];
   reg [15:0] low_data [0:7];
   reg [15:0] high_data [0:7];
+  reg [15:0] higher_data [0:7];
   reg [15:0] top_data [0:7];
   reg [15:0] boundary_low = 0;
   reg [15:0] boundary_high = 0;
+  reg [15:0] boundary32_high = 0;
   integer wait_cycles = 0;
   integer phase = 0;
   integer i;
-  reg truncate_address;
+  integer truncate_bits = 32;
   reg saw_high_fetch = 0;
   reg saw_high_read = 0;
   reg saw_high_write = 0;
   reg saw_top_write = 0;
+  reg saw_higher_fetch = 0;
+  reg saw_higher_read = 0;
+  reg saw_higher_write = 0;
   reg [1:0] high_byte_writes = 0;
   reg [1:0] crossing_writes = 0;
+  reg [1:0] higher_byte_writes = 0;
+  reg [1:0] crossing32_writes = 0;
   wire active = (uds || lds) && bus_state != 2'b01;
-  // A negative-control run deliberately aliases memory at 16 MiB. The program
+  // Negative-control runs deliberately alias memory at 16 or 32 MiB. The program
   // must reject that model, rather than passing just because a high bus bit rose.
-  wire [31:0] memory_address = truncate_address ? (address & 32'h00ffffff) : address;
+  wire [31:0] memory_address = truncate_bits == 24 ? (address & 32'h00ffffff) :
+                               truncate_bits == 25 ? (address & 32'h01ffffff) : address;
   wire [31:0] word_address = memory_address & 32'hfffffffe;
 
   function [15:0] read_word;
@@ -49,6 +57,10 @@ module M68KUpperAddressTb;
         read_word = rom[a >> 1];
       else if (a >= 32'h01000100 && a < 32'h01001000)
         read_word = rom[(a - 32'h01000000) >> 1];
+      else if (a >= 32'h02000100 && a < 32'h02001000)
+        read_word = rom[(a - 32'h02000000) >> 1];
+      else if (a >= 32'h02010000 && a < 32'h02010010)
+        read_word = higher_data[(a - 32'h02010000) >> 1];
       else if (a >= 32'h00010000 && a < 32'h00010010)
         read_word = low_data[(a - 32'h00010000) >> 1];
       else if (a >= 32'h01010000 && a < 32'h01010010)
@@ -59,6 +71,8 @@ module M68KUpperAddressTb;
         read_word = boundary_low;
       else if (a == 32'h01000000)
         read_word = boundary_high;
+      else if (a == 32'h02000000)
+        read_word = boundary32_high;
       else
         read_word = 16'hffff;
     end
@@ -80,6 +94,8 @@ module M68KUpperAddressTb;
     begin
       if (a >= 32'h00010000 && a < 32'h00010010)
         low_data[(a - 32'h00010000) >> 1] = value;
+      else if (a >= 32'h02010000 && a < 32'h02010010)
+        higher_data[(a - 32'h02010000) >> 1] = value;
       else if (a >= 32'h01010000 && a < 32'h01010010)
         high_data[(a - 32'h01010000) >> 1] = value;
       else if (a >= 32'h01fffff0 && a < 32'h02000000)
@@ -88,6 +104,8 @@ module M68KUpperAddressTb;
         boundary_low = value;
       else if (a == 32'h01000000)
         boundary_high = value;
+      else if (a == 32'h02000000)
+        boundary32_high = value;
       else
         $fatal(1, "Unexpected write to %08x", a);
     end
@@ -101,6 +119,10 @@ module M68KUpperAddressTb;
           saw_high_fetch = 1;
         if (address >= 32'h01010000 && address < 32'h01010010)
           saw_high_read = 1;
+        if (bus_state == 2'b00 && address >= 32'h02000100 && address < 32'h02001000)
+          saw_higher_fetch = 1;
+        if (address >= 32'h02010000 && address < 32'h02010010)
+          saw_higher_read = 1;
       end else if (word_address == 32'h0000f100) begin
         if (data_out == 16'hdead)
           $fatal(1, "CPU test program reported failure (memory aliases or returned wrong data)");
@@ -108,15 +130,20 @@ module M68KUpperAddressTb;
           $fatal(1, "Invalid CPU result marker");
         if (!saw_high_fetch || !saw_high_read || !saw_high_write || !saw_top_write)
           $fatal(1, "CPU did not exercise all upper-address paths");
-        if (high_byte_writes != 2'b11 || crossing_writes != 2'b11)
+        if (!saw_higher_fetch || !saw_higher_read || !saw_higher_write)
+          $fatal(1, "CPU did not exercise bit 25 data and instruction paths");
+        if (high_byte_writes != 2'b11 || crossing_writes != 2'b11 ||
+            higher_byte_writes != 2'b11 || crossing32_writes != 2'b11)
           $fatal(1, "Missing byte lanes or boundary-crossing writes");
         if (low_data[0] != 16'ha5c7 || high_data[0] != 16'hb6d8 ||
             low_data[2] != 16'h1122 || low_data[3] != 16'h3344 ||
             high_data[2] != 16'h5566 || high_data[3] != 16'h7788 ||
             top_data[2] != 16'h99aa || top_data[3] != 16'hbbcc ||
-            top_data[7] != 16'h5a3c || boundary_low != 16'habcd || boundary_high != 16'h0123)
+            top_data[7] != 16'h9876 || boundary_low != 16'habcd || boundary_high != 16'h0123 ||
+            higher_data[0] != 16'hc9ea || higher_data[2] != 16'ha1b2 ||
+            higher_data[3] != 16'hc3d4 || boundary32_high != 16'hfedc)
           $fatal(1, "Independent memory scoreboard mismatch");
-        $display("PASS: 68000 mode upper addresses, byte lanes, longwords, 16 MiB crossing, high instruction fetch (wait_cycles=%0d)", wait_cycles);
+        $display("PASS: 68000 mode address bits 24/25, byte lanes, longwords, 16/32 MiB crossings, high instruction fetches (wait_cycles=%0d)", wait_cycles);
         $finish;
       end else begin
         merged = read_word(word_address);
@@ -128,6 +155,14 @@ module M68KUpperAddressTb;
           if (uds && !lds) high_byte_writes[1] = 1;
           if (lds && !uds) high_byte_writes[0] = 1;
         end
+        if (address >= 32'h02010000 && address < 32'h02010010) begin
+          saw_higher_write = 1;
+          if (uds && !lds) higher_byte_writes[1] = 1;
+          if (lds && !uds) higher_byte_writes[0] = 1;
+        end
+        if (word_address == 32'h01fffffe && data_out == 16'h9876 && uds && lds)
+          crossing32_writes[0] = 1;
+        if (word_address == 32'h02000000) crossing32_writes[1] = 1;
         if (address >= 32'h01fffff0 && address < 32'h02000000) saw_top_write = 1;
         if (word_address == 32'h00fffffe) crossing_writes[0] = 1;
         if (word_address == 32'h01000000) crossing_writes[1] = 1;
@@ -136,11 +171,14 @@ module M68KUpperAddressTb;
   end
 
   initial begin
-    truncate_address = $test$plusargs("truncate_address");
+    if (!$value$plusargs("truncate_bits=%d", truncate_bits)) truncate_bits = 32;
+    if (truncate_bits != 24 && truncate_bits != 25 && truncate_bits != 32)
+      $fatal(1, "Unsupported address truncation width");
     if (!$value$plusargs("wait_cycles=%d", wait_cycles)) wait_cycles = 0;
     for (i = 0; i < 8; i = i + 1) begin
       low_data[i] = 0;
       high_data[i] = 0;
+      higher_data[i] = 0;
       top_data[i] = 0;
     end
     $readmemh("simWorkspace/M68KUpperAddress/program.hex", rom);

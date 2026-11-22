@@ -1,6 +1,6 @@
 # Programmable timer
 
-The timer is mapped at `0x00F1C000` and uses 16-bit registers. It is a 32-bit
+The timer is mapped at `0x0211C000` and uses 16-bit registers. It is a 32-bit
 countdown timer whose input clock is divided by `DIVIDER + 1`. For a non-zero
 reload value, an interval is therefore `(DIVIDER + 1) * RELOAD` system-clock
 cycles. A reload value of zero expires on the first divided tick.

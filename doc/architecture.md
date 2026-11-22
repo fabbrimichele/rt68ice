@@ -35,9 +35,9 @@ Design and implement a high-performance Motorola 680x0-compatible System-on-a-Ch
     * **Vector Table:** The first 1 KiB is overlaid by FPGA BRAM for high-speed exception, interrupt, stack and firmware-data access. The first eight bytes are read from ROM for the reset stack pointer and program counter.
     * **Main Memory:** The board's 32MB SDRAM is accessed through the 14MB low-memory CPU window. An 8 KiB unified direct-mapped cache has four-word burst fills, write-hit updates and a single-entry posted-write buffer. A larger CPU memory window remains future work.
 * **ROM:**
-    * The 4 KiB boot ROM is decoded in a 16 KiB window at the Atari-compatible `0xFC0000` address, with its first eight bytes also visible at reset-vector addresses `0x000000-0x000007`.
+    * The 4 KiB boot ROM is decoded in a 16 KiB window at `0x021C0000`, with its first eight bytes also visible at reset-vector addresses `0x000000-0x000007`.
 * **Custom I/O:**
-    * The dedicated framebuffer is at `0xE00000`; custom peripherals occupy 16KB windows beginning at `0xF00000`.
+    * The dedicated framebuffer is at `0x02000000`; custom peripherals occupy 16KB windows beginning at `0x02100000`.
 * **Graphic Modes:**
     * **Planar:** Hardware-accelerated bitplane support for EmuTOS compatibility.
     * **Chunky:** Linear 8-bit framebuffer for optimized DOOM rendering and uClinux console.

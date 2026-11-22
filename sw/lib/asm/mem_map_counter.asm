@@ -1,1 +1,1 @@
-COUNTER     equ     $00F10000   ; Counter-mapped register base address
+COUNTER     equ     $02110000   ; Counter-mapped register base address

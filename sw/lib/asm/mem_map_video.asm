@@ -1,7 +1,7 @@
-VIDEO_CTRL          equ $00F0C000 ; Bits 3-0 select VIDEO_MODE_*; 9-15 fall back to 640x480x1
-VIDEO_IRQ_STATUS    equ $00F0C002 ; Bit 0 VBL pending; read to acknowledge
-VIDEO_IRQ_ENABLE    equ $00F0C004 ; Bit 0 VBL interrupt enable
-VIDEO_PLTE          equ $00F08000 ; Video Palette Registers
+VIDEO_CTRL          equ $0210C000 ; Bits 3-0 select VIDEO_MODE_*; 9-15 fall back to 640x480x1
+VIDEO_IRQ_STATUS    equ $0210C002 ; Bit 0 VBL pending; read to acknowledge
+VIDEO_IRQ_ENABLE    equ $0210C004 ; Bit 0 VBL interrupt enable
+VIDEO_PLTE          equ $02108000 ; Video Palette Registers
 
 VIDEO_MODE_320X200_4BPP equ 0
 VIDEO_MODE_640X200_2BPP equ 1

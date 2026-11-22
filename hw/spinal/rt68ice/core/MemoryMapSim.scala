@@ -1,146 +1,131 @@
 package rt68ice.core
 
+import spinal.core._
 import spinal.core.sim._
 
 object MemoryMapSim extends App {
   SimConfig.compile(BusController()).doSim { dut =>
     dut.clockDomain.forkStimulus(period = 10)
+    val cpu = dut.io.cpuBus
+    cpu.dataOut #= 0xA55A
+    cpu.wr #= false
+    cpu.uds #= true
+    cpu.lds #= true
+    dut.io.busState #= 2
 
-    dut.io.cpuBus.dataOut #= 0
-    dut.io.cpuBus.wr #= false
-    dut.io.cpuBus.uds #= true
-    dut.io.cpuBus.lds #= true
-    dut.io.busState #= 2 // Data read
-
-    Seq(
-      dut.io.romBus,
-      dut.io.ramBus,
-      dut.io.ledBus,
-      dut.io.uartBus,
-      dut.io.videoBus,
-      dut.io.sdRamBus,
-      dut.io.counterBus,
-      dut.io.ledsBus,
-      dut.io.dipSwitchesBus,
-      dut.io.cacheStatsBus,
-      dut.io.usbBus,
-      dut.io.timerBus,
-      dut.io.spiBus, dut.io.psgBus, dut.io.ds1302Bus
-    ).foreach { port =>
-      port.dataIn #= 0
+    val ports: Seq[M68KDeviceBusSignals] = Seq(
+      dut.io.romBus, dut.io.ramBus, dut.io.ledBus, dut.io.uartBus,
+      dut.io.videoBus, dut.io.sdRamBus, dut.io.counterBus, dut.io.ledsBus,
+      dut.io.dipSwitchesBus, dut.io.cacheStatsBus, dut.io.usbBus,
+      dut.io.timerBus, dut.io.spiBus, dut.io.psgBus, dut.io.ds1302Bus)
+    ports.zipWithIndex.foreach { case (port, index) =>
+      port.dataIn #= (0x1000 + index)
       port.irq #= false
       port.ready #= true
     }
 
-    dut.clockDomain.waitSampling(2)
+    val selects = Seq(dut.io.romBus.sel, dut.io.ramBus.sel, dut.io.ledBus.sel,
+      dut.io.uartBus.sel, dut.io.videoBus.fbSel, dut.io.videoBus.palSel,
+      dut.io.videoBus.ctrlSel, dut.io.sdRamBus.sel, dut.io.counterBus.sel,
+      dut.io.ledsBus.sel, dut.io.dipSwitchesBus.sel, dut.io.cacheStatsBus.sel,
+      dut.io.usbBus.sel, dut.io.timerBus.sel, dut.io.spiBus.sel,
+      dut.io.psgBus.sel, dut.io.ds1302Bus.sel)
 
-    def driveAddress(address: Long): Unit = {
-      dut.io.cpuBus.address #= address
+    // Explicit expected addresses are independent of the decoder definitions.
+    case class Window(name: String, base: Long, size: Long, select: Bool, port: M68KDeviceBusSignals)
+    val windows = Seq(
+      Window("framebuffer", 0x02000000L, 0x20000L, dut.io.videoBus.fbSel, dut.io.videoBus),
+      Window("LED",         0x02100000L, 0x4000L, dut.io.ledBus.sel, dut.io.ledBus),
+      Window("UART",        0x02104000L, 0x4000L, dut.io.uartBus.sel, dut.io.uartBus),
+      Window("palette",     0x02108000L, 0x4000L, dut.io.videoBus.palSel, dut.io.videoBus),
+      Window("video control",0x0210C000L,0x4000L,dut.io.videoBus.ctrlSel, dut.io.videoBus),
+      Window("counter",     0x02110000L, 0x4000L, dut.io.counterBus.sel, dut.io.counterBus),
+      Window("LED array",   0x02114000L, 0x4000L, dut.io.ledsBus.sel, dut.io.ledsBus),
+      Window("USB",         0x02118000L, 0x4000L, dut.io.usbBus.sel, dut.io.usbBus),
+      Window("timer",       0x0211C000L, 0x4000L, dut.io.timerBus.sel, dut.io.timerBus),
+      Window("SPI",         0x02120000L, 0x4000L, dut.io.spiBus.sel, dut.io.spiBus),
+      Window("PSG",         0x02124000L, 0x4000L, dut.io.psgBus.sel, dut.io.psgBus),
+      Window("RTC",         0x02128000L, 0x4000L, dut.io.ds1302Bus.sel, dut.io.ds1302Bus),
+      Window("DIP switches",0x0212C000L, 0x4000L, dut.io.dipSwitchesBus.sel, dut.io.dipSwitchesBus),
+      Window("cache stats", 0x02130000L, 0x4000L, dut.io.cacheStatsBus.sel, dut.io.cacheStatsBus),
+      Window("ROM",         0x021C0000L, 0x4000L, dut.io.romBus.sel, dut.io.romBus))
+
+    dut.clockDomain.waitSampling(2)
+    def drive(address: Long): Unit = {
+      cpu.address #= address
       sleep(1)
     }
-
-    driveAddress(0x00000000L)
-    assert(dut.io.romBus.sel.toBoolean, "Reset vectors are not mapped to ROM")
-
-    driveAddress(0x00000008L)
-    assert(dut.io.ramBus.sel.toBoolean, "Low vector memory is not mapped to fast RAM")
-
-    driveAddress(0x000003feL)
-    assert(dut.io.ramBus.sel.toBoolean, "The end of fast RAM is not mapped")
-
-    driveAddress(0x00000400L)
-    assert(dut.io.sdRamBus.sel.toBoolean, "SDRAM does not follow the fast RAM overlay")
-
-    driveAddress(0x007ffffeL)
-    assert(dut.io.sdRamBus.sel.toBoolean, "The end of the first 8 MiB SDRAM mapping is not mapped")
-
-    driveAddress(0x00800000L)
-    assert(dut.io.sdRamBus.sel.toBoolean, "The second SDRAM bank is not mapped at $800000")
-
-    driveAddress(0x00bffffeL)
-    assert(dut.io.sdRamBus.sel.toBoolean, "The end of the 4 MiB SDRAM extension is not mapped")
-
-    driveAddress(0x00c00000L)
-    assert(dut.io.sdRamBus.sel.toBoolean, "The final 2 MiB SDRAM mapping is not mapped at $C00000")
-
-    // EmuTOS relocates to this upper SDRAM area. Keep the address from the
-    // observed game failure covered explicitly, rather than only testing the
-    // start and end of the window.
-    driveAddress(0x00d82000L)
-    assert(dut.io.sdRamBus.sel.toBoolean, "$D82000 is not mapped to SDRAM")
-    assert(!dut.io.busErr.toBoolean, "$D82000 unexpectedly raises BERR")
-
-    driveAddress(0x00dffffeL)
-    assert(dut.io.sdRamBus.sel.toBoolean, "The final SDRAM word at $DFFFFE is not mapped")
-
-    driveAddress(0x00e20000L)
-    assert(dut.io.busErr.toBoolean, "The unmapped address after the framebuffer is unexpectedly mapped")
-
-    driveAddress(0x00e00000L)
-    assert(dut.io.videoBus.fbSel.toBoolean, "The framebuffer is not mapped at $E00000")
-
-    driveAddress(0x00f00000L)
-    assert(dut.io.ledBus.sel.toBoolean, "The LED peripheral is not mapped at $F00000")
-
-    driveAddress(0x00f04000L)
-    assert(dut.io.uartBus.sel.toBoolean, "The UART is not mapped at $F04000")
-
-    driveAddress(0x00f08000L)
-    assert(dut.io.videoBus.palSel.toBoolean, "The video palette is not mapped at $F08000")
-
-    driveAddress(0x00f0c000L)
-    assert(dut.io.videoBus.ctrlSel.toBoolean, "Video control is not mapped at $F0C000")
-
-    driveAddress(0x00f10000L)
-    assert(dut.io.counterBus.sel.toBoolean, "The counter is not mapped at $F10000")
-
-    driveAddress(0x00f14000L)
-    assert(dut.io.ledsBus.sel.toBoolean, "The LED array is not mapped at $F14000")
-
-    driveAddress(0x00f18000L)
-    assert(dut.io.usbBus.sel.toBoolean, "USB is not mapped at $F18000")
-
-    driveAddress(0x00f1c000L)
-    assert(dut.io.timerBus.sel.toBoolean, "The timer is not mapped at $F1C000")
-
-    dut.io.ds1302Bus.dataIn #= 0x1234
-    for (address <- Seq(0x00f28000L, 0x00f2bffeL)) {
-      driveAddress(address)
-      assert(dut.io.ds1302Bus.sel.toBoolean, "DS1302 is not selected in its address window")
-      assert(!dut.io.dipSwitchesBus.sel.toBoolean, "The DIP-switch window overlaps DS1302")
-      assert(!dut.io.busErr.toBoolean, "A DS1302 read raised BERR")
-      assert(dut.io.cpuBus.dataIn.toInt == 0x1234, "DS1302 read data did not reach the CPU")
+    def checkSelected(address: Long, selected: Bool, port: M68KDeviceBusSignals): Unit = {
+      drive(address)
+      assert(selected.toBoolean, f"Wrong device selected at $$$address%08X")
+      assert(selects.count(_.toBoolean) == 1, "Mapped windows must not overlap")
+      assert(!dut.io.busErr.toBoolean, "Mapped transfer must not raise BERR")
+      assert(port.address.toLong == address, "Downstream address must retain all CPU bits")
+      assert(port.dataOut.toInt == 0xA55A && port.uds.toBoolean && port.lds.toBoolean,
+        "Device bus must preserve data and byte strobes")
+      assert(cpu.dataIn.toInt == port.dataIn.toInt, "Selected device data must reach CPU")
+    }
+    def checkUnmapped(address: Long): Unit = {
+      drive(address)
+      assert(selects.forall(!_.toBoolean), f"Unexpected device alias at $$$address%08X")
+      assert(dut.io.busErr.toBoolean, f"Unmapped transfer must raise BERR at $$$address%08X")
     }
 
-    dut.io.dipSwitchesBus.dataIn #= 5
-    for (address <- Seq(0x00f2c000L, 0x00f2fffeL)) {
-      driveAddress(address)
-      assert(dut.io.dipSwitchesBus.sel.toBoolean, "DIP switches are not selected in their address window")
-      assert(!dut.io.ds1302Bus.sel.toBoolean, "The DS1302 window overlaps DIP switches")
-      assert(!dut.io.busErr.toBoolean, "A DIP-switch read raised BERR")
-      assert(dut.io.cpuBus.dataIn.toInt == 5, "DIP-switch read data did not reach the CPU")
+    // Reset vectors remain overlaid by ROM; fast RAM and the existing 14 MiB
+    // SDRAM window retain their boundaries during this relocation-only step.
+    for (address <- Seq(0L, 2L, 6L)) checkSelected(address, dut.io.romBus.sel, dut.io.romBus)
+    for (address <- Seq(8L, 0x3FEL)) checkSelected(address, dut.io.ramBus.sel, dut.io.ramBus)
+    for (address <- Seq(0x400L, 0x007FFFFEL, 0x00800000L, 0x00BFFFFEL,
+      0x00C00000L, 0x00D82000L, 0x00DFFFFEL))
+      checkSelected(address, dut.io.sdRamBus.sel, dut.io.sdRamBus)
+
+    for (window <- windows) {
+      for (address <- Seq(window.base, window.base + 1,
+        window.base + window.size - 2, window.base + window.size - 1))
+        checkSelected(address, window.select, window.port)
+
+      // Preserve full addresses and direction during writes too. Standard
+      // devices receive the gated write; self-timed devices retain direction.
+      drive(window.base)
+      cpu.wr #= true
+      dut.io.busState #= 3
+      sleep(1)
+      var observedWrite = false
+      for (_ <- 0 until 2) {
+        dut.clockDomain.waitSampling()
+        sleep(1)
+        assert(window.select.toBoolean && selects.count(_.toBoolean) == 1)
+        assert(window.port.address.toLong == window.base && window.port.dataOut.toInt == 0xA55A)
+        observedWrite ||= window.port.wr.toBoolean
+      }
+      assert(observedWrite, s"${window.name} did not receive a write")
+      cpu.wr #= false
+      dut.io.busState #= 2
+      sleep(1)
+
+      // No compatibility aliases: those low addresses will become SDRAM later.
+      checkUnmapped(window.base - 0x01200000L)
+      checkUnmapped(window.base - 0x01200000L + window.size - 1)
+
+      // Dropping bit 25 must not leave this peripheral selected, even where
+      // its low-address counterpart legitimately selects fast RAM or SDRAM.
+      drive(window.base & 0x01FFFFFFL)
+      assert(!window.select.toBoolean, s"${window.name} decode ignores address bit 25")
     }
+    for (address <- Seq(0x00E20000L, 0x01000000L, 0x01FFFFFEL,
+      0x02020000L, 0x020FFFFEL, 0x02134000L, 0x021BFFFEL, 0x021C4000L))
+      checkUnmapped(address)
 
-    dut.io.cacheStatsBus.dataIn #= 0x4343
-    for (address <- Seq(0x00f30000L, 0x00f33ffeL)) {
-      driveAddress(address)
-      assert(dut.io.cacheStatsBus.sel.toBoolean, "Cache stats window should be selected")
-      assert(!dut.io.dipSwitchesBus.sel.toBoolean, "DIP switches overlap cache stats")
-      assert(!dut.io.busErr.toBoolean, "Cache stats read raised BERR")
-      assert(dut.io.cpuBus.dataIn.toInt == 0x4343, "Cache stats data did not reach CPU")
-    }
-    driveAddress(0x00f34000L)
-    assert(!dut.io.cacheStatsBus.sel.toBoolean, "Cache stats extends beyond its window")
-    assert(dut.io.busErr.toBoolean, "The unmapped address after cache stats should raise BERR")
-
-    driveAddress(0x00fc0000L)
-    assert(dut.io.romBus.sel.toBoolean, "The boot ROM is not mapped at $FC0000")
-
-    driveAddress(0x0000c000L)
-    assert(dut.io.sdRamBus.sel.toBoolean, "The former UART window is not available as SDRAM")
-    assert(!dut.io.uartBus.sel.toBoolean, "The UART still responds at its former address")
-
-    driveAddress(0xfffffff2L)
-    assert(!dut.io.busErr.toBoolean, "An interrupt-acknowledge cycle raised BERR")
+    // RTC still excludes instruction fetches while ROM must accept them.
+    drive(0x02128000L)
+    dut.io.busState #= 0
+    sleep(1)
+    assert(!dut.io.ds1302Bus.sel.toBoolean, "RTC must remain data-cycle qualified")
+    checkSelected(0x021C0000L, dut.io.romBus.sel, dut.io.romBus)
+    dut.io.busState #= 2
+    drive(0xFFFFFFF2L)
+    assert(!dut.io.busErr.toBoolean, "Interrupt acknowledgement must not raise BERR")
+    assert(selects.forall(!_.toBoolean), "Interrupt acknowledgement must not select a device")
+    println("Memory map checks passed: relocated device boundaries, old-address rejection, bit-25 decode, vectors and unchanged SDRAM")
   }
 }

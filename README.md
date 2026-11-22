@@ -37,9 +37,17 @@ of button qualification. See [reset timing and tests](doc/reset.md).
 ## Memory Layout
 See the generated [System Memory Layout](./doc/memory_layout.md).
 
+The device block has moved above 32 MiB: framebuffer `$02000000`, I/O
+`$02100000`, and boot ROM `$021C0000`, preserving relative register offsets.
+This is a relocation-only step: SDRAM is still mapped below `$00E00000`.
+The matching emutos-ice port update is a follow-up; existing EmuTOS images and
+external utilities using the old addresses are incompatible with this map.
+See [device relocation and migration](doc/memory-map-relocation.md).
+
 The [CPU upper-address regression](doc/cpu-upper-address.md) verifies accesses
-above 16 MiB in the real core's 68000 mode. It is groundwork for a larger memory
-map; the production SDRAM window remains unchanged.
+with bits 24 and 25 set in the real core's 68000 mode, including instruction
+fetches above 32 MiB. It is groundwork for a larger memory map; the production
+SDRAM window remains unchanged.
 
 See [onboard SPI flash](./doc/spi_flash.md) for the SD/flash device ports,
 flash pin assignments, and SPI register selection.

@@ -1,1 +1,1 @@
-LEDS        equ     $00F14000   ; LED array mapped register base address
+LEDS        equ     $02114000   ; LED array mapped register base address

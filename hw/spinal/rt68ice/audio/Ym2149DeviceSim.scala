@@ -25,7 +25,7 @@ case class Ym2149BusHarness() extends Component {
     controller.io.romBus, controller.io.ramBus, controller.io.ledBus,
     controller.io.uartBus, controller.io.videoBus,
     controller.io.counterBus, controller.io.ledsBus, controller.io.usbBus,
-    controller.io.dipSwitchesBus,
+    controller.io.dipSwitchesBus, controller.io.cacheStatsBus,
     controller.io.timerBus, controller.io.spiBus, controller.io.ds1302Bus
   ).foreach { port =>
     port.dataIn := 0
@@ -52,7 +52,7 @@ object Ym2149DeviceSim extends App {
   }.doSim { dut =>
     val core = dut.psg.children.collectFirst { case bb: Ym2149BB => bb }.get
     dut.clockDomain.forkStimulus(10)
-    dut.io.bus.address #= 0xf24000
+    dut.io.bus.address #= 0x02124000
     dut.io.bus.dataOut #= 0
     dut.io.bus.wr #= false
     dut.io.bus.uds #= false
@@ -90,7 +90,7 @@ object Ym2149DeviceSim extends App {
     }
     def access(offset: Int, write: Boolean, data: Int = 0, hold: Int = 0): Int = {
       val before = executed.size
-      dut.io.bus.address #= 0xf24000 + offset
+      dut.io.bus.address #= 0x02124000 + offset
       dut.io.bus.wr #= write
       dut.io.bus.dataOut #= data
       dut.io.bus.lds #= true

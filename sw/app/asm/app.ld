@@ -2,8 +2,8 @@ MEMORY
 {
     /* Reserve the first 64 KiB for vectors, firmware data and system use. */
     SDRAM (rwx) : ORIGIN = 0x00010000, LENGTH = 0x00DF0000
-    ROM (rx)    : ORIGIN = 0x00FC0000, LENGTH = 16K
-    FB  (rw)    : ORIGIN = 0x00E00000, LENGTH = 76800
+    ROM (rx)    : ORIGIN = 0x021C0000, LENGTH = 16K
+    FB  (rw)    : ORIGIN = 0x02000000, LENGTH = 76800
 }
 
 SECTIONS

@@ -57,17 +57,17 @@ object BusControllerSim extends App {
 
     // A continuously driven or post-incremented address is not an access when
     // the CPU is idle or both data strobes are inactive.
-    driveTransfer(0x00e20000L, busState = 1, uds = false, lds = false)
+    driveTransfer(0x02020000L, busState = 1, uds = false, lds = false)
     assert(!dut.io.busErr.toBoolean, "An idle unmapped address raised BERR")
 
-    driveTransfer(0x00e20000L, busState = 3, uds = false, lds = false)
+    driveTransfer(0x02020000L, busState = 3, uds = false, lds = false)
     assert(!dut.io.busErr.toBoolean, "An unstrobed post-increment address raised BERR")
 
     // A genuine transfer to an unmapped address must still raise BERR.
-    driveTransfer(0x00e20000L, busState = 2, uds = true, lds = true)
+    driveTransfer(0x02020000L, busState = 2, uds = true, lds = true)
     assert(dut.io.busErr.toBoolean, "An active unmapped read did not raise BERR")
 
-    driveTransfer(0x00e20000L, busState = 3, uds = false, lds = true)
+    driveTransfer(0x02020000L, busState = 3, uds = false, lds = true)
     assert(dut.io.busErr.toBoolean, "An active unmapped write did not raise BERR")
 
     // Mapped SDRAM accesses and TG68K autovector interrupt-acknowledge cycles

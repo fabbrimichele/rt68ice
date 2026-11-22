@@ -1,7 +1,7 @@
 # Video controller
 
-The framebuffer starts at `0x00E00000`, the palette at `0x00F08000`, and the
-video control registers at `0x00F0C000`. Control registers use 16-bit accesses.
+The framebuffer starts at `0x02000000`, the palette at `0x02108000`, and the
+video control registers at `0x0210C000`. Control registers use 16-bit accesses.
 
 | Offset | Name | Access | Description |
 | :---: | :--- | :---: | :--- |
@@ -46,9 +46,9 @@ addresses are unchanged. Mode changes should be made during vertical blank.
 For example, select the new modes from the ROM monitor with one of:
 
 ```text
-write F0C000 0000
-write F0C000 0001
-write F0C000 0002
+write 0210C000 0000
+write 0210C000 0001
+write 0210C000 0002
 ```
 
 Use the `VIDEO_MODE_*` constants in `sw/lib/asm/mem_map_video.asm` from assembly.

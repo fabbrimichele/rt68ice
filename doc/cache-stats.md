@@ -35,7 +35,7 @@ No automatic benchmark launching or modification of CoreMark is included.
 
 ## Register map
 
-Base **`$00F30000`**, 16 KiB decoded window (`$F30000`–`$F33FFF`).
+Base **`$02130000`**, 16 KiB decoded window (`$02130000`–`$02133FFF`).
 All defined registers use 16-bit accesses at even byte offsets. Unused offsets
 read zero, writes to read-only offsets are ignored, and partial-byte writes
 to CONTROL are ignored. The peripheral is always ready and generates no IRQ.
