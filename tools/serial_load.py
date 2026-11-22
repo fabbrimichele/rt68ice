@@ -40,6 +40,40 @@ def write_all(fd, data):
         view = view[written:]
 
 
+def upload_image(fd, image):
+    total = len(image)
+    interactive = sys.stdout.isatty()
+    # Update in place on a terminal; keep redirected output to about ten lines.
+    progress_step = 1 if interactive else 10
+    last_bucket = 0
+
+    def show_progress(sent):
+        percent = sent * 100.0 / total
+        status = (
+            f"Upload: {percent:5.1f}% | {sent:,}/{total:,} bytes | "
+            f"{100.0 - percent:5.1f}% remaining"
+        )
+        print(("\r" if interactive else "") + status,
+              end="" if interactive else "\n", flush=True)
+
+    show_progress(0)
+    try:
+        for offset in range(0, total, 1024):
+            chunk = image[offset:offset + 1024]
+            write_all(fd, chunk)
+            # Count drained chunks, rather than bytes merely queued in the OS.
+            # As before, this tracks serial transmission, not monitor CRC acceptance.
+            termios.tcdrain(fd)
+            sent = offset + len(chunk)
+            bucket = (sent * 100 // total) // progress_step
+            if bucket != last_bucket or sent == total:
+                show_progress(sent)
+                last_bucket = bucket
+    finally:
+        if interactive:
+            print(flush=True)
+
+
 def wire_time_seconds(byte_count, baud):
     # 8N1 serial sends 1 start bit, 8 data bits, and 1 stop bit per byte.
     return byte_count * 10.0 / baud
@@ -87,8 +121,7 @@ def main():
         termios.tcdrain(fd)
         time.sleep(0.5)
 
-        write_all(fd, image)
-        termios.tcdrain(fd)
+        upload_image(fd, image)
 
         if args.no_run:
             return 0

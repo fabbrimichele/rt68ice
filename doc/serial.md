@@ -19,3 +19,19 @@ e.g.
 divisor = 31.250 MHz / 16 / 19200 = 101
 31.250 MHz / 16 / 101 = 19337 
 ```
+
+
+## Upload progress
+
+The host uploader shows the percentage sent, bytes sent/total and percentage
+remaining automatically:
+
+```sh
+python3 tools/serial_load.py --port /dev/ttyACM0 --baud 57600 target/app/blink.bin
+```
+
+A terminal gets one updating line; redirected output gets updates roughly every
+10 percent. Counts include the monitor image header. Progress advances after
+each 1 KiB chunk has drained from the host serial driver; 100 percent describes
+serial transmission, not confirmation of the monitor's CRC check. The transfer
+format, automatic `run` command and `--no-run` option are unchanged.
