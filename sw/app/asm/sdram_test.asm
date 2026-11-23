@@ -20,6 +20,8 @@ menu:
     beq     bench_test
     cmp.b   #'5',d0
     beq     upper_sdram_test
+    cmp.b   #'6',d0
+    beq     boundary_test
     cmp.b   #'e',d0
     beq     .end
     bra     menu
@@ -60,6 +62,12 @@ upper_sdram_test:
     lea     msg_tst_upper,a0
     bsr     put_str
     bsr     run_upper_sdram_test
+    bra     handle_test_result
+
+boundary_test:
+    lea     msg_tst_boundary,a0
+    bsr     put_str
+    bsr     run_boundary_test
     bra     handle_test_result
 
 handle_test_result:
@@ -130,29 +138,56 @@ run_data_test:
 ; Output: d0.b -> 0 OK, 1 Error
 ; ------------------------------------------------------
 run_addr_test:
-    move.l  #RAM_START+$000400,a0   ; SDRAM bank 0 test address
-    move.l  #RAM_START+$800400,a1   ; SDRAM bank 1: must not alias with $000400
+    ; Four addresses share one cache slot and cover all 8 MiB regions.
+    ; In particular, each low/high pair differs only in CPU address bit 24.
+    lea     alias_addresses,a3
+    moveq   #3,d3                  ; Four longword locations
+    bra     run_sparse_test
 
-    ; 1. Write unique patterns
-    move.w  #$AAAA,(a0)             ; Write to $000400
-    move.w  #$5555,2(a0)            ; Write to $000402
-    move.w  #$1234,(a1)             ; Write to $800400
+; ------------------------------------------------------
+; Longword accesses around the 16 MiB boundary and the end of SDRAM.
+; $00FFFFFE straddles 16 MiB; $01FFFFFC ends at the final RAM byte.
+; All accesses are word aligned, as required by the 68000.
+; ------------------------------------------------------
+run_boundary_test:
+    lea     boundary_addresses,a3
+    moveq   #5,d3                  ; Six longword locations
 
-    ; 2. Read back and verify the first two
-    cmp.w   #$AAAA,(a0)             ; Did $700000 change?
+; Write every location before checking any, so aliasing cannot pass by
+; reading back each value immediately after writing it. Address-derived
+; patterns and their complements distinguish every tested longword.
+; Input: a3 -> address table, d3.w -> number of locations minus one.
+; Output: d0.b -> 0 OK, 1 Error.
+run_sparse_test:
+    move.l  #SOAK_PASSES,d2
+    move.l  #$13579BDF,d4
+.pass:
+    movea.l a3,a2
+    move.w  d3,d0
+.fill:
+    movea.l (a2)+,a0
+    move.l  a0,d1
+    eor.l   d4,d1
+    move.l  d1,(a0)
+    dbra    d0,.fill
+
+    movea.l a3,a2
+    move.w  d3,d0
+.check:
+    movea.l (a2)+,a0
+    move.l  a0,d1
+    eor.l   d4,d1
+    cmp.l   (a0),d1
     bne.s   .error
-    cmp.w   #$5555,2(a0)            ; Did $700002 change?
-    bne.s   .error
+    dbra    d0,.check
 
-    ; 3. Verify the distant address
-    cmp.w   #$1234,(a1)             ; Did $700400 change?
-    bne.s   .error
-
-    moveq   #0,d0                   ; Success
+    not.l   d4
+    subq.l  #1,d2
+    bne.s   .pass
+    moveq   #0,d0
     rts
-
 .error:
-    moveq   #1,d0                   ; Error
+    moveq   #1,d0
     rts
 
 
@@ -275,7 +310,7 @@ run_bench_test:
 ; Value Constants
 ; ===========================
 RAM_START       equ $000000          ; SDRAM CPU window start address
-RAM_END         equ $DFFFFF          ; SDRAM CPU window end address (inclusive)
+RAM_END         equ $01FFFFFF          ; SDRAM CPU window end address (inclusive)
 APP_START       equ $010000          ; Applications are linked above low system memory
 RAM_TEST_START  equ APP_START+$10000 ; Reserve 64 KiB for this program
 RAM_TEST_WORDS  equ (RAM_END+1-RAM_TEST_START)/2
@@ -299,23 +334,25 @@ UPPER_SDRAM_TEST_LONGS equ 256        ; 1 KiB of back-to-back longword accesses
 ; ===========================
 msg_title:
     dc.b    CR,LF
-    dc.b    "** SDRAM Test **",CR,LF,NUL
+    dc.b    "** SDRAM Test - 32 MiB **",CR,LF
+    dc.b    "Destructive: run from monitor BEFORE loading EmuTOS.",CR,LF,NUL
 
 msg_menu:
     dc.b    CR,LF
     dc.b    "Select test:",CR,LF
-    dc.b    "1. Data Bus Integrity",CR,LF
-    dc.b    "2. Row/Bank Conflict",CR,LF
+    dc.b    "1. Data Bus Integrity ($00020000-$01FFFFFF)",CR,LF
+    dc.b    "2. Address alias (8/16/24 MiB separation)",CR,LF
     dc.b    "3. Timing Stress",CR,LF
     dc.b    "4. Benchmark",CR,LF
     dc.b    "5. Upper SDRAM stress ($D82000)",CR,LF
+    dc.b    "6. Longwords across 16 MiB / top of 32 MiB",CR,LF
     dc.b    "e. Exit",CR,LF,NUL
 
 msg_tst_data:
     dc.b    CR,LF,"Data Bus Integrity...",CR,LF,NUL
 
 msg_tst_addr:
-    dc.b    CR,LF,"Row/Bank Conflict...",CR,LF,NUL
+    dc.b    CR,LF,"Address alias (including CPU bit 24)...",CR,LF,NUL
 
 msg_tst_time:
     dc.b    CR,LF,"Timing Stress...",CR,LF,NUL
@@ -325,6 +362,9 @@ msg_tst_bench:
 
 msg_tst_upper:
     dc.b    CR,LF,"Upper SDRAM stress...",CR,LF,NUL
+
+msg_tst_boundary:
+    dc.b    CR,LF,"16 MiB boundary and top-of-RAM longwords...",CR,LF,NUL
 
 msg_cycles:
     dc.b    "Clock cycles: ",NUL
@@ -337,6 +377,13 @@ msg_err:
 
 msg_newline:
     dc.b    CR,LF,NUL
+
+    even
+alias_addresses:
+    dc.l    $00020400,$00820400,$01020400,$01820400
+boundary_addresses:
+    dc.l    $00FFFFF8,$00FFFFFE,$01000002,$01000008
+    dc.l    $01FFFFF8,$01FFFFFC
 
 ; ===========================
 ; RAM Data Section

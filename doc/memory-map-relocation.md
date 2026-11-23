@@ -26,10 +26,10 @@ the same. The generated [memory layout](memory_layout.md) lists all windows.
 ## Scope and software migration
 
 The first eight reset-vector bytes still read from ROM. The 1 KiB fast-RAM
-overlay, interrupt-acknowledge space, interrupt levels and existing 14 MiB
-SDRAM window are unchanged. The old device windows have no compatibility
-aliases and now raise a bus error on an active transfer. They are not yet
-SDRAM: cache tags, SDRAM addressing and the larger RAM decode are a later step.
+overlay, interrupt-acknowledge space and interrupt levels are unchanged.
+The subsequent expansion maps SDRAM through `$01FFFFFF`, including the former
+device windows. There are no legacy device aliases: those addresses now access
+RAM. Cache tags include CPU bit 24, and SDRAM receives all 24 word-address bits.
 
 The rt68ice monitor, other ROM examples, assembly register definitions and
 application/firmware linker scripts use the new addresses. Framebuffer symbols

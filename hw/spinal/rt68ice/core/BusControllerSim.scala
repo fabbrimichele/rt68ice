@@ -86,7 +86,7 @@ object BusControllerSim extends App {
     assert(dut.io.sdRamBus.sel.toBoolean, "$D82000 was not selected as SDRAM")
     assert(!dut.io.busErr.toBoolean, "$D82000 raised BERR")
 
-    driveTransfer(0x00dffffeL, busState = 3, uds = true, lds = true)
+    driveTransfer(0x01fffffeL, busState = 3, uds = true, lds = true)
     assert(dut.io.sdRamBus.sel.toBoolean, "The final SDRAM word was not selected")
     assert(!dut.io.busErr.toBoolean, "The final SDRAM word raised BERR")
 

@@ -9,8 +9,8 @@ import scala.language.postfixOps
 
 /*
 Four-word direct-mapped cache: 1,024 lines, 8 KiB of data.
-Address bits: tag [23:13], slot [12:3], word offset [2:1], byte offset [0].
-Each memory entry stores 75 bits: 11-bit tag + 64-bit line data.
+Address bits: tag [24:13], slot [12:3], word offset [2:1], byte offset [0].
+Each memory entry stores 76 bits: 12-bit tag + 64-bit line data.
 A separate 1,024-bit register holds one valid bit per line.
 In the packed data, word 0 is bits [15:0], word 3 is bits [63:48].
 
@@ -38,7 +38,7 @@ case class DirectMappedCache() extends Component {
   val active = io.mainBus.sel && (io.mainBus.uds || io.mainBus.lds)
   val isWrite = active && io.mainBus.wr
   val isRead = active && !io.mainBus.wr
-  val cache = Mem(Bits(75 bits), 1024)
+  val cache = Mem(Bits(76 bits), 1024)
   val valid = Reg(Bits(1024 bits)) init 0
 
   // Capture the current CPU request in the system clock domain. Reads retain
@@ -65,7 +65,7 @@ case class DirectMappedCache() extends Component {
   when(ramSelected && io.ramBus.ready) {
     responseData := io.ramReadLineData
   }
-  val tag = requestAddress(23 downto 13)
+  val tag = requestAddress(24 downto 13)
   val requestSlot = requestAddress(12 downto 3).asUInt
   val wordOffset = requestAddress(2 downto 1).asUInt
   val isValid = Reg(Bool())
@@ -112,7 +112,7 @@ case class DirectMappedCache() extends Component {
     io.ramBus.uds := ramSelected && pendingWriteUds
     io.ramBus.lds := ramSelected && pendingWriteLds
   } otherwise {
-    io.ramBus.address := (requestAddress(23 downto 3) ## B"000").resized
+    io.ramBus.address := requestAddress(31 downto 3) ## B"000"
     io.ramBus.dataOut := requestData
     io.ramBus.wr := False
     io.ramBus.uds := ramSelected && requestUds
@@ -182,7 +182,7 @@ case class DirectMappedCache() extends Component {
     }
 
     writeDramWait.whenIsActive {
-      val lineTag = line(74 downto 64)
+      val lineTag = line(75 downto 64)
       io.events.writeRamWait := !responseReady
 
       // Let CPU and write continue in parallel
@@ -197,7 +197,7 @@ case class DirectMappedCache() extends Component {
     }
 
     readLookup.whenIsActive {
-      val lineTag = line(74 downto 64)
+      val lineTag = line(75 downto 64)
       val lineData = line(63 downto 0)
 
       when(isValid && lineTag === tag) {

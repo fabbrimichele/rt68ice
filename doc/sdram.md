@@ -6,6 +6,49 @@ For measured changes at every step, see the
 [performance progression](validation.md#cache-performance-progression).
 The dated results below describe successive historical versions.
 
+## Standalone 32 MiB RAM test
+
+`sw/app/asm/sdram_test.asm` now targets the expanded SDRAM window ending at
+`$01FFFFFF`. Use the matching 32 MiB FPGA build. This is a destructive monitor
+application: run it before loading EmuTOS. The full sweep starts at `$00020000`,
+leaving the monitor's low memory and the application's reserved 64 KiB intact;
+it overwrites the EmuTOS image area.
+
+```sh
+make target/app/sdram_test.bin
+python3 tools/serial_load.py --port /dev/ttyACM0 --baud 57600 target/app/sdram_test.bin
+```
+
+Run option **2** and then **6** first, followed by **1**, **3** and **5**.
+Option **4** remains the existing copy benchmark.
+
+- **1 — Data Bus Integrity:** walking-one word patterns over
+  `$00020000–$01FFFFFF`, including the upper 16 MiB.
+- **2 — Address alias:** distinct longword patterns at `$00020400`,
+  `$00820400`, `$01020400` and `$01820400`. These share a cache slot and
+  cover all four 8 MiB regions. Writes to all locations precede verification,
+  so dropped address bits cannot be hidden by immediate write/read pairs.
+- **6 — Boundary longwords:** test `$00FFFFF8`, `$00FFFFFE`, `$01000002`,
+  `$01000008`, `$01FFFFF8` and `$01FFFFFC`. The access at `$00FFFFFE`
+  crosses 16 MiB; the final access ends exactly at `$01FFFFFF` without touching
+  the framebuffer at `$02000000`.
+
+Options 2 and 6 repeat ten passes with address-derived patterns and their
+complements. The assembled routines passed local TG68K CPU simulation with a
+32 MiB memory model; deliberately discarding address bit 24 made option 2 fail.
+The application image header/CRC and full-sweep bounds were checked locally.
+Board validation on 2026-11-23 passed all five integrity/stress tests
+(options 1, 2, 3, 5 and 6), including the full sweep through `$01FFFFFF`,
+address alias checks and boundary/top-of-RAM accesses. Option 4 measured
+**3,329 counter ticks**. Final routed timing passed all reported clocks:
+system 28.49 MHz at a 25 MHz requirement, SDRAM controller 96.39 MHz at 50 MHz,
+HDMI 212.99 MHz at 125 MHz. These reports do not independently establish
+external SDRAM timing or complete clock-domain-crossing sign-off.
+
+The FPGA now maps 32 MiB. The monitor image-load limit and companion EmuTOS
+RAM configuration still require follow-up; the standalone test runs below
+that load limit and accesses the expanded range directly.
+
 ### Resources
 - [AtariST_MiSTer/rtl/sdram.v](https://github.com/MiSTer-devel/AtariST_MiSTer/blob/master/rtl/sdram.v)
 - [Higher level SDRAM controller - hides refresh](https://github.com/agg23/sdram-controller/blob/master/sdram.sv)

@@ -133,12 +133,8 @@ case class BusController() extends Component {
   val interruptAckMapping = MaskMapping(0xFFFFFFF0L, 0xFFFFFFF0L)
   // Boot vectors look at the absolute first 8 bytes via a 3-bit wildcard mask
   val bootMapping     = MaskMapping(0x00000000L, 0xFFFFFFF8L)
-  val ramMapping      = SizeMapping(0x00000000L, 1 KiB)   // $000000 - $0003FF, overlays SDRAM
-  val sdRamMapping1   = SizeMapping(0x00000000L, 8 MiB)   // $000000 - $7FFFFF
-  val sdRamMapping2   = SizeMapping(0x00800000L, 4 MiB)   // $800000 - $BFFFFF
-  val sdRamMapping3   = SizeMapping(0x00C00000L, 2 MiB)   // $C00000 - $DFFFFF
-  // Relocate the former $00E00000-$00FFFFFF device block above 32 MiB.
-  // The SDRAM mappings above remain 14 MiB until the memory-expansion step.
+  val ramMapping      = SizeMapping(0x00000000L, 1 KiB)   // $00000000 - $000003FF, overlays SDRAM
+  val sdRamMapping    = SizeMapping(0x00000000L, 32 MiB)  // $00000000 - $01FFFFFF
   val vidFbMapping    = SizeMapping(0x02000000L, 128 KiB) // $02000000 - $0201FFFF; first 75 KiB used
   val ledMapping      = SizeMapping(0x02100000L, 16 KiB)  // $02100000 - $02103FFF
   val uartMapping     = SizeMapping(0x02104000L, 16 KiB)  // $02104000 - $02107FFF
@@ -159,9 +155,7 @@ case class BusController() extends Component {
     "doc/memory_layout.md",
     "BOOT VECTORS" -> bootMapping,
     "FAST RAM" -> ramMapping,
-    "SDRAM 8MB" -> sdRamMapping1,
-    "SDRAM 4MB" -> sdRamMapping2,
-    "SDRAM 2MB" -> sdRamMapping3,
+    "SDRAM 32MB" -> sdRamMapping,
     "VIDEO FB" -> vidFbMapping,
     "LED PERIPH" -> ledMapping,
     "UART PERIPH" -> uartMapping,
@@ -187,7 +181,7 @@ case class BusController() extends Component {
     io.romBus.sel := True
   } elsewhen ramMapping.hit(address) {
     io.ramBus.sel := True
-  } elsewhen (sdRamMapping1.hit(address) || sdRamMapping2.hit(address) || sdRamMapping3.hit(address)) {
+  } elsewhen sdRamMapping.hit(address) {
     io.sdRamBus.sel := True
   } elsewhen romMapping.hit(address) {
     io.romBus.sel := True

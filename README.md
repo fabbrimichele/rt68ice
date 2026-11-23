@@ -39,9 +39,12 @@ See the generated [System Memory Layout](./doc/memory_layout.md).
 
 The device block has moved above 32 MiB: framebuffer `$02000000`, I/O
 `$02100000`, and boot ROM `$021C0000`, preserving relative register offsets.
-This is a relocation-only step: SDRAM is still mapped below `$00E00000`.
-The matching emutos-ice port update is a follow-up; existing EmuTOS images and
-external utilities using the old addresses are incompatible with this map.
+SDRAM now covers `$00000000–$01FFFFFF` (32 MiB), with the boot-vector and
+1 KiB fast-RAM overlays preserved. The standalone full-range RAM, alias and
+boundary tests passed on the board; see [SDRAM validation](doc/sdram.md#standalone-32-mib-ram-test).
+The companion emutos-ice device relocation is available, but its RAM-size
+configuration still needs updating. Images and external utilities using the
+old device addresses are incompatible with this map.
 See [device relocation and migration](doc/memory-map-relocation.md).
 
 The [CPU upper-address regression](doc/cpu-upper-address.md) verifies accesses

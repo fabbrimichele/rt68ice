@@ -71,12 +71,12 @@ object MemoryMapSim extends App {
       assert(dut.io.busErr.toBoolean, f"Unmapped transfer must raise BERR at $$$address%08X")
     }
 
-    // Reset vectors remain overlaid by ROM; fast RAM and the existing 14 MiB
-    // SDRAM window retain their boundaries during this relocation-only step.
+    // Reset vectors and fast RAM retain priority over the expanded 32 MiB SDRAM.
     for (address <- Seq(0L, 2L, 6L)) checkSelected(address, dut.io.romBus.sel, dut.io.romBus)
     for (address <- Seq(8L, 0x3FEL)) checkSelected(address, dut.io.ramBus.sel, dut.io.ramBus)
     for (address <- Seq(0x400L, 0x007FFFFEL, 0x00800000L, 0x00BFFFFEL,
-      0x00C00000L, 0x00D82000L, 0x00DFFFFEL))
+      0x00C00000L, 0x00D82000L, 0x00DFFFFEL, 0x00FFFFFEL,
+      0x01000000L, 0x01800000L, 0x01FFFFFEL))
       checkSelected(address, dut.io.sdRamBus.sel, dut.io.sdRamBus)
 
     for (window <- windows) {
@@ -103,17 +103,17 @@ object MemoryMapSim extends App {
       dut.io.busState #= 2
       sleep(1)
 
-      // No compatibility aliases: those low addresses will become SDRAM later.
-      checkUnmapped(window.base - 0x01200000L)
-      checkUnmapped(window.base - 0x01200000L + window.size - 1)
+      // Former device windows are now RAM, not legacy peripheral aliases.
+      checkSelected(window.base - 0x01200000L, dut.io.sdRamBus.sel, dut.io.sdRamBus)
+      checkSelected(window.base - 0x01200000L + window.size - 1,
+        dut.io.sdRamBus.sel, dut.io.sdRamBus)
 
       // Dropping bit 25 must not leave this peripheral selected, even where
       // its low-address counterpart legitimately selects fast RAM or SDRAM.
       drive(window.base & 0x01FFFFFFL)
       assert(!window.select.toBoolean, s"${window.name} decode ignores address bit 25")
     }
-    for (address <- Seq(0x00E20000L, 0x01000000L, 0x01FFFFFEL,
-      0x02020000L, 0x020FFFFEL, 0x02134000L, 0x021BFFFEL, 0x021C4000L))
+    for (address <- Seq(0x02020000L, 0x020FFFFEL, 0x02134000L, 0x021BFFFEL, 0x021C4000L))
       checkUnmapped(address)
 
     // RTC still excludes instruction fetches while ROM must accept them.
@@ -126,6 +126,6 @@ object MemoryMapSim extends App {
     drive(0xFFFFFFF2L)
     assert(!dut.io.busErr.toBoolean, "Interrupt acknowledgement must not raise BERR")
     assert(selects.forall(!_.toBoolean), "Interrupt acknowledgement must not select a device")
-    println("Memory map checks passed: relocated device boundaries, old-address rejection, bit-25 decode, vectors and unchanged SDRAM")
+    println("Memory map checks passed: relocated device boundaries, former windows as RAM, bit-25 decode, vectors and 32 MiB SDRAM")
   }
 }
