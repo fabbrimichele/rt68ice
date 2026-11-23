@@ -15,11 +15,11 @@ are those reported by the test programs; they were not independently measured.
 | CPU | TG68K in 68000 mode |
 | CPU/system clock | 25 MHz in the inspected design |
 | SDRAM clock | 50 MHz in the inspected design |
-| SDRAM | 32 MiB physical, 16-bit data bus; 14 MiB CPU window |
+| SDRAM | 32 MiB physical and CPU window, 16-bit data bus |
 | Low-memory overlay | 1 KiB FPGA BRAM; first eight bytes selected from ROM |
 | Framebuffer | Dedicated FPGA BRAM, up to 75 KiB |
 | Operating system | RT68ICE EmuTOS port |
-| EmuTOS image address | `$00D80000` |
+| EmuTOS image address | `$01F80000` (boot confirmed; expanded YAART run pending) |
 
 Repository state inspected when recording this report:
 
@@ -1033,3 +1033,23 @@ Pre-PR verification also passed `CacheStatsDeviceSim`, `BusControllerSim`,
 the cache regression. No additional full bitstream build was run for these
 documentation/comment changes; the on-board results above refer to the user's
 previously built and programmed version.
+
+## 32 MiB expansion and top-of-RAM EmuTOS (2026-11-23)
+
+The user confirmed that the standalone 32 MiB RAM test passed options 1, 2,
+3, 5 and 6. These include the walking-one sweep through `$01FFFFFF`, address
+alias checks across all four 8 MiB regions, longwords crossing 16 MiB and the
+final longword at `$01FFFFFC`. The copy benchmark measured 3,329 counter ticks.
+Final routed system timing passed at 28.49 MHz against a 25 MHz requirement;
+all reported clocks passed. This is not complete external-interface/CDC sign-off.
+
+The monitor was updated to accept images through the 32 MiB SDRAM limit, and
+EmuTOS was linked at `$01F80000`, reserving the last 512 KiB. Both builds and
+local monitor range-check simulations passed. After programming the FPGA and
+serial-uploading EmuTOS, a power cycle was needed to discard the old warm-boot
+13,824 KiB limit. The user then confirmed approximately 32 MiB on the welcome
+screen (31.5 MiB configured ST-RAM).
+
+YAARTTT reported the test range `$00026AE8–$01F80000` with ST-RAM selected.
+Completed passes have not yet been reported; expanded-range YAART, CoreMark,
+flash-image boot and broader peripheral/reset checks remain pending.

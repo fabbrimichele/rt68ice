@@ -77,7 +77,7 @@ boot
 
 `loadflash` reads and verifies the image at flash offset `$00100000`, copies
 its payload to the SDRAM address in its header, and prints that address. It
-does not run the image. For EmuTOS, subsequently use `run 00D80000`.
+does not run the image. For EmuTOS, subsequently use `run 01F80000`.
 `boot` performs the same load and verification, then jumps to the header's
 load address only if successful.
 
@@ -140,7 +140,7 @@ After building and loading the updated FPGA bitstream:
 - With no image at 1 MiB, `loadflash` and `boot` must report an invalid magic
   (or another read error) and remain at the prompt.
 - With the headered image installed, `loadflash` must report `Done.` and
-  `Loaded at 00D80000`; `boot` must start EmuTOS.
+  `Loaded at 01F80000`; `boot` must start EmuTOS.
 - Repeat serial loading of an existing monitor application to check that the
   UART path remains functional.
 - For a negative CRC test, use a copy of the application image with one payload

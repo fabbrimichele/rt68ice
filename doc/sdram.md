@@ -45,9 +45,13 @@ system 28.49 MHz at a 25 MHz requirement, SDRAM controller 96.39 MHz at 50 MHz,
 HDMI 212.99 MHz at 125 MHz. These reports do not independently establish
 external SDRAM timing or complete clock-domain-crossing sign-off.
 
-The FPGA now maps 32 MiB. The monitor image-load limit and companion EmuTOS
-RAM configuration still require follow-up; the standalone test runs below
-that load limit and accesses the expanded range directly.
+The FPGA now maps 32 MiB. The monitor image-load limit is also expanded to
+32 MiB for the companion EmuTOS image at `$01F80000`; EmuTOS reserves the final
+512 KiB and configures 31.5 MiB contiguous ST-RAM. This monitor/EmuTOS update
+requires rebuilding/programming the FPGA and loading the new OS image. The
+32 MiB hardware board results above precede this monitor/OS update. Subsequent
+board testing confirmed boot and 31.5 MiB ST-RAM after a power cycle; YAARTTT
+reported `$00026AE8–$01F80000`. Completed-pass results remain pending.
 
 ### Resources
 - [AtariST_MiSTer/rtl/sdram.v](https://github.com/MiSTer-devel/AtariST_MiSTer/blob/master/rtl/sdram.v)

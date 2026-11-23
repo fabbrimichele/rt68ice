@@ -34,9 +34,13 @@ RAM. Cache tags include CPU bit 24, and SDRAM receives all 24 word-address bits.
 The rt68ice monitor, other ROM examples, assembly register definitions and
 application/firmware linker scripts use the new addresses. Framebuffer symbols
 such as `_fb_start` now resolve to `$02000000`; the monitor reset PC points
-into the relocated ROM. The monitor still accepts images only within the
-existing SDRAM application range, ending at `$00E00000`; neither that loader
-limit nor the EmuTOS image load address `$00D80000` is a device mapping.
+into the relocated ROM. The monitor accepts images in `$00010000–$01FFFFFF`, rejecting overflow,
+odd entry addresses and transfers into the relocated devices. The matching
+EmuTOS image now loads at `$01F80000`, leaving 31.5 MiB contiguous ST-RAM and
+reserving the final 512 KiB for the OS. Both the serial `load` and flash image
+paths use the expanded range check; the header format and flash offset stay
+unchanged. Rebuild/program the monitor-containing FPGA bitstream before loading
+the new EmuTOS image. The previous monitor rejects its high load address.
 The unrelated serial-flash offsets/capacity and RGB colour constants do not
 change. Makefile dependencies include the linker maps so address-only edits
 cannot silently leave stale firmware/applications.
@@ -95,3 +99,19 @@ still cover the existing window, not 32 MiB. Exact command logs and loaded
 binary hashes were not supplied. The matching EmuTOS port remains the next
 integration step; SD/flash, RTC, timer and audio board checks were not separately
 confirmed in these reports.
+
+## Top-of-RAM EmuTOS image: local validation
+
+The updated monitor builds with `make rom` and occupies 3,216 of 4,096 ROM
+bytes. A local real-TG68K simulation of its production range-check instructions
+accepted the new EmuTOS address in both serial and flash modes and an image
+ending exactly at `$02000000`. It rejected transfers crossing that boundary,
+framebuffer destinations, 32-bit wraparound, empty images, odd entry addresses,
+protected low RAM and flash images exceeding the existing flash capacity limit.
+The flash capacity limit and CRC/header protocol are unchanged. The user subsequently programmed the FPGA, uploaded EmuTOS over serial and
+booted it at `$01F80000`. After a power cycle, the welcome screen reported
+31.5 MiB ST-RAM. YAARTTT reported `$00026AE8–$01F80000`; no completed-pass
+results have been reported yet. Flash loading of this high-address image,
+CoreMark and broader peripheral/reset regression remain to be checked.
+A warm boot initially retained the previous 13,824 KiB RAM limit; use a power
+cycle or cold restart when switching between RAM configurations.

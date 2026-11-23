@@ -31,9 +31,9 @@ Design and implement a high-performance Motorola 680x0-compatible System-on-a-Ch
     * **Current CPU configuration:** 68000 mode. Enabling the core's partial 68020 support is a separate future change.
     * **Data Bus:** 16-bit external; direct 1:1 mapping to the iCESugar Pro’s 16-bit wide SDRAM chip.
 * **RAM:**
-    * **Low Memory:** The 14MB CPU window is contiguous from `0x000000` to `0xDFFFFF`.
+    * **Low Memory:** The 32 MiB CPU window is contiguous from `0x00000000` to `0x01FFFFFF`.
     * **Vector Table:** The first 1 KiB is overlaid by FPGA BRAM for high-speed exception, interrupt, stack and firmware-data access. The first eight bytes are read from ROM for the reset stack pointer and program counter.
-    * **Main Memory:** The board's 32MB SDRAM is accessed through the 14MB low-memory CPU window. An 8 KiB unified direct-mapped cache has four-word burst fills, write-hit updates and a single-entry posted-write buffer. A larger CPU memory window remains future work.
+    * **Main Memory:** The board's 32 MiB SDRAM is mapped into the low-memory CPU window. An 8 KiB unified direct-mapped cache has four-word burst fills, write-hit updates and a single-entry posted-write buffer. The companion EmuTOS image reserves the top 512 KiB at `0x01F80000`, leaving 31.5 MiB contiguous ST-RAM.
 * **ROM:**
     * The 4 KiB boot ROM is decoded in a 16 KiB window at `0x021C0000`, with its first eight bytes also visible at reset-vector addresses `0x000000-0x000007`.
 * **Custom I/O:**

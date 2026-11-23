@@ -300,8 +300,8 @@ image_load:
     beq     image_bad_range
     add.l   d1,d0
     bcs     image_bad_range
-    ; Keep the current 14 MiB SDRAM limit; device relocation does not add RAM.
-    cmpi.l  #$00e00000,d0
+    ; Exclusive end of the expanded 32 MiB SDRAM window.
+    cmpi.l  #$02000000,d0
     bhi     image_bad_range
     tst.b   d7
     beq     .range_ok

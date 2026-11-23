@@ -42,8 +42,11 @@ The device block has moved above 32 MiB: framebuffer `$02000000`, I/O
 SDRAM now covers `$00000000–$01FFFFFF` (32 MiB), with the boot-vector and
 1 KiB fast-RAM overlays preserved. The standalone full-range RAM, alias and
 boundary tests passed on the board; see [SDRAM validation](doc/sdram.md#standalone-32-mib-ram-test).
-The companion emutos-ice device relocation is available, but its RAM-size
-configuration still needs updating. Images and external utilities using the
+The companion emutos-ice image now loads at `$01F80000`, reserving the top
+512 KiB and configuring 31.5 MiB contiguous ST-RAM. The monitor accepts images
+through the 32 MiB SDRAM limit; this requires the matching rebuilt bitstream.
+Board testing confirmed the new monitor/image boots with 31.5 MiB ST-RAM;
+YAARTTT reported the expanded range, with completed-pass results still pending. Images and external utilities using the
 old device addresses are incompatible with this map.
 See [device relocation and migration](doc/memory-map-relocation.md).
 
