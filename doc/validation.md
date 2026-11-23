@@ -19,7 +19,7 @@ are those reported by the test programs; they were not independently measured.
 | Low-memory overlay | 1 KiB FPGA BRAM; first eight bytes selected from ROM |
 | Framebuffer | Dedicated FPGA BRAM, up to 75 KiB |
 | Operating system | RT68ICE EmuTOS port |
-| EmuTOS image address | `$01F80000` (boot confirmed; expanded YAART run pending) |
+| EmuTOS image address | `$01F80000` (boot, six YAART passes and one CoreMark run confirmed) |
 
 Repository state inspected when recording this report:
 
@@ -1051,5 +1051,17 @@ serial-uploading EmuTOS, a power cycle was needed to discard the old warm-boot
 screen (31.5 MiB configured ST-RAM).
 
 YAARTTT reported the test range `$00026AE8–$01F80000` with ST-RAM selected.
-Completed passes have not yet been reported; expanded-range YAART, CoreMark,
-flash-image boot and broader peripheral/reset checks remain pending.
+The user subsequently reported six complete passes with zero errors by
+55:55, confirmed by the start of pass 7; pass 7 also continued cleanly through
+its ones/zeros test at 56:12. This exercises approximately 31.35 MiB of free
+ST-RAM, including the added upper 16 MiB, without overwriting the OS image.
+
+One CoreMark 1.0 run validated with 200 iterations, 2,635 ticks, 13.175 seconds
+and **15.180265 iterations/sec**. Compiler: GCC 8.2.1 20181017, flags
+`-O2 -mcpu=68000 -fomit-frame-pointer -DPERFORMANCE_RUN=1`, code and data in RAM.
+CRCs: seed `e9f5`, list `e714`, matrix `1fd7`, state `8e3a`, final `382f`.
+This is consistent with the previous approximately 15.17 iterations/sec;
+no meaningful performance change is established by a single run. More CoreMark
+repetitions, flash-image boot and broader peripheral/reset/file-I/O checks
+remain useful. The known keyboard-reset boot-modifier issue is separate from
+the RAM expansion.

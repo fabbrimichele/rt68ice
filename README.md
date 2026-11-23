@@ -46,7 +46,8 @@ The companion emutos-ice image now loads at `$01F80000`, reserving the top
 512 KiB and configuring 31.5 MiB contiguous ST-RAM. The monitor accepts images
 through the 32 MiB SDRAM limit; this requires the matching rebuilt bitstream.
 Board testing confirmed the new monitor/image boots with 31.5 MiB ST-RAM;
-YAARTTT reported the expanded range, with completed-pass results still pending. Images and external utilities using the
+YAARTTT completed six full expanded-range passes with zero errors, and one
+CoreMark run validated at 15.180265 iterations/sec. Images and external utilities using the
 old device addresses are incompatible with this map.
 See [device relocation and migration](doc/memory-map-relocation.md).
 

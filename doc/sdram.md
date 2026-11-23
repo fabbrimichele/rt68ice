@@ -51,7 +51,11 @@ The FPGA now maps 32 MiB. The monitor image-load limit is also expanded to
 requires rebuilding/programming the FPGA and loading the new OS image. The
 32 MiB hardware board results above precede this monitor/OS update. Subsequent
 board testing confirmed boot and 31.5 MiB ST-RAM after a power cycle; YAARTTT
-reported `$00026AE8–$01F80000`. Completed-pass results remain pending.
+tested `$00026AE8–$01F80000` and completed six full passes with zero errors by
+55:55, with pass 7 continuing. One CoreMark run validated at 15.180265
+iterations/sec (2,635 ticks, 13.175 seconds, 200 iterations), consistent with
+the previous approximately 15.17 baseline. Further repetitions and broader
+peripheral/file-I/O checks remain useful.
 
 ### Resources
 - [AtariST_MiSTer/rtl/sdram.v](https://github.com/MiSTer-devel/AtariST_MiSTer/blob/master/rtl/sdram.v)

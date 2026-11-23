@@ -110,8 +110,9 @@ framebuffer destinations, 32-bit wraparound, empty images, odd entry addresses,
 protected low RAM and flash images exceeding the existing flash capacity limit.
 The flash capacity limit and CRC/header protocol are unchanged. The user subsequently programmed the FPGA, uploaded EmuTOS over serial and
 booted it at `$01F80000`. After a power cycle, the welcome screen reported
-31.5 MiB ST-RAM. YAARTTT reported `$00026AE8–$01F80000`; no completed-pass
-results have been reported yet. Flash loading of this high-address image,
-CoreMark and broader peripheral/reset regression remain to be checked.
+31.5 MiB ST-RAM. YAARTTT completed six full passes over
+`$00026AE8–$01F80000` with zero errors by 55:55, with pass 7 continuing.
+One CoreMark run validated at 15.180265 iterations/sec. Flash loading of this
+high-address image and broader peripheral/reset regression remain to be checked.
 A warm boot initially retained the previous 13,824 KiB RAM limit; use a power
 cycle or cold restart when switching between RAM configurations.
