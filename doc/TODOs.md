@@ -1,5 +1,52 @@
 # TODOs
 
+## Planned features
+
+Suggested order; keep each feature in a separate branch.
+
+1. **Fix keyboard-triggered reset.** Investigate held Ctrl/Alt keys being
+   interpreted as boot options after Ctrl+Alt+Delete or
+   Ctrl+Alt+Right Shift+Delete, selecting A: and skipping accessories and
+   desktop configuration. Check USB key-state handling before changing generic
+   EmuTOS startup logic; preserve deliberate boot-key options.
+2. **Integrate DS3231.** Replace the DS1302 interface with I²C and update the
+   EmuTOS RTC driver. Test time read/write, temperature and battery retention.
+   Initially use only VCC, GND, SCL and SDA; alarms/SQW, 32K output and the
+   module's EEPROM are deferred.
+3. **Add MIDI IN/OUT.** Implement the appropriate DIN electrical interfaces
+   (including opto-isolated input), UART operation at 31,250 baud and EmuTOS
+   MIDI BIOS support. Start with standalone loopback and sustained-traffic
+   tests. Add an RX FIFO only if testing demonstrates a need; direct Atari
+   MIDI ACIA compatibility is separate follow-up work.
+4. **Evaluate 68020 mode.** Verify TG68K's supported instructions and exception
+   behavior, compare synthesis resources with 68000 mode, then check routed
+   timing and run compatibility/performance tests. Keep the validated 68000
+   configuration available; the external data bus remains 16 bits.
+5. **Test FreeMiNT.** Start with a minimal 68000-compatible setup using the
+   existing EmuTOS services, without Atari-specific hardware drivers. Verify
+   machine detection, timer scheduling, keyboard, storage and memory handling.
+   This can be attempted before 68020 mode; MMU memory protection is unavailable.
+6. **Add chunky video and port Doom.** Add a 320x240, 8-bit indexed-colour
+   mode using the existing FPGA framebuffer. Start with a silent doomgeneric
+   EmuTOS port, WAD loading, keyboard input, palette updates and a 320x200 game
+   image. Measure a repeatable timedemo before choosing optimizations; neither
+   a particular frame rate nor 68020 speedup is established yet.
+7. **Optionally move VRAM to SDRAM.** Add SDRAM arbitration, scanout buffering,
+   clock-domain handling and a policy ensuring video sees completed CPU writes.
+   Validate one fixed mode before adding programmable framebuffer addresses
+   and switching buffers at vertical blank. Preserve the FPGA framebuffer as
+   a bring-up fallback where resources permit. Double buffering needs software
+   support; it is not automatically enabled for the desktop.
+
+## Engineering work
+
+- Investigate the consistently longer FPGA builds after the 32 MiB expansion.
+  Compare synthesis, placement and routing times, resource usage and routing
+  iterations against the previous design with identical tool settings/seeds.
+- Complete timing and clock-domain-crossing checks, particularly the related
+  CPU/SDRAM clocks and external SDRAM interface. Passing per-clock frequency
+  reports alone do not establish complete timing/CDC sign-off.
+
 ## Build
 - Give ecpdap a try, it should be much faster than openFPGALoader (it's not faster)
 ## Monitor
