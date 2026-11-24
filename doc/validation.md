@@ -1063,5 +1063,20 @@ CRCs: seed `e9f5`, list `e714`, matrix `1fd7`, state `8e3a`, final `382f`.
 This is consistent with the previous approximately 15.17 iterations/sec;
 no meaningful performance change is established by a single run. More CoreMark
 repetitions, flash-image boot and broader peripheral/reset/file-I/O checks
-remain useful. The known keyboard-reset boot-modifier issue is separate from
-the RAM expansion.
+remain useful. The keyboard-reset boot-modifier fix was subsequently completed in
+emutos-ice; see the 2026-11-24 note below.
+
+## Keyboard reset and welcome behavior (2026-11-24)
+
+The EmuTOS keyboard-reset path waits for Ctrl, Alt, right Shift and Delete to
+be released before warm or cold restart. This prevents the reset chord from
+being reused as boot options, without changing generic boot-option handling.
+The temporary eight-second welcome screen on every boot was removed: warm
+resets skip it, while cold starts use a three-second countdown, skippable with
+Space. The implementation is in emutos-ice `master`, `make rt68ice` passed,
+and the user confirmed it works on the board. No FPGA change is required.
+
+Staged release, chords split across keyboards, and explicit accessory/configuration
+and deliberate Ctrl/Alt boot-option checks are optional additional validation;
+they have not all been individually reported. No further reset implementation
+is planned. DS3231 integration is next in the roadmap.
