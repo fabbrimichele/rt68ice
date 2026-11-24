@@ -27,6 +27,12 @@ snapshots of hits, misses, writes, elapsed time and read/write stall cycles.
 The write RAM-wait counter has a documented limitation with posted writes;
 it does not measure background write duration.
 
+## RTC
+
+The current design uses the [DS1302 RTC](doc/ds1302.md). Its planned DS3231
+replacement is documented in the [module reference, wiring notes and vendor
+images](doc/ds3231.md); integration is not implemented yet.
+
 ## Reset button
 
 The active-low reset button must remain pressed for 10 ms after synchronization

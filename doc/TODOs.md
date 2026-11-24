@@ -14,7 +14,7 @@
 
 Suggested order; keep each feature in a separate branch.
 
-1. **Integrate DS3231.** Replace the DS1302 interface with I²C and update the
+1. **Integrate DS3231** ([module reference and images](ds3231.md)). Replace the DS1302 interface with I²C and update the
    EmuTOS RTC driver. Test time read/write, temperature and battery retention.
    Initially use only VCC, GND, SCL and SDA; alarms/SQW, 32K output and the
    module's EEPROM are deferred.
