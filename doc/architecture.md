@@ -16,9 +16,9 @@ in `BusController` (USB 6, timer 5, video 4, UART 3).
 
 The address map and decoding priority remain centralized in `BusController`.
 It also preserves the separate gated-write and held-direction wiring groups.
-RTC selection includes CPU data-cycle qualification before it reaches the
-device. Bundling these signals does not add registers or change the device
-handshakes.
+The generic I²C window follows ordinary peripheral address decoding; register
+accesses require both byte strobes. Its command pulses are generated in the
+device wrapper, and software polls status between I²C operations.
 
 ## Project Goals
 Design and implement a high-performance Motorola 680x0-compatible System-on-a-Chip (SoC) using SpinalHDL, targeting the iCESugar Pro (Lattice ECP5-25F).
@@ -45,8 +45,8 @@ Design and implement a high-performance Motorola 680x0-compatible System-on-a-Ch
     * Memory Management Unit omitted due to the current lack of a verified 68851 or 68030-compatible MMU softcore.
 
 Device `ready` signals are high while idle or when a transfer can complete.
-Devices with no extended waits drive `ready` high; SDRAM, PSG, and RTC use
-their existing completion logic. `BusController` ANDs every device's `ready`
+Devices with no extended waits, including the generic I²C register interface,
+drive `ready` high; SDRAM and PSG use their existing completion logic. `BusController` ANDs every device's `ready`
 with its own fixed-wait condition to produce the final CPU `clockEn`. The top
 level connects that result directly to the CPU. Peripheral state machines keep
 running while CPU advancement is held.

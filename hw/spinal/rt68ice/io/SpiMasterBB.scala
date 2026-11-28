@@ -4,6 +4,8 @@ import spinal.core._
 
 import scala.language.postfixOps
 
+//noinspection TypeAnnotation
+//noinspection ScalaWeakerAccess
 class SpiMasterBB extends BlackBox {
   val io = new Bundle {
     // Generic 16-bit register interface; CPU bus decoding belongs in the wrapper.

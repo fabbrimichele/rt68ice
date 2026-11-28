@@ -32,7 +32,7 @@ case class Rt68IceTopLevel(romFile: String) extends Component {
     val sd = master(Spi())
     val flash = master(SpiFlash())
     val audio = Audio()
-    val ds1302 = master(Ds1302())
+    val i2c = master(I2c())
   }
 
   val clockCtrl = ClockCtrl()
@@ -86,10 +86,10 @@ case class Rt68IceTopLevel(romFile: String) extends Component {
     io.audio.right := psg.io.pwmAudio
     bus.io.psgBus <> psg.io.bus
 
-    // DS1302
-    val ds1302 = Ds1302Device()
-    io.ds1302 <> ds1302.io.ds1302
-    bus.io.ds1302Bus <> ds1302.io.bus
+    // I2C
+    val i2cDevice = I2cDevice()
+    io.i2c <> i2cDevice.io.i2c
+    bus.io.i2cBus <> i2cDevice.io.bus
 
     // LED Device
     val ledDevice = LedDevice()

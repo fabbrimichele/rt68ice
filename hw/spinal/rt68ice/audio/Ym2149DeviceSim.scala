@@ -26,7 +26,7 @@ case class Ym2149BusHarness() extends Component {
     controller.io.uartBus, controller.io.videoBus,
     controller.io.counterBus, controller.io.ledsBus, controller.io.usbBus,
     controller.io.dipSwitchesBus, controller.io.cacheStatsBus,
-    controller.io.timerBus, controller.io.spiBus, controller.io.ds1302Bus
+    controller.io.timerBus, controller.io.spiBus, controller.io.i2cBus
   ).foreach { port =>
     port.dataIn := 0
     port.irq := False

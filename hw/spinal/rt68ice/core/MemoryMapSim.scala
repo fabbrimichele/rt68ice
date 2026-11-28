@@ -17,7 +17,7 @@ object MemoryMapSim extends App {
       dut.io.romBus, dut.io.ramBus, dut.io.ledBus, dut.io.uartBus,
       dut.io.videoBus, dut.io.sdRamBus, dut.io.counterBus, dut.io.ledsBus,
       dut.io.dipSwitchesBus, dut.io.cacheStatsBus, dut.io.usbBus,
-      dut.io.timerBus, dut.io.spiBus, dut.io.psgBus, dut.io.ds1302Bus)
+      dut.io.timerBus, dut.io.spiBus, dut.io.psgBus, dut.io.i2cBus)
     ports.zipWithIndex.foreach { case (port, index) =>
       port.dataIn #= (0x1000 + index)
       port.irq #= false
@@ -29,7 +29,7 @@ object MemoryMapSim extends App {
       dut.io.videoBus.ctrlSel, dut.io.sdRamBus.sel, dut.io.counterBus.sel,
       dut.io.ledsBus.sel, dut.io.dipSwitchesBus.sel, dut.io.cacheStatsBus.sel,
       dut.io.usbBus.sel, dut.io.timerBus.sel, dut.io.spiBus.sel,
-      dut.io.psgBus.sel, dut.io.ds1302Bus.sel)
+      dut.io.psgBus.sel, dut.io.i2cBus.sel)
 
     // Explicit expected addresses are independent of the decoder definitions.
     case class Window(name: String, base: Long, size: Long, select: Bool, port: M68KDeviceBusSignals)
@@ -45,7 +45,7 @@ object MemoryMapSim extends App {
       Window("timer",       0x0211C000L, 0x4000L, dut.io.timerBus.sel, dut.io.timerBus),
       Window("SPI",         0x02120000L, 0x4000L, dut.io.spiBus.sel, dut.io.spiBus),
       Window("PSG",         0x02124000L, 0x4000L, dut.io.psgBus.sel, dut.io.psgBus),
-      Window("RTC",         0x02128000L, 0x4000L, dut.io.ds1302Bus.sel, dut.io.ds1302Bus),
+      Window("I2C",         0x02128000L, 0x4000L, dut.io.i2cBus.sel, dut.io.i2cBus),
       Window("DIP switches",0x0212C000L, 0x4000L, dut.io.dipSwitchesBus.sel, dut.io.dipSwitchesBus),
       Window("cache stats", 0x02130000L, 0x4000L, dut.io.cacheStatsBus.sel, dut.io.cacheStatsBus),
       Window("ROM",         0x021C0000L, 0x4000L, dut.io.romBus.sel, dut.io.romBus))
@@ -116,16 +116,17 @@ object MemoryMapSim extends App {
     for (address <- Seq(0x02020000L, 0x020FFFFEL, 0x02134000L, 0x021BFFFEL, 0x021C4000L))
       checkUnmapped(address)
 
-    // RTC still excludes instruction fetches while ROM must accept them.
+    // The generic I2C register window follows the ordinary peripheral decode:
+    // unlike the old DS1302-specific mapping, it also selects on fetch cycles.
     drive(0x02128000L)
     dut.io.busState #= 0
     sleep(1)
-    assert(!dut.io.ds1302Bus.sel.toBoolean, "RTC must remain data-cycle qualified")
+    checkSelected(0x02128000L, dut.io.i2cBus.sel, dut.io.i2cBus)
     checkSelected(0x021C0000L, dut.io.romBus.sel, dut.io.romBus)
     dut.io.busState #= 2
     drive(0xFFFFFFF2L)
     assert(!dut.io.busErr.toBoolean, "Interrupt acknowledgement must not raise BERR")
     assert(selects.forall(!_.toBoolean), "Interrupt acknowledgement must not select a device")
-    println("Memory map checks passed: relocated device boundaries, former windows as RAM, bit-25 decode, vectors and 32 MiB SDRAM")
+    println("Memory map checks passed: relocated device boundaries, former windows as RAM, bit-25 decode, vectors, I2C window and 32 MiB SDRAM")
   }
 }

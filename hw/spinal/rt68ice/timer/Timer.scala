@@ -6,6 +6,8 @@ import spinal.lib._
 
 import scala.language.postfixOps
 
+//noinspection TypeAnnotation
+//noinspection ScalaWeakerAccess
 object Timer {
   val ControlAddress = 0
   val StatusAddress = 1

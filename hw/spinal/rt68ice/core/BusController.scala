@@ -33,7 +33,8 @@ case class BusController() extends Component {
     val timerBus        = master(M68KDeviceBus())
     val spiBus          = master(M68KDeviceBus())
     val psgBus          = master(M68KDeviceBus())
-    val ds1302Bus       = master(M68KDeviceBus())
+    val i2cBus          = master(M68KDeviceBus())
+    //val ds1302Bus       = master(M68KDeviceBus())
   }
 
   // ---------------------------
@@ -101,9 +102,9 @@ case class BusController() extends Component {
   //    Address Decoding
   // ------------------------
   // Preserve RTC data-cycle qualification formerly wired in the top level.
-  val ds1302AddressSelected = Bool()
-  io.ds1302Bus.sel := ds1302AddressSelected &&
-    ((io.busState === B"10") || (io.busState === B"11"))
+  //val ds1302AddressSelected = Bool()
+  //io.ds1302Bus.sel := ds1302AddressSelected &&
+  //  ((io.busState === B"10") || (io.busState === B"11"))
 
   // Default assignments
   io.ramBus.sel := False
@@ -120,7 +121,8 @@ case class BusController() extends Component {
   io.timerBus.sel := False
   io.spiBus.sel := False
   io.psgBus.sel := False
-  ds1302AddressSelected := False
+  io.i2cBus.sel := False
+  //ds1302AddressSelected := False
   io.videoBus.fbSel := False
   io.sdRamBus.sel := False
   io.busErr := False
@@ -146,7 +148,8 @@ case class BusController() extends Component {
   val timerMapping    = SizeMapping(0x0211C000L, 16 KiB)  // $0211C000 - $0211FFFF
   val spiMapping      = SizeMapping(0x02120000L, 16 KiB)  // $02120000 - $02123FFF
   val psgMapping      = SizeMapping(0x02124000L, 16 KiB)  // $02124000 - $02127FFF
-  val ds1302Mapping   = SizeMapping(0x02128000L, 16 KiB)  // $02128000 - $0212BFFF
+  //val ds1302Mapping   = SizeMapping(0x02128000L, 16 KiB)  // $02128000 - $0212BFFF
+  val i2cMapping   = SizeMapping(0x02128000L, 16 KiB)  // $02128000 - $0212BFFF
   val dipSwitchesMapping = SizeMapping(0x0212C000L, 16 KiB)  // $0212C000 - $0212FFFF
   val cacheStatsMapping = SizeMapping(0x02130000L, 16 KiB) // $02130000 - $02133FFF
   val romMapping      = SizeMapping(0x021C0000L, 16 KiB)  // $021C0000 - $021C3FFF
@@ -167,7 +170,7 @@ case class BusController() extends Component {
     "TIMER" -> timerMapping,
     "SPI" -> spiMapping,
     "PSG" -> psgMapping,
-    "DS1302" -> ds1302Mapping,
+    "I2C" -> i2cMapping,
     "DIP SWITCHES" -> dipSwitchesMapping,
     "CACHE STATS" -> cacheStatsMapping,
     "MAIN ROM" -> romMapping,
@@ -211,8 +214,8 @@ case class BusController() extends Component {
     io.spiBus.sel := True
   } elsewhen psgMapping.hit(address) {
     io.psgBus.sel := True
-  } elsewhen ds1302Mapping.hit(address) {
-    ds1302AddressSelected := True
+  } elsewhen i2cMapping.hit(address) {
+    io.i2cBus.sel := True
   } otherwise {
     io.busErr := cpuTransferActive // Out-of-bounds active transfer
   }
@@ -224,7 +227,7 @@ case class BusController() extends Component {
   val buses = List(
     io.romBus, io.ramBus, io.ledBus, io.uartBus, io.videoBus,
     io.counterBus, io.ledsBus, io.dipSwitchesBus, io.usbBus,
-    io.timerBus, io.spiBus, io.cacheStatsBus
+    io.timerBus, io.spiBus, io.cacheStatsBus, io.i2cBus
   )
 
   for (bus <- buses) {
@@ -235,9 +238,9 @@ case class BusController() extends Component {
     bus.wr := gatedWrite
   }
 
-  // SDRAM, PSG and DS1302 manage their own extended waits and need the original
+  // SDRAM and PSG manage their own extended waits and need the original
   // write direction throughout the access, rather than a one-cycle pulse.
-  val selfTimedBuses = List(io.sdRamBus, io.psgBus, io.ds1302Bus)
+  val selfTimedBuses = List(io.sdRamBus, io.psgBus)
   for (bus <- selfTimedBuses) {
     bus.address := io.cpuBus.address
     bus.dataOut := io.cpuBus.dataOut
@@ -279,7 +282,7 @@ case class BusController() extends Component {
     io.cpuBus.dataIn := io.spiBus.dataIn
   } elsewhen io.psgBus.sel {
     io.cpuBus.dataIn := io.psgBus.dataIn
-  } elsewhen ds1302AddressSelected {
-    io.cpuBus.dataIn := io.ds1302Bus.dataIn
+  } elsewhen io.i2cBus.sel {
+    io.cpuBus.dataIn := io.i2cBus.dataIn
   }
 }

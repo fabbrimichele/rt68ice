@@ -29,9 +29,10 @@ it does not measure background write duration.
 
 ## RTC
 
-The current design uses the [DS1302 RTC](doc/ds1302.md). Its planned DS3231
-replacement is documented in the [module reference, wiring notes and vendor
-images](doc/ds3231.md); integration is not implemented yet.
+This branch replaces the [DS1302 RTC](doc/ds1302.md) interface with generic I²C
+for the DS3231. See the [module reference, wiring, assembly diagnostics and
+vendor images](doc/ds3231.md). The standalone diagnostic and setter use the
+monitor UART; the EmuTOS RTC driver still needs updating.
 
 ## Reset button
 
