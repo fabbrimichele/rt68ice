@@ -29,10 +29,13 @@ it does not measure background write duration.
 
 ## RTC
 
-This branch replaces the [DS1302 RTC](doc/ds1302.md) interface with generic I²C
-for the DS3231. See the [module reference, wiring, assembly diagnostics and
+The [DS1302 RTC](doc/ds1302.md) interface has been replaced with generic I²C
+for the DS3231. The matching RTC driver is merged into emutos-ice `master`
+([PR #20](https://github.com/fabbrimichele/emutos-ice/pull/20)); boot-time reads,
+clock setting and reset/power-cycle retention were confirmed on hardware on
+2026-11-28. See the [module reference, wiring, assembly diagnostics and
 vendor images](doc/ds3231.md). The standalone diagnostic and setter use the
-monitor UART; the EmuTOS RTC driver still needs updating.
+monitor UART. Older DS1302 EmuTOS images are incompatible with this interface.
 
 ## Reset button
 
