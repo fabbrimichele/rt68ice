@@ -26,7 +26,7 @@ object BusControllerSim extends App {
       dut.io.cacheStatsBus,
       dut.io.usbBus,
       dut.io.timerBus,
-      dut.io.spiBus, dut.io.psgBus, dut.io.ds1302Bus
+      dut.io.spiBus, dut.io.psgBus, dut.io.i2cBus
     )
     devicePorts.foreach { port =>
       port.dataIn #= 0

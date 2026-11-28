@@ -15,7 +15,7 @@
 | TIMER           | 0x0211C000 | 0x0211FFFF |   16 KB |
 | SPI             | 0x02120000 | 0x02123FFF |   16 KB |
 | PSG             | 0x02124000 | 0x02127FFF |   16 KB |
-| DS1302          | 0x02128000 | 0x0212BFFF |   16 KB |
+| I2C             | 0x02128000 | 0x0212BFFF |   16 KB |
 | DIP SWITCHES    | 0x0212C000 | 0x0212FFFF |   16 KB |
 | CACHE STATS     | 0x02130000 | 0x02133FFF |   16 KB |
 | MAIN ROM        | 0x021C0000 | 0x021C3FFF |   16 KB |

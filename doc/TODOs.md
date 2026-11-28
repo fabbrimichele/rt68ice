@@ -14,8 +14,10 @@
 
 Suggested order; keep each feature in a separate branch.
 
-1. **Integrate DS3231.** Replace the DS1302 interface with I²C and update the
-   EmuTOS RTC driver. Test time read/write, temperature and battery retention.
+1. **Integrate DS3231** ([module reference and images](ds3231.md)). Replace the DS1302 interface with I²C and update the
+   EmuTOS RTC driver. FPGA integration and standalone time read/write,
+   temperature and battery-retention tests passed on 2026-11-28; the EmuTOS
+   driver update remains next.
    Initially use only VCC, GND, SCL and SDA; alarms/SQW, 32K output and the
    module's EEPROM are deferred.
 2. **Add MIDI IN/OUT.** Implement the appropriate DIN electrical interfaces

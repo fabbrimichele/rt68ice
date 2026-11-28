@@ -27,6 +27,13 @@ snapshots of hits, misses, writes, elapsed time and read/write stall cycles.
 The write RAM-wait counter has a documented limitation with posted writes;
 it does not measure background write duration.
 
+## RTC
+
+This branch replaces the [DS1302 RTC](doc/ds1302.md) interface with generic I²C
+for the DS3231. See the [module reference, wiring, assembly diagnostics and
+vendor images](doc/ds3231.md). The standalone diagnostic and setter use the
+monitor UART; the EmuTOS RTC driver still needs updating.
+
 ## Reset button
 
 The active-low reset button must remain pressed for 10 ms after synchronization

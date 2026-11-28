@@ -1080,3 +1080,20 @@ Staged release, chords split across keyboards, and explicit accessory/configurat
 and deliberate Ctrl/Alt boot-option checks are optional additional validation;
 they have not all been individually reported. No further reset implementation
 is planned. DS3231 integration is next in the roadmap.
+
+## DS3231 standalone integration (2026-11-28)
+
+The DS1302 hardware interface was replaced with a generic I²C controller in
+`$02128000–$0212BFFF`, using word accesses and low-bit payloads. SDA/SCL reuse
+M1/K1 respectively. The three existing bus/map/audio integration simulations
+pass with the renamed bus. The standalone diagnostic and setter build, pass
+CPU/register-model checks and passed the user's real-module tests: valid time
+write/readback, advancing seconds and minute rollover, temperature 22.00/22.25°C,
+OSF clearing from status `$88` to `$08`, and battery retention after several
+minutes without FPGA power. See [the full results](ds3231.md#board-validation-2026-11-28).
+
+All posted per-clock timing results passed, with system Fmax 30.81 MHz against
+25 MHz. The DS1302-derived clocks are absent. No precise build-duration
+comparison or full external-interface/CDC sign-off was established. EmuTOS
+still needs its DS3231 driver before it can boot using this RTC interface;
+EEPROM and alarm support remain deferred.
